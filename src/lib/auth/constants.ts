@@ -45,11 +45,11 @@ export const LOCKOUT_DURATION_MINS = 15;
 // Reserved for later sessions — declared here so importers can plan ahead,
 // but the values are intentionally NOT used yet (Phase A only needs the two
 // above). Each is uncommented when its owning session ships.
+//
+// UPDATE (Session 3): EXPIRING_WINDOW_DAYS was reserved here but has shipped
+// in src/lib/compliance/calculator.ts instead — collocated with the pure
+// function that consumes it. See calculator.ts for rationale.
 // -----------------------------------------------------------------------------
-
-// Session 3 (Compliance Engine): a document is "Expiring" if its next
-// renewal date falls within this many days from today.
-// export const EXPIRING_WINDOW_DAYS = 90;
 
 // Session 4 (Administration): API key prefix. Persisted alongside the
 // SHA-256 hash so the UI can render "urm_a1b2c3d4..." without leaking the
