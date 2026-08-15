@@ -16,11 +16,14 @@ const db = new PrismaClient();
 //    1 = annual cycle
 //    3 = term cycle (typically 3-year office-bearer terms in PNG)
 //
-// DISCREPANCY: User asked for 13 entries but listed 12. The 12 below are
-// exactly what the user listed (with two obvious typos corrected:
-// "Inspectin" → "Inspection", "Secretray" → "Secretary"). The 13th is
-// pending user clarification — likely candidates based on the original
-// spec are "Bylaws", "Annual Return", or "Meeting Minutes".
+// NOTE on "Legislation" (the 13th rule):
+// This is distinct from the Legislation Library (Session 7), which is a
+// static JSON config of acts/regulations the DEPARTMENT publishes.
+// Here, "Legislation" tracks each union's reference to the specific
+// industrial legislation it's registered under — e.g. a maritime union
+// files its registration under the Maritime (Maritime Industry) Act.
+// Permanent (99/99) because the applicable statute rarely changes and
+// must be retained forever for historical legal context.
 // =============================================================================
 
 interface RuleSeed {
@@ -118,6 +121,18 @@ const RULES: RuleSeed[] = [
     renewalYears: 1,
     retentionYrs: 7,
     rationale: "Annual welfare-fund statement — 7-year retention.",
+  },
+  {
+    documentType: "Legislation",
+    required: true,
+    renewalYears: 99,
+    retentionYrs: 99,
+    rationale:
+      "The specific industrial legislation the union is registered under " +
+      "(e.g. Maritime Industry Act). Permanent — statutes rarely change, " +
+      "and historical legal context must be retained forever. Distinct from " +
+      "the Session 7 Legislation Library, which is a department-wide static " +
+      "config, not a per-union filing.",
   },
 ];
 
