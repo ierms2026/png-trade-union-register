@@ -1,0 +1,978 @@
+     1→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+     2→
+     3→
+     4→
+     5→
+     6→          Live interactive demo · No login required to read this page
+     7→
+     8→
+     9→
+    10→     Union Records Management System
+    11→     A guided tour of the build so far — Phases 1 through 5 complete (24 of 37 chunks).
+    12→     End-user scenarios, click-through links to real screens, and "what to look for" callouts
+    13→     so you know exactly what each feature demonstrates.
+    14→
+    15→
+    16→              How to use this demo
+    17→              You're on the public tour page. To interact with the live screens:
+    18→
+    19→               1. Pick a role below (Registrar / Inspector / Officer) and copy its credentials.
+    20→               2. Click "Open login screen" → sign in with the copied email + password.
+    21→               3. You'll land on the Dashboard. Use the sidebar to explore.
+    22→               4. Each scenario card below has an "Open this screen" button — click after signing in.
+    23→
+    24→              Tip: If you reached this page via the chat UI's "Live Preview" or "Open in New Tab" button, you're already on the public
+    25→              URL — just sign in to start clicking through.
+    26→
+    27→
+    28→
+    29→
+    30→           Phases 1-7 complete                 ~20 min walkthrough              614+ automated assertions
+    31→
+    32→
+    33→       6 demo unions · 39 documents
+    34→
+    35→
+    36→
+    37→        A. Foundation        B. Records        C. Compliance         D. Oversight       G. Productivity (Phase 6)
+    38→
+    39→
+    40→        H. Public Portal (Phase 7)        E. Administration      F. Officer's scoped view
+    41→
+    42→
+    43→
+    44→
+    45→                   Start here: pick a role
+    46→           Three demo accounts are pre-seeded. Click an email to copy it, then click "Open login" to sign in.
+    47→
+    48→
+    49→
+    50→                     Registrar
+    51→              Full system access. All screens. Use this for the admin scenarios.
+    52→
+    53→
+    54→
+    55→                registrar@example.com
+    56→
+    57→
+    58→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                                1/16
+    59→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+    60→
+    61→                Test!2345
+    62→
+    63→
+    64→
+    65→
+    66→                    Inspector
+    67→              Oversight role. Sees Unions, Documents, Compliance, Compare, Audit, Retention (reject only). No admin screens.
+    68→
+    69→
+    70→
+    71→                inspector@example.com
+    72→
+    73→                Test!2345
+    74→
+    75→
+    76→
+    77→
+    78→                    Officer
+    79→              Union-scoped. Sees only "My Union" (Papua Maritime) + own compliance. No global oversight.
+    80→
+    81→
+    82→
+    83→                officer@example.com
+    84→
+    85→                Test!2345
+    86→
+    87→
+    88→
+    89→
+    90→                   Open login screen                Go straight to dashboard (will prompt login)
+    91→
+    92→
+    93→
+    94→
+    95→     A. Foundation
+    96→     Authentication, 2FA, and session management — the bedrock every later phase builds on.
+    97→
+    98→
+    99→
+   100→                   Sign in as a Registrar                                                                                  2 min
+   101→
+   102→
+   103→
+   104→
+   105→          You are the Registrar — the system administrator. From sign-in you land on the Dashboard, which is
+   106→          your daily command center. The login flow uses an HMAC-signed session cookie with a JTI (JWT ID) for
+   107→          revocation; wrong passwords and wrong 2FA codes share a single lockout counter, so 3 failures of any
+   108→          kind locks the account for 15 minutes.
+   109→
+   110→          TRY IT
+   111→          1. Click "Open login screen" below.
+   112→          2. Sign in with registrar@example.com / Test!2345.
+   113→          3. You should land on /dashboard automatically.
+   114→          4. Open the user menu (top-right) → "Active Sessions" to see this session listed with its JTI.
+   115→
+   116→              WHAT TO LOOK FOR
+   117→
+   118→
+   119→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                          2/16
+   120→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   121→
+   122→          → No flash of unauthenticated content — the App Shell waits for /api/auth/me before rendering the sidebar.
+   123→
+   124→          → The "Active Sessions" dialog shows your current session with a "This device" badge — that badge is computed from
+   125→              the JTI match, not a magic flag.
+   126→
+   127→          → Try signing in as inspector@example.com in another browser — note the nav sidebar shows different items (no Users,
+   128→              no Security, no API Keys).
+   129→
+   130→
+   131→                                                            Open login screen
+   132→
+   133→
+   134→
+   135→
+   136→                   Enable 2FA on your account                                                                               3 min
+   137→
+   138→
+   139→
+   140→
+   141→          Two-factor authentication uses TOTP (RFC 6238) — the same standard as Google Authenticator, Authy,
+   142→          1Password. Setup happens in two phases: first you scan the QR code and verify a real code (only then is
+   143→          the secret persisted), then every future login requires both password and a fresh 6-digit code. Disabling
+   144→          2FA requires your password; an admin can reset it (which also clears the secret).
+   145→
+   146→          TRY IT
+   147→          1. Sign in as registrar@example.com.
+   148→          2. Open the user menu (top-right) → "Account Security".
+   149→          3. Click "Enable 2FA" → scan the QR code with an authenticator app.
+   150→          4. Enter the 6-digit code from your app to confirm.
+   151→          5. Sign out, then sign back in — you'll be prompted for a 2FA code after your password.
+   152→
+   153→              WHAT TO LOOK FOR
+   154→
+   155→          → The QR code is generated server-side from a per-user secret stored in the DB; the secret is never sent back to the
+   156→              client in plaintext after setup.
+   157→
+   158→          → After enabling, the login flow has TWO steps: password → 2FA challenge → authenticated session. The 2FA challenge
+   159→              is a short-lived opaque token (30s), not the session itself.
+   160→
+   161→          → A wrong 2FA code increments the SAME lockout counter as a wrong password — 3 wrong attempts of any kind locks
+   162→              the account.
+   163→
+   164→
+   165→                                                          Open account security
+   166→
+   167→
+   168→
+   169→
+   170→     B. Records
+   171→     Unions and documents — the core registry. Phase 2's 5 chunks built this end-to-end.
+   172→
+   173→
+   174→
+   175→
+   176→                   Browse the Union Registry                                                                                2 min
+   177→
+   178→
+   179→
+   180→
+   181→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                           3/16
+   182→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   183→
+   184→          The Union Registry is the master list of registered trade unions — 6 demo unions are pre-loaded
+   185→          covering all 3 statuses (active, suspended, deregistered). Default sort is by document count descending.
+   186→          Click any union to see its full detail page.
+   187→
+   188→          TRY IT
+   189→
+   190→          1. Sign in as registrar@example.com.
+   191→          2. Click "Unions" in the sidebar.
+   192→          3. Note the 6 demo unions (Papua Maritime, Highlands Coffee, Lae Stevedores, Southern Teachers, New Islands Fishers,
+   193→             Western Miners).
+   194→          4. Click "Papua Maritime Workers Union" to open Union Detail.
+   195→
+   196→              WHAT TO LOOK FOR
+   197→
+   198→          → The status badge on each row (Active = green, Suspended = yellow, Deregistered = gray).
+   199→
+   200→          → Union Detail shows 13 document-type tiles, each with a real compliance badge (Compliant / Expiring / Overdue /
+   201→              Missing / N/A) — this is the loop-close from Phase 2 → Phase 3.
+   202→
+   203→          → The Officer silent-pin rule: try editing a union as an Officer — address fields save, but
+   204→              unionName/registrationNo/status are silently ignored server-side.
+   205→
+   206→
+   207→                                                           Open union registry
+   208→
+   209→
+   210→
+   211→
+   212→                   Upload a document with version history                                                                       4 min
+   213→
+   214→
+   215→
+   216→
+   217→          Documents are filed against a union, typed as one of 13 canonical types (constitution, bylaws, annual
+   218→          return, etc.), and stored as files on disk under /storage/unions/{unionId}/{documentId}.bin. SHA-256
+   219→          checksums detect duplicates. Uploading a new version of an existing document preserves the old
+   220→          version in a version chain — restoring an old version creates a NEW version (v4 with v1's content), never
+   221→          mutates history.
+   222→
+   223→          TRY IT
+   224→
+   225→          1. Sign in as registrar@example.com.
+   226→          2. Open any union (e.g. Papua Maritime).
+   227→          3. Scroll to a document-type tile → click "Upload".
+   228→          4. Pick a PDF file, give it a title, submit.
+   229→          5. After upload, click the document title → "Version history" to see v1.
+   230→          6. Upload another file to the same type — note the version number increments.
+   231→
+   232→              WHAT TO LOOK FOR
+   233→
+   234→          → The upload is atomic: file written to .tmp first, then renamed — a crash mid-write never produces a partial file.
+   235→
+   236→          → The checksum is shown in the document detail panel — uploading the same file again to the same union + type
+   237→              triggers a duplicate-detection warning.
+   238→
+   239→          → Version history shows every version with its uploader, timestamp, and file size. Restoring v1 of a v3 doc creates v4
+   240→              (with v1's content) — the original v1 row is never mutated.
+   241→
+   242→
+   243→
+   244→
+   245→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                               4/16
+   246→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   247→
+   248→                                                             Open first union
+   249→
+   250→
+   251→
+   252→
+   253→     C. Compliance
+   254→     The highest-leverage principle of Phase 3: compute live, never store. Every status is recomputed on read.
+   255→
+   256→
+   257→
+   258→
+   259→                   Review compliance across all unions                                                                        3 min
+   260→
+   261→
+   262→
+   263→
+   264→          The Compliance screen shows every union × every document type in a single matrix. Statuses are
+   265→          computed live via pure functions (no DB caching) — so editing a rule instantly changes every union's
+   266→          score. The 5 statuses: Compliant (green), Expiring (yellow, ≤90 days to renewal), Overdue (red), Missing
+   267→          (gray), Not Applicable (excluded from scoring).
+   268→
+   269→          TRY IT
+   270→
+   271→          1. Sign in as registrar@example.com.
+   272→          2. Click "Compliance" in the sidebar.
+   273→          3. Note the matrix: rows = unions, columns = document types, cells = colored status badges.
+   274→          4. Click any cell to deep-link into that union's detail page.
+   275→          5. Use the "Status" filter dropdown to show only Overdue unions.
+   276→
+   277→              WHAT TO LOOK FOR
+   278→
+   279→          → The overall score per union = (Compliant types) / (required types) × 100. Not-Applicable types are excluded from
+   280→              BOTH numerator and denominator.
+   281→
+   282→          → The "Expiring" status uses the EXPIRING_WINDOW_DAYS constant (90 days) — change the constant in
+   283→              src/lib/auth/constants.ts and every status recomputes immediately.
+   284→
+   285→          → Officer signing in sees the same screen but scoped to only their assigned union — server-side filter, not client-side.
+   286→
+   287→
+   288→                                                        Open compliance matrix
+   289→
+   290→
+   291→
+   292→
+   293→                   Edit a compliance rule + preview impact                                                                    3 min
+   294→
+   295→
+   296→
+   297→
+   298→          Each of the 13 document types has a ComplianceRule: required (bool), renewalYears (how often to re-
+   299→          file), retentionYrs (how long to keep before disposal). Editing a rule recomputes every union's score live
+   300→          — but before saving, you can preview exactly which unions would change status. This is the "preview-
+   301→          impact" pattern: never surprise the user with side effects.
+   302→
+   303→          TRY IT
+   304→
+   305→          1. Sign in as registrar@example.com.
+   306→          2. Open Compliance → click "Configure Rules" (top-right).
+   307→
+   308→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                             5/16
+   309→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   310→          3. Find "Meeting Minutes" → change renewalYears from 1 to 3.
+   311→          4. Click "Preview Impact" — a dialog shows which unions would shift from Compliant to Overdue.
+   312→          5. Cancel or save — the preview is read-only, no side effects until you click Save.
+   313→
+   314→              WHAT TO LOOK FOR
+   315→
+   316→          → The preview dialog lists each affected union by name with its current vs. new status — no vague "X unions will be
+   317→              affected", always concrete.
+   318→
+   319→          → After saving, the Compliance matrix updates immediately (live recompute, no cache to invalidate).
+   320→
+   321→          → Audited as "compliance_rule_edit" with before/after diff in the audit log.
+   322→
+   323→
+   324→                                                         Open compliance rules
+   325→
+   326→
+   327→
+   328→
+   329→                   Compare unions side-by-side                                                                                2 min
+   330→
+   331→
+   332→
+   333→
+   334→          The Compare screen lets you pick 2-6 unions and see them side-by-side in a gap matrix: rows =
+   335→          document types, columns = selected unions, cells = colored letter badges (C/E/O/M). Click any cell to
+   336→          jump to that union's detail page. Crucially, Compare does NOT recompute any score — it calls
+   337→          /api/compliance (the same endpoint Compliance uses) and pivots the result client-side.
+   338→
+   339→          TRY IT
+   340→          1. Sign in as registrar@example.com.
+   341→          2. Click "Compare" in the sidebar.
+   342→          3. Click "Add Union" → pick 3 unions (e.g. Maritime, Coffee, Stevedores).
+   343→          4. Read the gap matrix — find types where one union is Compliant and another is Overdue.
+   344→          5. Try adding a 7th union — the picker blocks at 6 (UI-level block, not submit-level).
+   345→
+   346→              WHAT TO LOOK FOR
+   347→
+   348→          → No scoring logic in this screen — single /api/compliance call, client-side pivot. This guarantees Compare never
+   349→              diverges from Compliance.
+   350→
+   351→          → Each cell is a clickable button → /unions/[id]. Try it.
+   352→
+   353→          → The 7th-union block is at the UI level (Add Union button hidden, picker disabled for unselected unions when 6 are
+   354→              picked) — per spec, not a submit-time rejection.
+   355→
+   356→
+   357→                                                              Open compare
+   358→
+   359→
+   360→
+   361→
+   362→     D. Oversight
+   363→     Phase 5 — Dashboard, Audit, Retention. The Registrar's and Inspector's daily oversight tools.
+   364→
+   365→
+   366→
+   367→
+   368→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                             6/16
+   369→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   370→
+   371→                   Start your day on the Dashboard                                                                                3 min
+   372→
+   373→
+   374→
+   375→
+   376→          The Dashboard is the Registrar's morning command center. Six stat cards summarize the system: total
+   377→          unions, total documents, and compliance summary (compliant/expiring/overdue/missing). Each
+   378→          compliance card deep-links into Compliance pre-filtered by that status — click "Overdue" to jump
+   379→          straight to the overdue list. The Recent Activity feed shows the latest 20 audit entries.
+   380→
+   381→          TRY IT
+   382→          1. Sign in as registrar@example.com (you land here automatically).
+   383→          2. Read the 6 stat cards across the top.
+   384→          3. Click the red "Overdue" card → you land on /compliance?status=overdue.
+   385→          4. Click back → scroll to "Recent Activity" — note your own login is the most recent entry.
+   386→          5. Scroll to "Documents by Type" — see the distribution across all 13 types.
+   387→
+   388→              WHAT TO LOOK FOR
+   389→
+   390→          → The stat cards and activity feed load INDEPENDENTLY — separate useEffects with separate loading states. A slow
+   391→              /api/dashboard/stats doesn't block /api/dashboard/activity.
+   392→
+   393→          → The compliance card deep-links use ?status= as a URL parameter — the Compliance page reads it and pre-selects the
+   394→              filter. This is the loop-close from Phase 3 → Phase 5.
+   395→
+   396→          → Zero-data state: if you reset test data, the cards show "0" and activity shows "No recent activity" — graceful, not
+   397→              broken.
+   398→
+   399→
+   400→                                                             Open dashboard
+   401→
+   402→
+   403→
+   404→
+   405→                   Investigate an action in the Audit Log                                                                     4 min
+   406→
+   407→
+   408→
+   409→
+   410→          Every mutating action across the system writes an AuditLog row with before/after JSON snapshots. The
+   411→          Audit screen lets you filter by entity type, action, actor, and date range — all combine with AND logic.
+   412→          Expand any row to see the diff: Create actions show only "after", Delete actions show only "before", Edits
+   413→          show both side-by-side. Actor names are captured at action time, so even if a user is later renamed or
+   414→          deleted, their audit entries still show the correct name.
+   415→
+   416→          TRY IT
+   417→          1. Sign in as registrar@example.com.
+   418→          2. Click "Audit Log" in the sidebar.
+   419→          3. Filter by Entity Type = "Union", Action = "Union Created" — see the 6 demo union creates.
+   420→          4. Click any row to expand → see the "after" panel only (no empty "before" panel for Create actions).
+   421→          5. Filter by Actor = "System" — see system-triggered entries (lockouts, seed events).
+   422→          6. Filter by Start Date = a future date → expect 0 results (verifies date filter works).
+   423→
+   424→              WHAT TO LOOK FOR
+   425→
+   426→          → The before/after diff viewer: Create shows only "after" (no confusing empty "before" panel), Delete shows only
+   427→              "before". Edits show both side-by-side with red/green color coding.
+   428→
+   429→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                                 7/16
+   430→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   431→
+   432→          → The Actor dropdown includes "System" as a filter option — but the filter matches BOTH actorId=null AND
+   433→              actorName='System', so login-failed entries for nonexistent emails (which also have actorId=null but actorName = the
+   434→              typed email) don't show up under "System".
+   435→
+   436→          → Pagination caps at 100/page — default 50/page. Total count shown.
+   437→
+   438→
+   439→                                                              Open audit log
+   440→
+   441→
+   442→
+   443→
+   444→                   Dispose of an expired document                                                                                   4 min
+   445→
+   446→
+   447→
+   448→
+   449→          Retention is the most irreversible action in the system — once a document is marked disposed, it
+   450→          cannot be brought back (the row stays for audit, but it's gone from every active view). The flow:
+   451→          pending-disposal list shows documents past their retention period → Approve requires a two-step
+   452→          confirmation (type the document title exactly) → Reject snoozes for 30 days. Race-safe: if two Registrars
+   453→          click Approve simultaneously, only one succeeds.
+   454→
+   455→          TRY IT
+   456→          1. Sign in as registrar@example.com.
+   457→          2. Click "Retention" in the sidebar.
+   458→          3. Note the pending-disposal list — these are docs whose filedAt + retentionYrs ≤ today.
+   459→          4. Scroll to the "Retention Schedule" table at the bottom — see retentionYrs per type (constitution = 99 = never
+   460→             dispose).
+   461→          5. Click "Approve" on any pending doc → the dialog requires you to TYPE THE EXACT TITLE to enable Confirm.
+   462→          6. Type the title → click "Confirm Disposal" → the doc disappears from the list.
+   463→          7. Open Audit Log → filter by Entity Type = "Retention" → see the disposal entry with severity = Critical.
+   464→
+   465→              WHAT TO LOOK FOR
+   466→
+   467→          → The two-step confirm: the Confirm Disposal button is disabled until titleInput.trim() === entry.title.trim(). This is the
+   468→              same pattern GitHub uses for repo deletion.
+   469→
+   470→          → The audit entry is severity = Critical (disposal is irreversible) — retention_reject is severity = Info (snooze is reversible).
+   471→
+   472→          → The race-safe updateMany pattern: if you open two browser tabs and click Approve on the same doc in both, only
+   473→              one succeeds — the other gets 409 "concurrent_modification".
+   474→
+   475→          → Inspector can see the list + Reject, but NOT Approve — the button is hidden via {isRegistrar && ...}.
+   476→
+   477→
+   478→                                                              Open retention
+   479→
+   480→
+   481→
+   482→
+   483→     G. Productivity (Phase 6)
+   484→     Tasks (FSD-14), Calendar (FSD-15), BJS-01 Daily Sweep, and the notification bell loop-close.
+   485→
+   486→
+   487→
+   488→
+   489→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                                     8/16
+   490→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   491→
+   492→                   Create a task + cycle its status                                                                           3 min
+   493→
+   494→
+   495→
+   496→
+   497→          Tasks are to-do items that can be personal, union-scoped, or assigned to a specific user. The status
+   498→          badge is clickable — click it to cycle Pending → In Progress → Completed without opening the edit
+   499→          dialog. Overdue tasks (dueDate in the past + not completed) are flagged with a red OVERDUE badge,
+   500→          live-computed on every render from the API.
+   501→
+   502→          TRY IT
+   503→          1. Sign in as registrar@example.com.
+   504→          2. Click "Tasks" in the sidebar.
+   505→          3. Note the 4 summary cards: Total, Active, Overdue, Urgent.
+   506→          4. Click "New Task" → fill in title + due date + priority → save.
+   507→          5. Find your task in the list → click its status badge once (Pending → In Progress).
+   508→          6. Click it again (In Progress → Completed). Note: no edit dialog opened.
+   509→          7. Create a task with a due date in the past → note the red OVERDUE badge.
+   510→
+   511→              WHAT TO LOOK FOR
+   512→
+   513→          → The status badge is a <button> with cursor-pointer — click it and the PATCH fires with only { status: next }, no edit
+   514→              dialog.
+   515→
+   516→          → Optimistic update: the badge flips immediately. If the PATCH fails, it reverts and a toast appears.
+   517→
+   518→          → The OVERDUE badge is rendered when task.overdue is true — a live-computed boolean from the API (dueDate <
+   519→              today AND status != completed). No client-side date math.
+   520→
+   521→          → The summary cards refetch after every status change — the Active/Overdue counts update immediately.
+   522→
+   523→
+   524→                                                                 Open tasks
+   525→
+   526→
+   527→
+   528→
+   529→                   Officer's scoped task view                                                                                 3 min
+   530→
+   531→
+   532→
+   533→
+   534→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                             9/16
+   535→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   536→
+   537→          Officers see a NARROWER task list than Registrars: only tasks for their assigned union OR tasks assigned
+   538→          to them personally (even if for a different union). This OR-condition is the subtle part — a task assigned
+   539→          to an Officer by a Registrar, for a DIFFERENT union than the Officer's own, must still be visible. The
+   540→          assignee dropdown is also narrow: an Officer can only assign to themselves or leave it unassigned —
+   541→          the full user list is never fetched.
+   542→
+   543→          TRY IT
+   544→
+   545→          1. Sign in as registrar@example.com.
+   546→          2. Create a task assigned to officer@example.com for a DIFFERENT union than Papua Maritime (e.g. Highlands Coffee).
+   547→          3. Sign out → sign in as officer@example.com.
+   548→          4. Open Tasks → confirm you see BOTH your own union's tasks AND the cross-union task assigned to you.
+   549→          5. Click "New Task" → open the assignee dropdown → confirm it contains ONLY "Myself" and "Unassigned" (not a full
+   550→             user list).
+   551→          6. Confirm the union field is locked to your assigned union (disabled).
+   552→
+   553→              WHAT TO LOOK FOR
+   554→                   Calendar: composed view of tasks + compliance deadlines                                                      4 min
+   555→
+   556→          → The OR-condition: a cross-union task assigned to the Officer is visible. This is the single most subtle part of the Tasks
+   557→              API (Chunk 6.1).
+   558→
+   559→          TheThe
+   560→          →   Calendar
+   561→                 assigneecomposes   data
+   562→                          dropdown for an from
+   563→                                          Officertwo sources
+   564→                                                  contains     — 2Tasks
+   565→                                                           exactly      (due
+   566→                                                                   options: "Myself" and
+   567→                                                                              dates)and   Compliance
+   568→                                                                                        "Unassigned".   (renewal
+   569→                                                                                                      The          deadlines)
+   570→                                                                                                          /api/tasks/assignees
+   571→            endpoint
+   572→          — into     returns
+   573→                 a single    403 for Officers
+   574→                          monthly             — defense-in-depth
+   575→                                     grid. Four                   so even
+   576→                                                 tabs filter the view: Alla(Tasks
+   577→                                                                            UI bug+
+   578→                                                                                  can't leak the userDocuments
+   579→                                                                                    Documents),       list.    (all renewal
+   580→          → The unionTasks
+   581→          deadlines), field is(due
+   582→                               disabled for Officers
+   583→                                    dates),          — locked to(only
+   584→                                            and Compliance       their assigned union via the—
+   585→                                                                       Expiring/Overdue       /api/auth/me  user.assignedUnionId.
+   586→                                                                                                a strict subset  of Documents).
+   587→          Switching
+   588→          →         tabs
+   589→            An Officer    triggers
+   590→                       cannot       a fresh
+   591→                              reassign tasks server  request,
+   592→                                             (the assignee fieldnot  client-side
+   593→                                                                 is read-only     filtering.
+   594→                                                                              on edit),      Click adelete
+   595→                                                                                        and cannot         eventcreated
+   596→                                                                                                     Task tasks   to open   the edit
+   597→                                                                                                                        by other
+   598→             usersin(only
+   599→          dialog          theirclick
+   600→                      place;     own).
+   601→                                     a Document event to navigate to that union.
+   602→
+   603→          TRY IT                                          Open tasks as Officer
+   604→          1. Sign in as registrar@example.com.
+   605→          2. Click "Calendar" in the sidebar.
+   606→          3. Note the month grid — days with events show colored chips (blue for tasks, amber for Expiring, red for Overdue, slate
+   607→             for Compliant).
+   608→          4. Switch between the 4 tabs (All / Documents / Tasks / Compliance) — each triggers a distinct network request.
+   609→          5. Find a day with 3+ events → note the "+N more" badge. Click the day to expand.
+   610→          6. Click a Task-type event → the CreateEditTaskDialog opens (reused from Tasks, not rebuilt).
+   611→          7. Click a Document-type event → navigates to that union's detail page.
+   612→
+   613→              WHAT TO LOOK FOR
+   614→
+   615→          → The Compliance tab is a STRICT SUBSET of the Documents tab — if they look identical, that's a bug. Documents shows
+   616→              ALL renewal deadlines; Compliance shows only Expiring/Overdue.
+   617→
+   618→          → The All tab = Tasks + Documents only (NOT + Compliance, which would double-count). The counts badge on each
+   619→              tab reflects this.
+   620→
+   621→          → Clicking a Task event reuses the same CreateEditTaskDialog component from the Tasks screen — single source of
+   622→              truth, no duplicate dialog.
+   623→
+   624→          → Day cells with 3+ events show a "+N more" count badge (expandable) rather than cramming entries inline.
+   625→
+   626→
+   627→                                                              Open calendar
+   628→
+   629→
+   630→
+   631→
+   632→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                               10/16
+   633→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   634→
+   635→
+   636→
+   637→                   Notification bell (BJS-01 loop-close)                                                                        3 min
+   638→
+   639→
+   640→
+   641→
+   642→          The notification bell has existed since Phase 1 but nothing populated it until Phase 6's BJS-01 daily
+   643→          sweep. The cron job runs daily (or on-demand via HTTP), checks every union for Expiring/Overdue
+   644→          compliance issues + every overdue task, and creates Notification rows with a status-inclusive dedup key.
+   645→          The bell now displays real notifications, navigates on click, and marks-as-read without a page reload.
+   646→
+   647→          TRY IT
+   648→          1. Sign in as registrar@example.com.
+   649→          2. Look at the bell icon in the top-right header — you should see a red badge with "14" (14 unread notifications from
+   650→             the daily sweep).
+   651→          3. Click the bell → dropdown lists the notifications (compliance overdue alerts, each with title + body + relative time).
+   652→          4. Click a notification → it marks as read (count decrements immediately, no page reload) + navigates to the union's
+   653→             compliance view.
+   654→          5. Open the bell again → the clicked notification is gone from the list.
+   655→          6. To run the sweep manually: curl -X POST -H "Authorization: Bearer urm-cron-secret-
+   656→             7a3b9c2d5e8f1a4b6d0c2e4f6a8b0c2d" http://localhost:3000/api/cron/compliance-sweep
+   657→
+   658→              WHAT TO LOOK FOR
+   659→
+   660→          → The bell badge shows the unread count (14 for the demo data). Clicking a notification decrements it optimistically —
+   661→              no page reload.
+   662→
+   663→          → The dedup key includes the STATUS value (compliance:{unionId}:{docType}:{status}). When a document escalates from
+   664→              Expiring to Overdue, a NEW notification is created — the original Expiring one stays undismissed. This is the single
+   665→              most important design detail in Phase 6.
+   666→
+   667→          → Running the sweep twice creates 0 new notifications (idempotent — dedup keys prevent duplicates).
+   668→
+   669→          → Inspectors receive ZERO notifications — only Officers + Registrars are notified about compliance issues.
+   670→
+   671→
+   672→                                                  Open dashboard (bell is top-right)
+   673→
+   674→
+   675→
+   676→
+   677→     H. Public Portal (Phase 7)
+   678→     FSD-17 Public Disclosure Portal + FSD-18 Legislation Library. Fully public — no login required.
+   679→
+   680→
+   681→
+   682→                   Search the public union registry                                                                             3 min
+   683→
+   684→
+   685→
+   686→
+   687→          The public portal is a distinct, simpler layout — no sidebar, no user menu, no notification bell. A citizen
+   688→          can search the union registry by name or registration number, see only whitelisted fields (unionName,
+   689→          registrationNo, status — no contact info, no fileNumber, no compliance data), and click through to a
+   690→          union's public documents. Rate-limited to 60 requests/minute per IP.
+   691→
+   692→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                               11/16
+   693→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   694→          TRY IT
+   695→          1. Open a fresh browser tab (or sign out).
+   696→          2. Navigate to /public/unions — no login required.
+   697→          3. Type "maritime" in the search bar (debounced 300ms).
+   698→          4. Note the results show only unionName, registrationNo, and status badge — no contact info, no file numbers.
+   699→          5. Click "Papua Maritime Workers Union" → opens the public detail page.
+   700→          6. Scroll to the "Public Documents" section — only Certificate + Constitution appear (other types are internal-only).
+   701→
+   702→              WHAT TO LOOK FOR
+   703→
+   704→          → The public layout has NO authenticated chrome — no sidebar, no user menu, no notification bell. Just a minimal
+   705→              header with "Union Records Portal" + nav links.
+   706→
+   707→          → The search is debounced 300ms — no request fires on every keystroke.
+   708→
+   709→          → A deregistered union (Western Province Miners League) still appears in public search with its history intact —
+   710→              deregistering doesn't hide public disclosure.
+   711→
+   712→          → Inspect the raw API response (browser devtools → Network): the union object has EXACTLY 4 keys (id, unionName,
+   713→              registrationNo, status). No fileNumber, no address, no contactPerson.
+   714→
+   715→
+   716→                                                            Open public search
+   717→
+   718→
+   719→
+   720→
+   721→                   Download a public document (security-checked)                                                              2 min
+   722→
+   723→
+   724→
+   725→
+   726→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                             12/16
+   727→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   728→
+   729→          The public file download endpoint (/api/public/files/[id]) is the highest-risk endpoint in the system. A
+   730→          fully anonymous caller must never retrieve a non-public document type or a disposed one. Every
+   731→          rejection returns an identical 404 — the caller can't distinguish "wrong type" from "disposed" from
+   732→          "doesn't exist." Rate-limited
+   733→               Legislation              + security-checked
+   734→                              Library (client-side          on every request.
+   735→                                                     filtering)                                                                2 min
+   736→
+   737→
+   738→          TRY IT
+   739→          1. Navigate to /public/unions → click any union.
+   740→          The Legislation Library is a static config file (no database) bundled with the app. At startup, the app
+   741→          2. Find a Certificate or Constitution document → click "Download".
+   742→          validates every referenced file exists on disk — if any are missing, the app FAILS to start (loud error
+   743→          3. The file downloads successfully (PDF).
+   744→          naming  the
+   745→          4. Now try tospecific
+   746→                        access a file). The UIdocument:
+   747→                                 NON-public    filters client-side  (no network
+   748→                                                          find a Financial         request
+   749→                                                                           Statement's ID (viaon
+   750→                                                                                               an filter) because
+   751→                                                                                                  authenticated         the DB), is
+   752→                                                                                                                   theordataset
+   753→                                                                                                                view             then
+   754→          small + static.
+   755→            construct /api/public/files/[that-id] in your browser.
+   756→          5. Confirm you get a 404 — the response body is just {"error":"Not found."} with no indication of WHY.
+   757→          TRY IT
+   758→             WHAT TO LOOK FOR
+   759→          1. Navigate to /public/legislation — no login required.
+   760→          → The 404 for "wrong type" + "disposed" + "doesn't exist" are INDISTINGUISHABLE — same status code (404), same
+   761→          2. Note the 5 legislation documents (Industrial Relations Act, Trade Unions Regulation, etc.).
+   762→             body ({"error":"Not found."}). The document's existence is never confirmed to an anonymous caller.
+   763→          3. Type "industrial" in the search bar → the list filters instantly (no network request — check devtools).
+   764→          →  The endpoint
+   765→          4. Click         haschip
+   766→                   a category    NO(e.g.
+   767→                                     authentication — no session,
+   768→                                         "Primary Legislation")       no API
+   769→                                                                 → filters bykey, no cookie.
+   770→                                                                               category, also It works completely anonymously.
+   771→                                                                                              client-side.
+   772→          5.
+   773→          → Click "Download"
+   774→             Rate-limited:     on any document
+   775→                           60 requests/minute per→IP.
+   776→                                                   the  PDF
+   777→                                                      The   downloads.
+   778→                                                          61st request returns 429 with Retry-After + X-RateLimit-* headers.
+   779→
+   780→          → WHAT
+   781→            The security
+   782→                  TO LOOKcheckFOR
+   783→                               runs on EVERY request (not just at boot) — server-side, verifies documentType is
+   784→            Certificate/Constitution AND disposedAt IS NULL before serving.
+   785→          → Filtering happens with NO network request — open browser devtools → Network tab → type in the search bar → no
+   786→              new requests fire. The filtering is 100% client-side via useMemo.
+   787→                                                            Open public search
+   788→          → Two distinct empty states: "No legislation documents are currently available" (zero entries) vs "No documents match
+   789→              your search" (no matches).
+   790→
+   791→          → The startup validation: if a referenced PDF is missing from disk, the app refuses to start. The error message names the
+   792→              specific missing file. (Verified in Chunk 7.4 — temporarily remove a file + restart to see it.)
+   793→
+   794→          → No database model for legislation — it's a static JSON config file at public/legislation/legislation.json. Changes are a
+   795→              deployment, not a runtime update.
+   796→
+   797→
+   798→                                                         Open legislation library
+   799→
+   800→
+   801→
+   802→
+   803→     E. Administration
+   804→     Phase 4 — Users, Security, API Keys. Registrar-only screens for system administration.
+   805→
+   806→
+   807→
+   808→                   Manage users + last-Registrar protection                                                                    4 min
+   809→
+   810→
+   811→
+   812→
+   813→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                               13/16
+   814→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   815→
+   816→          The Users screen is Registrar-only. Create users (no password at creation — a set-password email is
+   817→          sent), edit roles, disable, enable, reset 2FA, reset password. Three protection mechanisms work
+   818→          independently: lockout (3 failed attempts), disabled (admin toggle), and 2FA reset (clears the secret).
+   819→          The last-Registrar protection prevents you from disabling or role-changing the only remaining active
+   820→          Registrar — system-wide count, not self-check.
+   821→
+   822→          TRY IT
+   823→          1. Sign in as registrar@example.com.
+   824→          2. Click "Users" in the sidebar — see the 3 seeded users.
+   825→          3. Try to disable yourself → blocked with "You cannot disable the last remaining Registrar".
+   826→          4. Try to change your own role to Inspector → blocked with the same message.
+   827→          5. Reset 2FA on the officer account → the secret is cleared (the user must set up 2FA again).
+   828→          6. Reset password on the officer account → an email is sent; the API NEVER accepts a plaintext password in the request
+   829→             body.
+   830→
+   831→              WHAT TO LOOK FOR
+   832→
+   833→          → Three-mechanism independence: Unlock clears ONLY failedLoginAttempts + lockedUntil. Disable sets disabled=true
+   834→              but doesn't touch lockout. 2FA reset clears twoFactorSecret but doesn't touch either. They can all coexist on the same
+   835→              user.
+   836→
+   837→          → Last-Registrar protection is a SYSTEM-WIDE count of OTHER active Registrars — not a self-check. So you can't disable
+   838→              yourself if you're the only one, but you CAN if there are 2+ active Registrars.
+   839→
+   840→          → Password reset NEVER accepts a plaintext password in the request body — the API generates a token, sends an email,
+   841→              and the user sets their new password via the reset-password link.
+   842→
+   843→                   Review security overview + unlock a locked account                                                         3 min
+   844→                                                                 Open users
+   845→
+   846→
+   847→          The Security screen is the Registrar's early-warning dashboard. Cards show: failed logins in last 24h / 7d,
+   848→          currently locked-out accounts, disabled accounts, 2FA adoption rate (excluding disabled users from the
+   849→          denominator), active sessions. Below the cards: a filterable login-attempts table and a locked-out users
+   850→          list with one-click Unlock.
+   851→
+   852→          TRY IT
+   853→          1. Sign in as registrar@example.com.
+   854→          2. Click "Security" in the sidebar.
+   855→          3. Read the 6 overview cards — note 2FA adoption rate excludes disabled users.
+   856→          4. To generate lockout data: open a private window, try logging in as inspector@example.com with a wrong password 3
+   857→             times.
+   858→          5. Refresh Security → the "Locked-Out Users" card should show 1.
+   859→          6. Click "Unlock" on the locked inspector account — note it clears ONLY the lockout (not disabled, not 2FA, not
+   860→             password).
+   861→          7. The inspector can now attempt login again immediately.
+   862→
+   863→              WHAT TO LOOK FOR
+   864→
+   865→          → The "Also Disabled" badge: if a user is BOTH locked out AND disabled, the badge appears — visual confirmation that
+   866→              the two states coexist independently.
+   867→
+   868→          → 2FA adoption rate denominator is `db.user.count({ where: { disabled: false } })` — disabled users excluded from BOTH
+   869→              numerator and denominator.
+   870→
+   871→
+   872→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                              14/16
+   873→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   874→
+   875→          → The Unlock response includes `disabledUnchanged: true` if the user was also disabled — so the UI can show "Note:
+   876→              this user is also disabled" rather than implying unlock = full restore.
+   877→
+   878→
+   879→                                                               Open security
+   880→
+   881→
+   882→
+   883→
+   884→                   Create an API key + test it                                                                                4 min
+   885→
+   886→
+   887→
+   888→
+   889→          API keys enable programmatic access (scripts, integrations) without a browser session. Created by
+   890→          Registrars, scoped to a fixed set of permissions (unions/documents/compliance/audit — deliberately
+   891→          NO users:* or api-keys:* scope), max 365-day expiry. The full key value is shown EXACTLY ONCE on
+   892→          creation — only the SHA-256 hash + first-12-char prefix are persisted. Revocation is a soft-delete
+   893→          (revokedAt set) for audit history.
+   894→
+   895→          TRY IT
+   896→          1. Sign in as registrar@example.com.
+   897→          2. Click "API Keys" in the sidebar.
+   898→          3. Click "Create Key" → name it "Test integration", pick scopes (unions:read, documents:read), set expiry to 30 days.
+   899→          4. On the create-success dialog, COPY the full key value (starts with urm_) — this is the only time it's shown.
+   900→          5. In a terminal: curl -H "Authorization: Bearer YOUR_KEY" http://localhost:3000/api/unions → should return the union
+   901→             list.
+   902→          6. Back in the UI, click "Revoke" on the key → confirm. Try the curl again → 401 Unauthorized.
+   903→          7. Note the revoked key is still VISIBLE in the list (with a "Revoked" badge) — soft-delete for audit.
+   904→
+   905→              WHAT TO LOOK FOR
+   906→
+   907→          → The full key value is shown ONCE. Subsequent GET /api/api-keys returns only the prefix (e.g. "urm_a1b2c3d4..."), never
+   908→              the full value, never the keyHash.
+   909→
+   910→          → PATCH /api/api-keys/[id] rejects scope/expiry changes with "Revoke and reissue" — scopes are fixed at creation.
+   911→
+   912→          → Loop-close from Chunk 4.2: if you DISABLE the key's owner, the key immediately stops authenticating (401). Re-
+   913→              enable the owner → key works again. This is the disabled-user-API-key check built into auth-guard.ts.
+   914→
+   915→
+   916→                                                               Open API keys
+   917→
+   918→
+   919→
+   920→
+   921→     F. Officer's scoped view
+   922→     Sign in as the union_officer role to see the system from the union's perspective — scoped, restricted, practical.
+   923→
+   924→
+   925→
+   926→                   Sign in as a Union Officer                                                                                 3 min
+   927→
+   928→
+   929→
+   930→
+   931→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                             15/16
+   932→8/14/26, 3:36 PM                                                 Z.ai Code Scaffold - AI-Powered Development
+   933→
+   934→          The Officer role represents a union's appointed representative. They see ONLY their own union (My
+   935→          Union, not the global Unions registry), their own compliance (scoped server-side), and have NO access
+   936→          to Documents (global search), Compare, Users, Security, API Keys, or Audit. They CAN edit their own
+   937→          union's contact fields (address, phone, email) but NOT unionName, registrationNo, fileNumber, status,
+   938→          or remarks — those are silently pinned server-side.
+   939→
+   940→          TRY IT
+   941→          1. Sign out, then sign in as officer@example.com / Test!2345.
+   942→          2. Note the nav sidebar: only "My Union", "Compliance", "Dashboard". (Tasks and Calendar are Phase 6 placeholders.)
+   943→          3. Click "My Union" — you see Papua Maritime Workers Union (assigned in demo data).
+   944→          4. Try editing the address field → saves successfully.
+   945→          5. Try editing unionName via the network tab (curl with a custom body) → the API silently ignores it; the response
+   946→             reflects the original name.
+   947→          6. Click "Compliance" — you see ONLY your union's compliance, not the system-wide matrix.
+   948→
+   949→              WHAT TO LOOK FOR
+   950→
+   951→          → The nav excludes Unions, Documents, Compare, Audit, Users, Security, API Keys, Retention — Officer has no oversight
+   952→              role.
+   953→
+   954→          → The Officer's PUT /api/unions/[id] request silently pins restricted fields (unionName, registrationNo, fileNumber,
+   955→              status, remarks) to their existing values. The response reflects the actual state, proving the pin worked — not a 403
+   956→              rejection.
+   957→
+   958→          → Compliance scope: /api/compliance returns only the officer's union when the role is union_officer — server-side filter,
+   959→              not client-side. Trying to bypass with ?unionId=other-union returns the officer's own union anyway.
+   960→
+   961→
+   962→                                                      Sign out + sign in as officer
+   963→
+   964→
+   965→
+   966→
+   967→          Build complete
+   968→          All 7 phases are built — 37/37 chunks complete. The system is a full Union Records Management
+   969→          System spanning authentication, records, compliance, admin, oversight, productivity, and public
+   970→          disclosure. Ready for migration to server.
+   971→
+   972→            14 Prisma models        38 verify scripts (700+ assertions)      13 nav items       3 roles + public portal
+   973→
+   974→
+   975→
+   976→
+   977→https://preview-chat-cddfde34-915b-4b40-abad-c8ff85b80f89.space-z.ai/demo                                                             16/16
+   978→
