@@ -189,6 +189,23 @@ export interface DocumentVersionInput {
 // -----------------------------------------------------------------------------
 
 /**
+ * Compute the expiry date for a document: filedAt + renewalYears.
+ *
+ * Pure: clones the input date (doesn't mutate it). Uses calendar-year math
+ * (setFullYear, not 365*N days) so a "1-year renewal filed Aug 15 2026"
+ * expires Aug 15 2027 — not Aug 14 2027 minus leap-day drift.
+ *
+ * Shared between `calculateStatus` and the Compliance Matrix API so both
+ * compute the exact same date — no drift between the status calculation
+ * and the `expiresAt` field shown in the matrix response.
+ */
+export function computeExpiryDate(filedAt: Date, renewalYears: number): Date {
+  const expiryDate = new Date(filedAt.getTime());
+  expiryDate.setFullYear(expiryDate.getFullYear() + renewalYears);
+  return expiryDate;
+}
+
+/**
  * Compute the compliance status for a (rule, document, latestVersion) tuple.
  *
  * Pure: no I/O, no `Date.now()`, no side effects. Pass a fixed `now` for
@@ -254,9 +271,10 @@ export function calculateStatus(
   //    cycles are legal terms, not astronomical ones — a "1-year renewal"
   //    means "filed Aug 15 2026, due Aug 15 2027", not "due Aug 14 2027
   //    minus leap-day drift".
-  //    Implementation: setFullYear mutates the Date object, so we clone first.
-  const expiryDate = new Date(filedAt.getTime());
-  expiryDate.setFullYear(expiryDate.getFullYear() + rule.renewalYears);
+  //    The computeExpiryDate helper is shared with the route layer so both
+  //    compute the exact same date — no drift between status calc and the
+  //    "expiresAt" field shown in the matrix response.
+  const expiryDate = computeExpiryDate(filedAt, rule.renewalYears);
 
   // Edge case: renewalYears ≤ 0 means a misconfigured rule. The doc
   // can never be compliant — return OVERDUE so the matrix shows red and
