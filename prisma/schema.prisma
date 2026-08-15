@@ -1,7 +1,8 @@
 // =============================================================================
 // Union Records Management System — Prisma Schema
 // PNG Department of Labour & Industrial Relations — Office of The Industrial Registrar
-// Session 1, Step 2 — Foundation schema (User, Session, LoginAttempt, AuditLog)
+// Session 1: Foundation schema (User, Session, LoginAttempt, AuditLog)
+// Session 2: Records Management (Union, Document, DocumentVersion, ComplianceRule)
 // =============================================================================
 
 generator client {
@@ -75,4 +76,76 @@ model AuditLog {
   severity   Severity @default(INFO)
   createdAt  DateTime @default(now())
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+}
+
+// -----------------------------------------------------------------------------
+// Session 2 — Records Management
+// -----------------------------------------------------------------------------
+// Four models covering: union registry, document metadata, non-destructive
+// version history, and per-document-type compliance rules.
+//
+// Crucial principle carried into the API layer: compliance status is NEVER
+// stored in these tables. The "Compliant / Expiring / Overdue / Missing"
+// status is computed live on read (Session 3) via pure functions that read
+// Document.currentVersionId → DocumentVersion.uploadedAt + ComplianceRule's
+// renewalYears / retentionYrs. Caching a status field here would create a
+// drift bug the first time a Registrar edits a rule.
+// -----------------------------------------------------------------------------
+
+enum UnionStatus {
+  ACTIVE
+  SUSPENDED
+  DEREGISTERED
+}
+
+model ComplianceRule {
+  id            String   @id @default(cuid())
+  documentType  String   @unique // e.g., "Constitution", "Annual Return"
+  required      Boolean  @default(true)
+  renewalYears  Int      @default(1)
+  retentionYrs  Int      @default(7)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Union {
+  id             String       @id @default(cuid())
+  unionName      String
+  registrationNo String       @unique
+  fileNumber     String?
+  status         UnionStatus  @default(ACTIVE)
+  address        String?
+  contactPerson  String?
+  contactEmail   String?
+  contactPhone   String?
+  remarks        String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  documents      Document[]
+}
+
+model Document {
+  id               String            @id @default(cuid())
+  unionId          String
+  documentType     String            // e.g., "Constitution", "Bylaws"
+  currentVersionId String?
+  disposedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  union            Union             @relation(fields: [unionId], references: [id], onDelete: Cascade)
+  versions         DocumentVersion[]
+}
+
+model DocumentVersion {
+  id             String   @id @default(cuid())
+  documentId     String
+  versionNumber  Int
+  fileName       String
+  filePath       String   // Relative path to the .bin file
+  fileSize       Int
+  checksum       String   // SHA-256 hash
+  fileExtension  String?
+  uploadedById   String?
+  uploadedAt     DateTime @default(now())
+  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
