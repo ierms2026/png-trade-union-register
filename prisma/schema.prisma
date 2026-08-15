@@ -1,11 +1,7 @@
 // =============================================================================
 // Union Records Management System — Prisma Schema
 // PNG Department of Labour & Industrial Relations — Office of The Industrial Registrar
-// =============================================================================
-// Session 1: Foundation & Authentication
-// Models: User, Session, LoginAttempt, AuditLog
-// (Union, Document, DocumentVersion, ComplianceRule arrive in Session 2;
-//  ApiKey in Session 4; Task, Notification in Session 6.)
+// Session 1, Step 2 — Foundation schema (User, Session, LoginAttempt, AuditLog)
 // =============================================================================
 
 generator client {
@@ -17,178 +13,66 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// -----------------------------------------------------------------------------
-// User
-// -----------------------------------------------------------------------------
-// The single identity row for every authenticated actor in the system.
-//
-// role drives UI navigation + API authorization:
-//   - registrar     : full system access (admin + oversight + records + retention)
-//   - inspector     : read-only oversight (no admin, retention Reject only)
-//   - union_officer : scoped to assignedUnionId — sees only "My Union"
-//
-// assignedUnionId is nullable + stored as String (not a relation) for now —
-// the Union table arrives in Session 2. Storing as a plain string now means
-// adding the FK later is non-breaking. This keeps the session shape stable
-// from day 1, so /api/auth/me can return it immediately and the Officer
-// routing logic is wired up before any union records exist.
-//
-// Three independent mechanisms coexist on this row:
-//   - failedLoginAttempts + lockedUntil  (lockout state, 3 failures → 15 min)
-//   - disabled                            (admin toggle, blocks login at the gate)
-//   - twoFactorSecret + twoFactorEnabled  (TOTP, RFC 6238)
-// They are intentionally NOT coupled — an admin can lock a user without
-// disabling them (buying time during an investigation) or disable a user
-// without clearing their 2FA (preserving the option to re-enable).
-// -----------------------------------------------------------------------------
+enum Role {
+  REGISTRAR
+  INSPECTOR
+  OFFICER
+}
+
+enum Severity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 model User {
-  id                  String    @id @default(cuid())
-  email               String    @unique
-  name                String?
-  role                String    @default("union_officer") // "registrar" | "inspector" | "union_officer"
-  assignedUnionId     String?   // FK to Union (added Session 2); plain string for now
-
-  // Auth credentials
-  passwordHash        String
-
-  // 2FA (TOTP, RFC 6238)
-  twoFactorSecret     String?   // persisted only after a successful verify during setup
-  twoFactorEnabled    Boolean   @default(false)
-
-  // Lockout: unified counter shared by password + 2FA failures (3 of any → 15 min)
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
-
-  // Admin toggle (independent of lockout — see model comment)
-  disabled            Boolean   @default(false)
-
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  // Relations (one user → many sessions, attempts, audit entries)
-  sessions            Session[]
-  loginAttempts       LoginAttempt[]
-  auditEntries        AuditLog[]   // where this user was the actor
-
-  @@index([role])
-  @@index([assignedUnionId])
+  id                   String         @id @default(cuid())
+  email                String         @unique
+  passwordHash         String
+  role                 Role
+  assignedUnionId      String?
+  twoFactorSecret      String?
+  twoFactorEnabled     Boolean        @default(false)
+  failedLoginAttempts  Int            @default(0)
+  lockedUntil          DateTime?
+  disabled             Boolean        @default(false)
+  sessions             Session[]
+  loginAttempts        LoginAttempt[]
+  auditLogs            AuditLog[]
 }
 
-// -----------------------------------------------------------------------------
-// Session
-// -----------------------------------------------------------------------------
-// A row per active authenticated session. The session cookie carries an
-// HMAC-signed JWT ID (JTI) — the JTI is the lookup key into this table, so
-// revoking a session is a single DELETE (no JWT denylist required).
-//
-// Why not stateless JWT? A stateless JWT can't be revoked without a denylist,
-// and a denylist is just a session table with extra steps. By storing the
-// session server-side and only putting the JTI in the cookie, we get:
-//   - real revocation (the "Active Sessions" → revoke button does something)
-//   - small cookie (just the JTI + HMAC, not the whole payload)
-//   - server-side session metadata (IP, UA, createdAt) for the sessions UI
-// -----------------------------------------------------------------------------
 model Session {
-  id         String   @id @default(cuid())
-  userId     String
-  jti        String   @unique              // JWT ID — HMAC-signed, lookup key
-  expiresAt  DateTime
-  ip         String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
-  revokedAt  DateTime?                     // soft-revoke (audit history)
-
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
+  id        String   @id @default(cuid())
+  userId    String
+  jti       String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ip        String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// -----------------------------------------------------------------------------
-// LoginAttempt
-// -----------------------------------------------------------------------------
-// Append-only audit of every login attempt — including emails that don't
-// match any user. This is the source of truth for the Security dashboard's
-// "failed logins in last 24h / 7d" cards (Session 4).
-//
-// We store the *typed* email (not a userId FK) deliberately: a brute-forcer
-// trying random emails must show up in the audit trail even though no User
-// row exists for them. If we used a userId FK, those attempts would be
-// unattributable.
-//
-// reason captures the failure mode so the Security dashboard can break down
-// failures by category: "wrong_password", "wrong_2fa", "user_disabled",
-// "account_locked", "user_not_found".
-// -----------------------------------------------------------------------------
 model LoginAttempt {
-  id         String    @id @default(cuid())
-  email      String                       // the typed email (may not match a user)
-  userId     String?                      // FK if the email matched a User
-  success    Boolean
-  reason     String?                      // failure mode (see comment above)
-  ip         String?
-  userAgent  String?
-  createdAt  DateTime  @default(now())
-
-  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([email])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([success])
+  id        String   @id @default(cuid())
+  email     String
+  success   Boolean
+  userId    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
-// -----------------------------------------------------------------------------
-// AuditLog
-// -----------------------------------------------------------------------------
-// The system's evidentiary trail. Every mutating action across all 7 phases
-// writes a row here. The design has three non-negotiable properties:
-//
-//   1. actorName is captured at action time (NOT a JOIN to User).
-//      If we JOIN to User and the actor is later renamed or deleted, the
-//      audit trail changes retroactively — destroying its evidentiary value
-//      in a courtroom. Denormalizing actorName at write time makes the row
-//      immutable history.
-//
-//   2. before/after are JSON snapshots, not diffs. A diff would require the
-//      reader to reconstruct state from a delta; snapshots let the reader
-//      see exactly what the row looked like before and after the action.
-//      For Create actions, before is null (we render only "after" in the UI).
-//      For Delete actions, after is null (we render only "before").
-//      For Update actions, both are present (rendered side-by-side).
-//
-//   3. severity classifies the action's blast radius:
-//        Info      — normal mutations (login, document upload, rule edit)
-//        Warning   — sensitive but reversible (account lockout, role change)
-//        Critical  — irreversible (document disposal — once done, can't undo)
-//      The Retention screen filters by severity=Critical to surface the
-//      highest-stakes actions for regulatory review.
-//
-// actorId is nullable — null means "System" (e.g. automated lockout, BJS-01
-// cron sweep in Session 6). The Audit UI's "System" filter matches
-// actorId=null AND actorName='System' so that login-failed entries for
-// nonexistent emails (which also have actorId=null but actorName = the
-// typed email) don't pollute the System filter.
-// -----------------------------------------------------------------------------
 model AuditLog {
   id         String   @id @default(cuid())
-  actorId    String?                       // null = System
-  actorName  String                        // snapshot at action time — never JOIN
-  action     String                        // e.g. "user_login", "union_created", "retention_dispose"
-  entityType String                        // "User" | "Union" | "Document" | "ComplianceRule" | ...
+  actorId    String?
+  actorName  String
+  action     String
+  entityType String
   entityId   String?
-  before     String?                       // JSON snapshot (null for Create)
-  after      String?                       // JSON snapshot (null for Delete)
-  severity   String   @default("Info")     // "Info" | "Warning" | "Critical"
-  ip         String?
-  userAgent  String?
+  beforeJson String?
+  afterJson  String?
+  severity   Severity @default(INFO)
   createdAt  DateTime @default(now())
-
-  actor      User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
-
-  @@index([actorId])
-  @@index([entityType, entityId])
-  @@index([action])
-  @@index([severity])
-  @@index([createdAt])
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
 }
