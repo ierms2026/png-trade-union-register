@@ -3,6 +3,7 @@
 // PNG Department of Labour & Industrial Relations — Office of The Industrial Registrar
 // Session 1: Foundation schema (User, Session, LoginAttempt, AuditLog)
 // Session 2: Records Management (Union, Document, DocumentVersion, ComplianceRule)
+// Session 4: Administration (ApiKey model + passwordReset fields on User)
 // =============================================================================
 
 generator client {
@@ -37,9 +38,42 @@ model User {
   failedLoginAttempts  Int            @default(0)
   lockedUntil          DateTime?
   disabled             Boolean        @default(false)
+  // Session 4: password reset flow — token generated at create time or on
+  // admin reset, expires after a window. The set-password route consumes
+  // the token + the user's chosen password (NEVER accepted in the admin
+  // API body per spec) and clears both fields.
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
   sessions             Session[]
   loginAttempts        LoginAttempt[]
   auditLogs            AuditLog[]
+  apiKeys              ApiKey[]
+}
+
+// -----------------------------------------------------------------------------
+// Session 4 — Administration
+// -----------------------------------------------------------------------------
+// ApiKey: programmatic access tokens for scripts/integrations. The full key
+// value is shown to the user EXACTLY ONCE on creation — only the SHA-256 hash
+// + first-12-char prefix are persisted. The prefix lets the UI render
+// "urm_a1b2c3d4..." without leaking the full key.
+//
+// Revocation is a soft-delete (revokedAt set) — the row stays for audit
+// history. The disabled-user-API-key check (built into auth-guard in
+// Session 1 Step 5) ensures a disabled owner's key immediately stops
+// authenticating, even before the key itself is revoked.
+// -----------------------------------------------------------------------------
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  prefix      String    @unique // First 12 chars of the key
+  keyHash     String    @unique // SHA-256 hash of the full key
+  scopes      String    // Comma-separated scopes (e.g., "unions:read,documents:read")
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  createdById String?
+  creator     User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
 }
 
 model Session {

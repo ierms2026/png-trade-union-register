@@ -32,9 +32,11 @@ import { Role } from "@prisma/client";
 // =============================================================================
 
 export interface AuthUser {
-  /** User ID. Nullable in mock (no real User row exists yet); real
-   *  auth-guard will always return a non-null ID. Used as AuditLog.actorId. */
-  id: string | null;
+  /** User ID. In the mock, this is a stable "mock-id" string (or overridden
+   *  via X-Test-User-Id for tests that need a real User row). The real
+   *  auth-guard will return the actual User.id from the DB. Used as
+   *  AuditLog.actorId and ApiKey.createdById. */
+  id: string;
   name: string;
   email: string;
   role: Role;
@@ -100,11 +102,28 @@ export async function getAuthUser(req?: Request): Promise<AuthUser> {
   }
 
   // --- Build the mock user ----------------------------------------------------
-  // ID is null in the mock because no real User row exists yet. The real
-  // auth-guard will return the actual User.id from the DB. AuditLog.actorId
-  // is nullable in the schema, so this works without violating the FK.
+  // Per Session 4 spec, getAuthUser() must return { role, id } so admin
+  // routes can record actorId in AuditLog. The id is a stable mock value
+  // ("mock-id") so it's deterministic across requests and identifiable in
+  // the audit trail as mock data. The real auth-guard (Session 1 Step 5)
+  // will replace this with the actual User.id from the DB.
+  //
+  // To support tests that need a real User row to exist (e.g. FK
+  // constraints), the X-Test-User-Id header overrides the id. Forbidden
+  // in production.
+  const headerUserId = req?.headers.get("x-test-user-id");
+  let userId: string;
+  if (headerUserId) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("X-Test-User-Id header is forbidden in production.");
+    }
+    userId = headerUserId;
+  } else {
+    userId = "mock-id";
+  }
+
   const user: AuthUser = {
-    id: null,
+    id: userId,
     name: `Mock ${role.charAt(0)}${role.slice(1).toLowerCase()}`,
     email: `mock-${role.toLowerCase()}@example.com`,
     role,
