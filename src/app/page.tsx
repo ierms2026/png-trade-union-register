@@ -95,7 +95,7 @@ export default function Home() {
         return <DashboardView />;
       case "unions":
       case "my-union":
-        return <UnionsView />;
+        return <UnionsView user={user} />;
       case "compliance":
         return <ComplianceView />;
       case "configure-rules":

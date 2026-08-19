@@ -10,6 +10,8 @@ import {
   ArrowLeft,
   History,
   RotateCcw,
+  Download,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -79,11 +82,12 @@ interface Union {
   documents: UnionDocument[];
 }
 
-export function UnionsView() {
+export function UnionsView({ user }: { user: { role: string; assignedUnionId: string | null } }) {
   const { data, loading, error, refetch } = useFetch<{ unions: Union[] }>("/api/unions");
   const [selectedUnionId, setSelectedUnionId] = useState<string | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadDocType, setUploadDocType] = useState<string>("");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const selectedUnion = data?.unions.find((u) => u.id === selectedUnionId);
 
@@ -120,15 +124,25 @@ export function UnionsView() {
                   </Badge>
                 </CardDescription>
               </div>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setUploadDialogOpen(true);
-                }}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Document
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditDialogOpen(true)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setUploadDialogOpen(true);
+                  }}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Document
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -209,6 +223,18 @@ export function UnionsView() {
               refetch();
               setUploadDialogOpen(false);
               setUploadDocType("");
+            }}
+          />
+        )}
+
+        {editDialogOpen && (
+          <EditUnionDialog
+            union={selectedUnion}
+            userRole={user.role}
+            onClose={() => setEditDialogOpen(false)}
+            onSaved={() => {
+              setEditDialogOpen(false);
+              refetch();
             }}
           />
         )}
@@ -339,6 +365,14 @@ function DocumentTile({
           <Upload className="mr-1 h-3 w-3" />
           New version
         </Button>
+        {doc.latestVersion && !doc.disposedAt && (
+          <a href={`/api/unions/${unionId}/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="ghost" className="h-7 text-xs">
+              <Download className="mr-1 h-3 w-3" />
+              Download
+            </Button>
+          </a>
+        )}
         <Button
           size="sm"
           variant="ghost"
@@ -399,8 +433,213 @@ function DocumentTile({
 }
 
 // -----------------------------------------------------------------------------
-// Upload dialog
+// Edit Union Dialog — with Officer silent-pin awareness
 // -----------------------------------------------------------------------------
+
+function EditUnionDialog({
+  union,
+  userRole,
+  onClose,
+  onSaved,
+}: {
+  union: Union;
+  userRole: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isRegistrar = userRole === "REGISTRAR";
+  const isOfficer = userRole === "OFFICER";
+
+  const [unionName, setUnionName] = useState(union.unionName);
+  const [registrationNo, setRegistrationNo] = useState(union.registrationNo);
+  const [fileNumber, setFileNumber] = useState(union.fileNumber || "");
+  const [status, setStatus] = useState(union.status);
+  const [address, setAddress] = useState(union.address || "");
+  const [contactPerson, setContactPerson] = useState(union.contactPerson || "");
+  const [contactEmail, setContactEmail] = useState(union.contactEmail || "");
+  const [contactPhone, setContactPhone] = useState(union.contactPhone || "");
+  const [remarks, setRemarks] = useState(union.remarks || "");
+  const [saving, setSaving] = useState(false);
+
+  // Officer restricted fields (silently pinned server-side)
+  const restrictedFields = isOfficer
+    ? ["unionName", "registrationNo", "fileNumber", "status", "remarks"]
+    : [];
+
+  async function handleSave(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {};
+      if (isRegistrar) {
+        body.unionName = unionName;
+        body.registrationNo = registrationNo;
+        body.fileNumber = fileNumber || null;
+        body.status = status;
+        body.remarks = remarks || null;
+      }
+      body.address = address || null;
+      body.contactPerson = contactPerson || null;
+      body.contactEmail = contactEmail || null;
+      body.contactPhone = contactPhone || null;
+
+      const res = await fetch(`/api/unions/${union.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update union.");
+        return;
+      }
+      toast.success("Union updated successfully.");
+      onSaved();
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Union</DialogTitle>
+          <DialogDescription>
+            {isOfficer
+              ? "You can edit contact information only. Core identity fields are protected."
+              : "Update union details. Changes are logged in the audit trail."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSave} className="space-y-4">
+          {/* Union Name — Registrar only */}
+          <div className="space-y-2">
+            <Label>Union Name</Label>
+            <Input
+              value={unionName}
+              onChange={(e) => setUnionName(e.target.value)}
+              disabled={isOfficer}
+              className={isOfficer ? "bg-muted" : ""}
+            />
+            {isOfficer && (
+              <p className="text-xs text-muted-foreground">Restricted — only Registrars can change this.</p>
+            )}
+          </div>
+
+          {/* Registration No — Registrar only */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Registration No</Label>
+              <Input
+                value={registrationNo}
+                onChange={(e) => setRegistrationNo(e.target.value)}
+                disabled={isOfficer}
+                className={isOfficer ? "bg-muted" : ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>File Number</Label>
+              <Input
+                value={fileNumber}
+                onChange={(e) => setFileNumber(e.target.value)}
+                disabled={isOfficer}
+                className={isOfficer ? "bg-muted" : ""}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          {/* Status — Registrar only */}
+          {isRegistrar && (
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                  <SelectItem value="DEREGISTERED">Deregistered</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Contact fields — both roles can edit */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Contact Person</Label>
+              <Input
+                value={contactPerson}
+                onChange={(e) => setContactPerson(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contact Phone</Label>
+              <Input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Contact Email</Label>
+            <Input
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Address</Label>
+            <Textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Optional"
+              rows={2}
+            />
+          </div>
+
+          {/* Remarks — Registrar only */}
+          {isRegistrar && (
+            <div className="space-y-2">
+              <Label>Remarks</Label>
+              <Textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Internal notes (Registrar only)"
+                rows={2}
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 interface UploadDialogProps {
   unionId: string;

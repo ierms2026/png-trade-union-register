@@ -1,10 +1,21 @@
 "use client";
 
-import { Archive, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Archive, CheckCircle2, Clock, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
@@ -13,14 +24,9 @@ import { EmptyState } from "@/components/app/empty-state";
 // =============================================================================
 // Retention view — pending disposal list with Approve (REGISTRAR) + Snooze.
 //
-// Lists documents whose retention period has elapsed. Each row shows:
-//   - Union name + registration no
-//   - Document type + version
-//   - Filed date + retention years + disposal due date
-//
-// ACTIONS:
-//   - Approve (REGISTRAR only): marks the document as disposed.
-//   - Snooze (REGISTRAR + INSPECTOR): defers disposal by 30 days.
+// APPROVE uses a type-to-confirm dialog: the Registrar must type the
+// document type EXACTLY to enable the Confirm button. This is the same
+// pattern GitHub uses for repo deletion — prevents accidental disposal.
 // =============================================================================
 
 interface RetentionItem {
@@ -43,6 +49,7 @@ interface User {
 
 export function RetentionView({ user }: { user: User }) {
   const { data, loading, error, refetch } = useFetch<{ pending: RetentionItem[] }>("/api/retention");
+  const [approveTarget, setApproveTarget] = useState<RetentionItem | null>(null);
 
   if (loading) return <CardListSkeleton count={4} />;
   if (error) return <ErrorState description={error} onRetry={refetch} />;
@@ -51,7 +58,6 @@ export function RetentionView({ user }: { user: User }) {
   const isRegistrar = user.role === "REGISTRAR";
 
   async function approve(documentId: string) {
-    if (!confirm("Approve this document for disposal? This action is IRREVERSIBLE.")) return;
     try {
       const res = await fetch(`/api/retention/${documentId}/approve`, {
         method: "POST",
@@ -62,7 +68,9 @@ export function RetentionView({ user }: { user: User }) {
         toast.error(data.error || "Failed to approve disposal.");
         return;
       }
-      toast.success("Document disposed.");
+      toast.success("Document disposed.", {
+        description: "This action is irreversible. The audit log records the disposal with CRITICAL severity.",
+      });
       refetch();
     } catch {
       toast.error("Network error.");
@@ -139,7 +147,7 @@ export function RetentionView({ user }: { user: User }) {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => approve(item.documentId)}
+                          onClick={() => setApproveTarget(item)}
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" />
                           Approve Disposal
@@ -161,6 +169,122 @@ export function RetentionView({ user }: { user: User }) {
           })}
         </div>
       )}
+
+      {/* Type-to-Confirm Disposal Dialog */}
+      {approveTarget && (
+        <TypeToConfirmDialog
+          item={approveTarget}
+          onConfirm={() => {
+            approve(approveTarget.documentId);
+            setApproveTarget(null);
+          }}
+          onClose={() => setApproveTarget(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// --- Type-to-Confirm Dialog ------------------------------------------------
+
+function TypeToConfirmDialog({
+  item,
+  onConfirm,
+  onClose,
+}: {
+  item: RetentionItem;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [typedText, setTypedText] = useState("");
+  const [approving, setApproving] = useState(false);
+
+  // The Confirm button is disabled until the typed text matches the document type EXACTLY.
+  // This is the same pattern GitHub uses for repo deletion.
+  const canConfirm = typedText.trim() === item.documentType.trim();
+
+  async function handleConfirm() {
+    if (!canConfirm) return;
+    setApproving(true);
+    onConfirm();
+    setApproving(false);
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            Confirm Document Disposal
+          </DialogTitle>
+          <DialogDescription>
+            This action is <strong>irreversible</strong>. The document will be permanently
+            marked as disposed and removed from all active views.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Document summary */}
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm">
+            <p className="font-medium text-red-900">{item.documentType}</p>
+            <p className="text-red-700">
+              {item.unionName} ({item.registrationNo})
+            </p>
+            <p className="mt-1 text-xs text-red-600">
+              Version {item.versionNumber} · Filed {new Date(item.filedAt).toLocaleDateString()}
+            </p>
+          </div>
+
+          {/* Type-to-confirm instruction */}
+          <div className="space-y-2">
+            <Label>
+              Type <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono">{item.documentType}</code> to confirm
+            </Label>
+            <Input
+              value={typedText}
+              onChange={(e) => setTypedText(e.target.value)}
+              placeholder={item.documentType}
+              autoFocus
+              className={canConfirm ? "border-green-400" : ""}
+            />
+            {!canConfirm && typedText.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Text doesn&apos;t match yet. Type the exact document type to enable confirmation.
+              </p>
+            )}
+            {canConfirm && (
+              <p className="text-xs text-green-600">
+                ✓ Matches — you can now confirm disposal.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={approving}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={!canConfirm || approving}
+          >
+            {approving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Disposing...
+              </>
+            ) : (
+              <>
+                <Archive className="mr-2 h-4 w-4" />
+                Confirm Disposal
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
