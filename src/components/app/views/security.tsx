@@ -10,6 +10,13 @@ import { StatsSkeleton, CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { LineChart, Line, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 // =============================================================================
 // Security view — Registrar's security dashboard.
@@ -75,6 +82,27 @@ function StatCard({
 
 export function SecurityView() {
   const { data, loading, error, refetch } = useFetch<SecurityOverview>("/api/security/overview");
+  const { data: trendData, loading: trendLoading, error: trendError, refetch: refetchTrend } = useFetch<{ days: Array<{ date: string; failed: number; successful: number }> }>("/api/security/login-trend");
+
+  // Chart data for login trend — format dates as "Mon DD"
+  const loginTrendData = (trendData?.days || []).map((d) => ({
+    date: new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", day: "numeric" }),
+    failed: d.failed,
+    successful: d.successful,
+  }));
+
+  const loginTrendConfig: ChartConfig = {
+    failed: { label: "Failed", color: "#ef4444" },
+    successful: { label: "Successful", color: "#22c55e" },
+  };
+
+  // Chart data for 2FA adoption donut
+  const twoFactorData = data
+    ? [
+        { name: "2FA Enabled", value: data.twoFactorAdoption.enabled, fill: "#22c55e" },
+        { name: "Not Enrolled", value: data.twoFactorAdoption.totalEligible - data.twoFactorAdoption.enabled, fill: "#f59e0b" },
+      ]
+    : [];
 
   if (loading) return (
     <div className="space-y-6">
@@ -158,6 +186,130 @@ export function SecurityView() {
           icon={Activity}
           color="bg-blue-100 text-blue-700"
         />
+      </div>
+
+      {/* Charts row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Login trend — line chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Activity className="h-5 w-5" />
+              Login Activity (7 Days)
+            </CardTitle>
+            <CardDescription>Daily failed vs. successful login attempts.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {trendLoading ? (
+              <div className="h-[240px] animate-pulse rounded-md bg-muted" />
+            ) : trendError ? (
+              <ErrorState description={trendError} onRetry={refetchTrend} />
+            ) : (
+              <ChartContainer config={loginTrendConfig} className="h-[240px] w-full">
+                <LineChart data={loginTrendData} margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 12 }}
+                    allowDecimals={false}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="failed"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#ef4444" }}
+                    name="Failed"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="successful"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#22c55e" }}
+                    name="Successful"
+                  />
+                </LineChart>
+              </ChartContainer>
+            )}
+            {/* Legend */}
+            <div className="mt-3 flex gap-4 text-xs">
+              <div className="flex items-center gap-1">
+                <span className="h-2 w-4 rounded-full bg-red-500" />
+                <span className="text-muted-foreground">Failed</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="h-2 w-4 rounded-full bg-green-500" />
+                <span className="text-muted-foreground">Successful</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 2FA adoption — donut chart */}
+        {data && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <KeyRound className="h-5 w-5" />
+                2FA Adoption
+              </CardTitle>
+              <CardDescription>
+                {data.twoFactorAdoption.enabled} of {data.twoFactorAdoption.totalEligible} eligible users have 2FA enabled.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                <ChartContainer config={{ value: { label: "Users" } }} className="h-[180px] w-[180px]">
+                  <PieChart>
+                    <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+                    <Pie
+                      data={twoFactorData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={2}
+                    >
+                      {twoFactorData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ChartContainer>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-3xl font-bold text-green-600">
+                      {data.twoFactorAdoption.rate}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">Adoption rate</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-green-500" />
+                      <span className="text-muted-foreground">Enabled:</span>
+                      <span className="font-medium">{data.twoFactorAdoption.enabled}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-amber-500" />
+                      <span className="text-muted-foreground">Not enrolled:</span>
+                      <span className="font-medium">{data.twoFactorAdoption.totalEligible - data.twoFactorAdoption.enabled}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Locked-out users */}
