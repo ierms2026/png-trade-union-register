@@ -8,6 +8,13 @@ import { StatsSkeleton, ActivitySkeleton, CardListSkeleton } from "@/components/
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -114,6 +121,35 @@ export function DashboardView() {
     refetch: refetchActivity,
   } = useFetch<{ activity: ActivityEntry[] }>("/api/dashboard/activity");
 
+  const {
+    data: docTypesData,
+    loading: docTypesLoading,
+    error: docTypesError,
+    refetch: refetchDocTypes,
+  } = useFetch<{ documentTypes: Array<{ documentType: string; count: number }>; total: number }>("/api/dashboard/document-types");
+
+  // --- Chart data: compliance status distribution ---
+  const complianceChartData = stats
+    ? [
+        { status: "Compliant", count: stats.compliance.compliant, fill: "#22c55e" },
+        { status: "Expiring", count: stats.compliance.expiring, fill: "#f59e0b" },
+        { status: "Overdue", count: stats.compliance.overdue, fill: "#ef4444" },
+        { status: "Missing", count: stats.compliance.missing, fill: "#9ca3af" },
+      ]
+    : [];
+
+  const complianceChartConfig: ChartConfig = {
+    count: { label: "Documents" },
+  };
+
+  // --- Chart data: documents by type (donut) ---
+  const DONUT_COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5", "#0d9488", "#be185d", "#92400e"];
+  const docTypeChartData = (docTypesData?.documentTypes || []).map((d, i) => ({
+    name: d.documentType,
+    value: d.count,
+    fill: DONUT_COLORS[i % DONUT_COLORS.length],
+  }));
+
   return (
     <div className="space-y-6">
       <div>
@@ -138,6 +174,93 @@ export function DashboardView() {
           <StatCard label="Missing" value={stats.compliance.missing} icon={FileQuestion} color="bg-gray-100 text-gray-700" />
         </div>
       ) : null}
+
+      {/* Charts row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Compliance status distribution — horizontal bar chart */}
+        {stats && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Compliance Status Distribution</CardTitle>
+              <CardDescription>Document compliance status across all unions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={complianceChartConfig} className="h-[240px] w-full">
+                <BarChart data={complianceChartData} layout="vertical" margin={{ left: 20, right: 20, top: 10, bottom: 10 }}>
+                  <XAxis type="number" tickLine={false} axisLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="status"
+                    tickLine={false}
+                    axisLine={false}
+                    width={70}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" radius={4}>
+                    {complianceChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Documents by type — donut chart */}
+        {docTypesLoading ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Documents by Type</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[240px] animate-pulse rounded-md bg-muted" />
+            </CardContent>
+          </Card>
+        ) : docTypesError ? (
+          <ErrorState description={docTypesError} onRetry={refetchDocTypes} />
+        ) : docTypeChartData.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Documents by Type</CardTitle>
+              <CardDescription>
+                {docTypesData?.total || 0} documents across {docTypeChartData.length} types.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={{ value: { label: "Documents" } }} className="h-[240px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+                  <Pie
+                    data={docTypeChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                  >
+                    {docTypeChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+              {/* Legend */}
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                {docTypeChartData.map((d) => (
+                  <div key={d.name} className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                    <span className="text-muted-foreground">{d.name}</span>
+                    <span className="font-medium">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
 
       {/* Compliance summary + Recent activity */}
       <div className="grid gap-6 lg:grid-cols-2">
