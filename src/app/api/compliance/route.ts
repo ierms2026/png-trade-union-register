@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 
 // =============================================================================
@@ -12,22 +13,35 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 // call to this endpoint returns the updated matrix immediately. No cache
 // invalidation, no drift, no migration.
 //
-// IMPLEMENTATION:
-// The actual matrix-building logic lives in src/lib/compliance/matrix.ts
-// (shared with the preview endpoint — Step 3). This route is now a thin
-// wrapper that fetches data and delegates to buildComplianceMatrix.
+// OFFICER SCOPING:
+// Officers see ONLY their assigned union's row. We enforce this by
+// filtering the `data.unions` array post-fetch (fetchMatrixData loads
+// all unions; we trim the array before buildComplianceMatrix iterates
+// over it).
 //
-// OFFICER SCOPING (TODO):
-// Per the business context, Officers see ONLY their assigned union's row.
-// This should be enforced server-side by filtering the unions query:
-//   where: user.role === "OFFICER" ? { id: user.assignedUnionId } : {}
-// For now, the mock getAuthUser doesn't enforce scoping — flagging this
-// as a TODO. When the real auth-guard ships (Session 1 Step 5), wrap
-// this with `requireUser()` and apply the filter.
+// AUTH:
+// Any authenticated role can view the matrix. Officers get a scoped view;
+// Registrars + Inspectors see the full matrix.
 // =============================================================================
 
-export async function GET() {
+export async function GET(req: Request) {
+  const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
+
   const data = await fetchMatrixData();
+
+  // Officer scoping: filter the unions array to just their assigned union.
+  // (We could also pass a where clause to fetchMatrixData, but filtering
+  // post-fetch is simpler and the dataset is small — 6 demo unions.)
+  if (user.role === "OFFICER" && user.assignedUnionId) {
+    data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
+  }
+
   const matrix = buildComplianceMatrix(data);
   return NextResponse.json(matrix);
 }

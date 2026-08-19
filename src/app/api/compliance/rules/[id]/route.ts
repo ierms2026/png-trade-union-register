@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/context";
+import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Severity } from "@prisma/client";
 
 // =============================================================================
@@ -87,6 +87,12 @@ export async function PUT(
 
   // --- 1. Auth check: REGISTRAR-only ---------------------------------------
   const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
   if (user.role !== "REGISTRAR") {
     // 403, not 404 — the rule's existence isn't secret (this is an
     // authenticated internal endpoint), and a 403 correctly signals

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/context";
+import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import type { ComplianceStatus } from "@/lib/compliance/calculator";
 import type { ComplianceRule } from "@prisma/client";
@@ -104,6 +104,12 @@ const STATUS_RANK: Record<ComplianceStatus, number> = {
 export async function POST(req: NextRequest) {
   // --- 1. Auth check: REGISTRAR-only ---------------------------------------
   const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
   if (user.role !== "REGISTRAR") {
     return NextResponse.json(
       {

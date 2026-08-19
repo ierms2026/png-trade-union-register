@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes, createHash } from "node:crypto";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/context";
+import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity } from "@prisma/client";
 
 // =============================================================================
@@ -95,6 +95,12 @@ const API_KEY_PUBLIC_FIELDS = {
 
 export async function GET(req: Request) {
   const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
   if (user.role !== Role.REGISTRAR) {
     return NextResponse.json(
       { error: "Only Registrars can view API keys." },
@@ -126,6 +132,12 @@ interface CreateRequestBody {
 export async function POST(req: NextRequest) {
   // --- 1. Auth check -------------------------------------------------------
   const actor = await getAuthUser(req);
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
   if (actor.role !== Role.REGISTRAR) {
     return NextResponse.json(
       { error: "Only Registrars can create API keys." },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UnionStatus } from "@prisma/client";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/context";
+import { getAuthUser } from "@/lib/auth/auth-guard";
 
 // =============================================================================
 // PUT /api/unions/[unionId] — Union update with Officer silent-pin.
@@ -91,9 +91,14 @@ export async function PUT(
 ) {
   const { unionId } = await params;
 
-  // 1. Get the authenticated user (mock for now — real auth-guard arrives
-  //    in Session 1 Step 5).
+  // 1. Get the authenticated user (real auth-guard).
   const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
 
   // 2. Parse the JSON body. Lenient on type, strict on JSON validity.
   let body: Record<string, unknown>;

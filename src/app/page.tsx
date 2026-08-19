@@ -1,46 +1,131 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+"use client";
 
-// Session 1 placeholder.
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { LoginForm } from "@/components/app/login-form";
+import { AppShell } from "@/components/app/app-shell";
+import { PublicPortal } from "@/components/app/public-portal";
+import { DashboardView } from "@/components/app/views/dashboard";
+import { ComplianceView } from "@/components/app/views/compliance";
+import { ConfigureRulesView } from "@/components/app/views/configure-rules";
+import { CompareView } from "@/components/app/views/compare";
+import { UnionsView } from "@/components/app/views/unions";
+import { TasksView } from "@/components/app/views/tasks";
+import { CalendarView } from "@/components/app/views/calendar";
+import { AuditView } from "@/components/app/views/audit";
+import { RetentionView } from "@/components/app/views/retention";
+import { UsersView } from "@/components/app/views/users";
+import { SecurityView } from "@/components/app/views/security";
+import { ApiKeysView } from "@/components/app/views/api-keys";
+import { AccountSecurityView } from "@/components/app/views/account-security";
+
+// =============================================================================
+// Main page entry.
 //
-// This page is the only route the user can preview right now. Once the auth
-// engine is wired up (Steps 3 + 4 of Session 1), this route will be replaced
-// by a redirect: unauthenticated → /login, authenticated → /dashboard.
+// On mount, calls /api/auth/me to determine:
+//   - If authenticated → render the AppShell with the active view.
+//   - If not authenticated → render the LoginForm (or PublicPortal if
+//     the user clicked "View public union registry").
 //
-// For now it just confirms the stack is alive: Next.js + Tailwind + shadcn/ui
-// rendering, Prisma schema pushed to SQLite, dev server responding.
+// The active view is stored in component state (no URL routing — this
+// is a single-page app at /). The AppShell's sidebar nav calls
+// setActiveView to switch views.
+// =============================================================================
+
+interface AuthUser {
+  id: string;
+  email: string;
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
+  assignedUnionId: string | null;
+  twoFactorEnabled: boolean;
+}
+
+type Mode = "loading" | "auth" | "public" | "public-login";
+
 export default function Home() {
+  const [mode, setMode] = useState<Mode>("loading");
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [activeView, setActiveView] = useState("dashboard");
+
+  useEffect(() => {
+    // Check if the user is authenticated.
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data: { user: AuthUser | null }) => {
+        if (data.user) {
+          setUser(data.user);
+          setMode("auth");
+        } else {
+          setMode("public-login"); // not authenticated → show login
+        }
+      })
+      .catch(() => {
+        setMode("public-login"); // network error → show login (let user retry)
+      });
+  }, []);
+
+  // Loading state — full-screen spinner while we check auth.
+  if (mode === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Public portal mode — chrome-less, no auth.
+  if (mode === "public") {
+    return (
+      <PublicPortal onBack={() => setMode("public-login")} />
+    );
+  }
+
+  // Not authenticated → show the login form.
+  if (mode !== "auth" || !user) {
+    return <LoginForm onPublicPortal={() => setMode("public")} />;
+  }
+
+  // Authenticated → render the app shell with the active view.
+  function renderView() {
+    switch (activeView) {
+      case "dashboard":
+        return <DashboardView />;
+      case "unions":
+      case "my-union":
+        return <UnionsView />;
+      case "compliance":
+        return <ComplianceView />;
+      case "configure-rules":
+        return <ConfigureRulesView />;
+      case "compare":
+        return <CompareView />;
+      case "tasks":
+        return <TasksView />;
+      case "calendar":
+        return <CalendarView />;
+      case "audit":
+        return <AuditView />;
+      case "retention":
+        return <RetentionView user={user} />;
+      case "users":
+        return <UsersView />;
+      case "security":
+        return <SecurityView />;
+      case "api-keys":
+        return <ApiKeysView />;
+      case "account-security":
+        return <AccountSecurityView user={user} />;
+      default:
+        return <DashboardView />;
+    }
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-2 text-center">
-          <div className="flex justify-center">
-            <Badge variant="outline" className="text-xs font-medium">
-              Session 1 · Phase A
-            </Badge>
-          </div>
-          <CardTitle className="text-2xl">Union Records Management System</CardTitle>
-          <CardDescription>
-            Office of The Industrial Registrar
-            <br />
-            PNG Department of Labour &amp; Industrial Relations
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p className="text-center font-medium text-foreground">
-            Session 1 in progress
-          </p>
-          <ul className="space-y-1.5 text-xs">
-            <li>• Next.js 16 + TypeScript + TailwindCSS + shadcn/ui — scaffolded</li>
-            <li>• Prisma + SQLite — initialized</li>
-            <li>• Dependencies installed — bcryptjs, otplib, qrcode</li>
-            <li>• Schema pushed — User, Session, LoginAttempt, AuditLog</li>
-          </ul>
-          <p className="text-center text-xs">
-            Auth API routes + Login UI arrive in Steps 3 &amp; 4.
-          </p>
-        </CardContent>
-      </Card>
-    </main>
-  )
+    <AppShell user={user} activeView={activeView} onNavigate={setActiveView}>
+      {renderView()}
+    </AppShell>
+  );
 }

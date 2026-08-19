@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/context";
+import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity } from "@prisma/client";
 
 // =============================================================================
@@ -37,6 +37,12 @@ export async function POST(
 
   // --- 1. Auth check -------------------------------------------------------
   const actor = await getAuthUser(req);
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
   if (actor.role !== Role.REGISTRAR) {
     return NextResponse.json(
       { error: "Only Registrars can reset 2FA." },

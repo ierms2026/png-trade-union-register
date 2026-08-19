@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/context";
+import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
 
 // =============================================================================
@@ -52,6 +52,12 @@ const USER_PUBLIC_FIELDS = {
 export async function GET(req: NextRequest) {
   // --- 1. Auth check: REGISTRAR-only ---------------------------------------
   const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
   if (user.role !== Role.REGISTRAR) {
     return NextResponse.json(
       { error: "Only Registrars can view the security overview." },

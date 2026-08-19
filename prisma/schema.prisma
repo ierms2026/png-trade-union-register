@@ -1,9 +1,7 @@
 // =============================================================================
 // Union Records Management System — Prisma Schema
 // PNG Department of Labour & Industrial Relations — Office of The Industrial Registrar
-// Session 1: Foundation schema (User, Session, LoginAttempt, AuditLog)
-// Session 2: Records Management (Union, Document, DocumentVersion, ComplianceRule)
-// Session 4: Administration (ApiKey model + passwordReset fields on User)
+// Full schema: Sessions 1–7
 // =============================================================================
 
 generator client {
@@ -164,6 +162,7 @@ model Document {
   documentType     String            // e.g., "Constitution", "Bylaws"
   currentVersionId String?
   disposedAt       DateTime?
+  snoozedUntil     DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   union            Union             @relation(fields: [unionId], references: [id], onDelete: Cascade)
@@ -182,4 +181,46 @@ model DocumentVersion {
   uploadedById   String?
   uploadedAt     DateTime @default(now())
   document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// Session 5 — Oversight (snoozedUntil on Document for Retention rejection)
+// Session 6 — Productivity (Task + Notification models)
+// -----------------------------------------------------------------------------
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum NotificationType {
+  COMPLIANCE
+  TASK
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  priority    String     @default("NORMAL")
+  dueDate     DateTime?
+  unionId     String?
+  assigneeId  String?
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  dedupKey  String           @unique
+  linkUrl   String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
 }

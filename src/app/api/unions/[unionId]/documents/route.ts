@@ -3,6 +3,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { db } from "@/lib/prisma";
+import { getAuthUser } from "@/lib/auth/auth-guard";
+import { Role } from "@prisma/client";
 
 // =============================================================================
 // POST /api/unions/[unionId]/documents
@@ -71,6 +73,27 @@ export async function POST(
   { params }: { params: Promise<{ unionId: string }> },
 ) {
   const { unionId } = await params;
+
+  // 0. Auth check + INSPECTOR 403 + Officer scoping.
+  const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 },
+    );
+  }
+  if (user.role === Role.INSPECTOR) {
+    return NextResponse.json(
+      { error: "Inspectors have read-only access." },
+      { status: 403 },
+    );
+  }
+  if (user.role === Role.OFFICER && user.assignedUnionId !== unionId) {
+    return NextResponse.json(
+      { error: "You can only upload documents to your own union." },
+      { status: 403 },
+    );
+  }
 
   // 1. Verify the union exists. Union existence is not a secret at this
   //    endpoint (it's an authenticated internal route), so a plain 404 is
@@ -268,7 +291,7 @@ export async function POST(
           fileSize: buffer.length,
           checksum,
           fileExtension,
-          // TODO: uploadedById — wire up once auth-guard is integrated
+          uploadedById: user.id,
         },
       });
 
