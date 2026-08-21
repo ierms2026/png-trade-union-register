@@ -357,6 +357,39 @@ export async function DELETE(
     );
   }
 
+  // --- Pre-delete: check for Task.creator constraint ----------------------
+  // Task.creator uses onDelete: Restrict (see schema). If the user created
+  // any tasks, the DB-level delete will throw a FK constraint error. We
+  // detect this BEFORE attempting the delete so we can return a clear 400
+  // instead of a 500.
+  //
+  // The admin's options at this point:
+  //   1. Reassign the tasks to another user (via PATCH /api/tasks/[id] with
+  //      a new assigneeId — but createdById is immutable, so this doesn't
+  //      help; the creator FK stays).
+  //   2. Delete the tasks first (via DELETE /api/tasks/[id]).
+  //   3. Disable the user instead of deleting (PUT /api/users/[id] with
+  //      disabled: true) — this preserves the audit trail + task provenance.
+  //
+  // Option 3 is the recommended path in most cases — disabling achieves
+  // the security goal (user can't log in) without losing provenance.
+  const createdTasksCount = await db.task.count({
+    where: { createdById: id },
+  });
+  if (createdTasksCount > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `Cannot delete this user because they created ${createdTasksCount} task(s). ` +
+          "Task creator is preserved for audit provenance (onDelete: Restrict). " +
+          "Either delete those tasks first, or disable the user instead " +
+          "(PUT /api/users/[id] with disabled: true).",
+        createdTasksCount,
+      },
+      { status: 400 },
+    );
+  }
+
   // Audit log entry BEFORE the delete (so we capture the before-state).
   // The afterJson is null because the entity is gone.
   await db.auditLog.create({
@@ -372,8 +405,14 @@ export async function DELETE(
     },
   });
 
-  // Delete the user. Cascades: sessions, loginAttempts, auditLogs are
-  // deleted or nullified per the schema's onDelete rules.
+  // Delete the user. Cascades per the schema's onDelete rules:
+  //   - Session → Cascade (sessions die with the user)
+  //   - LoginAttempt → SetNull (userId nulled, row stays for forensics)
+  //   - AuditLog → SetNull (actorId nulled, row stays for history)
+  //   - ApiKey → SetNull (createdById nulled, key row stays)
+  //   - Task.assignee → SetNull (assigneeId nulled, task stays)
+  //   - Task.creator → Restrict (guarded above — we'd have returned 400)
+  //   - Notification → Cascade (notifications die with the user)
   await db.user.delete({ where: { id } });
 
   return NextResponse.json({ success: true });

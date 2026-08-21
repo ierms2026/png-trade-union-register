@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, NotificationType } from "@prisma/client";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 
@@ -12,8 +12,9 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 //
 // AUTH:
 //   Bearer token via the `authorization` header. The token must match
-//   CRON_SECRET (set in .env). This is a programmatic endpoint — no
-//   browser session, no cookie.
+//   CRON_SECRET (set in .env) using a CONSTANT-TIME comparison
+//   (timingSafeEqual) to prevent timing side-channels. This is a
+//   programmatic endpoint — no browser session, no cookie.
 //
 //   The endpoint also enforces role-based notification routing:
 //   - REGISTRAR + OFFICER receive compliance notifications.
@@ -46,7 +47,13 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 // =============================================================================
 
 export async function POST(req: NextRequest) {
-  // --- 1. Bearer token auth ----------------------------------------------
+  // --- 1. Bearer token auth (constant-time) --------------------------------
+  // We use timingSafeEqual instead of plain `===` to prevent timing-side-
+  // channel attacks where an attacker probes the secret byte-by-byte by
+  // measuring response time. The lengths are compared first (timingSafeEqual
+  // throws on length mismatch), and we return the same 401 for any failure
+  // so the attacker can't distinguish "wrong length" from "right length,
+  // wrong bytes."
   const authHeader = req.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return NextResponse.json(
@@ -55,7 +62,12 @@ export async function POST(req: NextRequest) {
     );
   }
   const token = authHeader.slice(7);
-  if (token !== process.env.CRON_SECRET) {
+  const secret = process.env.CRON_SECRET;
+  if (
+    !secret ||
+    token.length !== secret.length ||
+    !timingSafeEqual(Buffer.from(token), Buffer.from(secret))
+  ) {
     return NextResponse.json(
       { error: "Invalid cron secret." },
       { status: 401 },

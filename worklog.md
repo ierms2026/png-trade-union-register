@@ -113,3 +113,48 @@ Stage Summary:
 - 2FA challenge token is now signed (closes a real forgeability gap).
 - PDF uploads are validated for integrity before being persisted.
 - Dev server confirmed healthy post-changes.
+
+---
+Task ID: 7
+Agent: main (continuation)
+Task: Chunk 7 — User lifecycle gap fixes (delete cascade, admin password reset, cron timing)
+
+Work Log:
+- **7-a: Fixed user-DELETE cascade crash.** My Chunk 5 schema change
+  (`Task.creator @relation(onDelete: Restrict)`) meant `db.user.delete()`
+  would throw a Prisma FK constraint error if the user had created any
+  tasks. The DELETE route didn't detect this — it would have crashed with
+  a raw 500. Added a pre-delete `db.task.count({ where: { createdById: id } })`
+  check that returns a clear 400 with the count + actionable guidance
+  (delete tasks first, or disable the user instead). Also documented the
+  full cascade map in the route comment (Session→Cascade, LoginAttempt→
+  SetNull, AuditLog→SetNull, ApiKey→SetNull, Task.assignee→SetNull,
+  Task.creator→Restrict, Notification→Cascade).
+- **7-b: Added POST /api/users/[id]/reset-password.** The schema documents
+  `passwordResetToken` as "generated at create time or on admin reset" but
+  there was NO route for an admin to trigger a reset on an existing user.
+  The only way to get a reset token was at creation time. New route:
+  REGISTRAR-only, generates a fresh 256-bit token (24h expiry), sets
+  `passwordHash` to "!pending" (immediately invalidates the old password),
+  writes a WARNING-severity audit entry, and returns the token ONE TIME
+  with a ready-to-share `?token=xxx` URL. Idempotent — re-calling
+  generates a fresh token and expires the old one.
+- **7-c: Fixed cron-secret timing comparison.** The compliance-sweep cron
+  route used plain `token !== process.env.CRON_SECRET` — short-circuits
+  on the first non-matching byte, theoretically leaking the secret via
+  response timing. Replaced with `timingSafeEqual(Buffer.from(token),
+  Buffer.from(secret))` with a length pre-check (timingSafeEqual throws
+  on length mismatch). Removed the unused `getAuthUser` import that was
+  left over from an earlier draft. Also updated the route header comment
+  to document the constant-time comparison.
+
+Stage Summary:
+- User deletion no longer crashes when the user created tasks — returns
+  a clear 400 with the count + remediation guidance.
+- Admins can now reset any user's password via the API (previously only
+  possible at user-creation time). The old password is invalidated
+  immediately; the user sets the new one via the existing set-password
+  flow.
+- Cron secret comparison is now constant-time.
+- `tsc --noEmit` clean; dev server healthy; both new/changed routes
+  return proper 401s for unauthenticated requests.
