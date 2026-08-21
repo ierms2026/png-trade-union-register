@@ -3,6 +3,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
+import {
+  checkRateLimit,
+  rateLimitedResponse,
+  rateLimitHeaders,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
 
 // =============================================================================
 // GET /api/unions/[unionId]/documents/[documentId]/download
@@ -43,6 +49,21 @@ export async function GET(
       { status: 403 },
     );
   }
+
+  // --- 2b. Rate limit — 30 downloads/min per user --------------------------
+  //     Per-userId: stops a stolen session cookie from scraping every
+  //     document in the system. 30/min is generous for normal browsing
+  //     (clicking through 5-10 docs in a row) but blocks a script.
+  const rl = checkRateLimit(
+    "documentDownload",
+    user.id,
+    RATE_LIMITS.documentDownload.max,
+    RATE_LIMITS.documentDownload.windowMs,
+  );
+  if (!rl.allowed) {
+    return rateLimitedResponse(rl);
+  }
+  const rlHeaders = rateLimitHeaders(rl);
 
   // --- 3. Fetch the document + its current version -------------------------
   const doc = await db.document.findFirst({
@@ -100,7 +121,8 @@ export async function GET(
   const fileName = latestVersion.fileName || "document";
 
   // Buffer → BodyInit: see /api/public/files/[id]/route.ts for the same
-  // cast rationale.
+  // cast rationale. Rate-limit headers attached so polite clients can
+  // self-throttle.
   return new NextResponse(fileBuffer as unknown as BodyInit, {
     status: 200,
     headers: {
@@ -108,6 +130,7 @@ export async function GET(
       "Content-Disposition": `inline; filename="${fileName}${ext || ""}"`,
       "Content-Length": String(fileBuffer.length),
       "Cache-Control": "private, no-cache",
+      ...rlHeaders,
     },
   });
 }

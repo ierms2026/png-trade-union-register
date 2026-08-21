@@ -158,3 +158,61 @@ Stage Summary:
 - Cron secret comparison is now constant-time.
 - `tsc --noEmit` clean; dev server healthy; both new/changed routes
   return proper 401s for unauthenticated requests.
+
+---
+Task ID: 8
+Agent: main (continuation)
+Task: Chunk 8 — Rate-limiting on authed upload/download/restore routes
+
+Work Log:
+- **8a: Created shared `src/lib/rate-limit.ts` helper.**
+  - Fixed-window counter (simplest correct implementation; burst-at-
+    boundary is acceptable for abuse prevention).
+  - Per-identifier keying: caller passes `user.id` (authed) or IP (public).
+  - Returns `{ allowed, limit, remaining, resetAt }` so callers can emit
+    `X-RateLimit-*` headers on EVERY response (not just 429s) — lets
+    polite clients self-throttle.
+  - `rateLimitedResponse()` builder emits 429 with `Retry-After` + the
+    three `X-RateLimit-*` headers.
+  - Pre-configured buckets: documentUpload (10/min), documentDownload
+    (30/min), documentRestore (10/min), publicSearch (60/min).
+  - In-memory Map — fine for single-process; documented that multi-
+    instance would need Redis.
+  - No explicit cleanup sweep — keyspace is bounded for authed routes
+    (user count) and auto-overwrites for public routes (stale IP entries
+    are small). Documented the sweep fallback if memory ever matters.
+
+- **8b: Wired into upload POST.** Check goes after auth + Officer scoping
+  (need `user.id`), before union-existence check. 10/min per user.
+  `rlHeaders` attached to the 201 success response.
+
+- **8c: Wired into download GET.** Same pattern. 30/min per user —
+  generous for normal browsing (5-10 docs in a row), blocks a scraping
+  script. Headers attached to the file-serving response.
+
+- **8d: Wired into restore POST.** 10/min per user — restore is a write
+  op (creates a new DocumentVersion), same budget as uploads. Headers
+  attached to the 201.
+
+- **8e: Refactored public unions route** to use the shared helper.
+  Previously had its own in-line `rateLimitStore` Map + `checkRateLimit`
+  function — now DRYed up to call the shared one. Public route now also
+  emits `X-RateLimit-*` headers on 200s (it didn't before). Removed the
+  `any` cast on the `where` clause while I was in there — replaced with
+  a proper typed `{ OR?: Array<Record<string, unknown>> }`.
+
+- **8f: Smoke-tested by hammering `/api/public/unions`.**
+  - First 60 requests: HTTP 200 with `x-ratelimit-limit: 60`,
+    `x-ratelimit-remaining: 59` (decrementing).
+  - Requests 61+: HTTP 429 with `retry-after: 59`, `x-ratelimit-remaining: 0`.
+  - After 60s window reset: back to 200.
+  - No errors in dev log.
+  - `tsc --noEmit` clean.
+
+Stage Summary:
+- Three authed routes (upload, download, restore) now rate-limited per-user.
+- Public search route refactored to share the same helper.
+- All four routes emit `X-RateLimit-*` headers on every response (not just
+  429s) so polite clients can self-throttle.
+- 429s include `Retry-After` per RFC 7231.
+- Verified end-to-end: 200 → 200 → ... → 429 → 429 → (wait 60s) → 200.

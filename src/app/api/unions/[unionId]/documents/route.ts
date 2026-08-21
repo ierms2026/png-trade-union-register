@@ -6,6 +6,12 @@ import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
 import { hasPdfMagicBytes, validatePdfIntegrity } from "@/lib/file-validation";
+import {
+  checkRateLimit,
+  rateLimitedResponse,
+  rateLimitHeaders,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
 
 // =============================================================================
 // POST /api/unions/[unionId]/documents
@@ -95,6 +101,25 @@ export async function POST(
       { status: 403 },
     );
   }
+
+  // 0b. Rate limit — 10 uploads/min per user.
+  //     Per-userId (not per-IP) because this is an authed route: one user
+  //     on multiple devices shares one budget; multiple users behind one
+  //     NAT get separate budgets. Stops a stolen session cookie from
+  //     spamming uploads.
+  const rl = checkRateLimit(
+    "documentUpload",
+    user.id,
+    RATE_LIMITS.documentUpload.max,
+    RATE_LIMITS.documentUpload.windowMs,
+  );
+  if (!rl.allowed) {
+    return rateLimitedResponse(rl);
+  }
+  // Stash the rate-limit result so we can attach the headers to the
+  // eventual success/error response. This lets polite clients see
+  // X-RateLimit-Remaining and self-throttle before hitting 429.
+  const rlHeaders = rateLimitHeaders(rl);
 
   // 1. Verify the union exists. Union existence is not a secret at this
   //    endpoint (it's an authenticated internal route), so a plain 404 is
@@ -345,6 +370,7 @@ export async function POST(
     // 14. Return 201 Created with the new version's metadata.
     //     Includes the checksum + filePath so the client can verify
     //     integrity and construct download URLs.
+    //     Rate-limit headers are attached so polite clients can self-throttle.
     return NextResponse.json(
       {
         documentId: result.documentId,
@@ -360,7 +386,7 @@ export async function POST(
           uploadedAt: result.newVersion.uploadedAt,
         },
       },
-      { status: 201 },
+      { status: 201, headers: rlHeaders },
     );
   } catch (err) {
     // Compensation: delete the file we wrote, since the DB transaction failed.

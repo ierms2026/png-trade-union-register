@@ -5,6 +5,12 @@ import crypto from "node:crypto";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
+import {
+  checkRateLimit,
+  rateLimitedResponse,
+  rateLimitHeaders,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
 
 // =============================================================================
 // POST /api/unions/[unionId]/documents/[documentId]/restore
@@ -52,6 +58,20 @@ export async function POST(
       { status: 403 },
     );
   }
+
+  // Rate limit — 10 restores/min per user. Same budget as uploads since
+  // restore is also a write op (creates a new DocumentVersion). Stops a
+  // stolen session cookie from creating endless restored versions.
+  const rl = checkRateLimit(
+    "documentRestore",
+    user.id,
+    RATE_LIMITS.documentRestore.max,
+    RATE_LIMITS.documentRestore.windowMs,
+  );
+  if (!rl.allowed) {
+    return rateLimitedResponse(rl);
+  }
+  const rlHeaders = rateLimitHeaders(rl);
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body.versionId !== "string") {
@@ -176,6 +196,6 @@ export async function POST(
         uploadedAt: newVersion.uploadedAt.toISOString(),
       },
     },
-    { status: 201 },
+    { status: 201, headers: rlHeaders },
   );
 }
