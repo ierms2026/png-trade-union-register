@@ -99,6 +99,13 @@ export async function PUT(
       { status: 401 },
     );
   }
+  // Inspectors are read-only — cannot update unions.
+  if (user.role === "INSPECTOR") {
+    return NextResponse.json(
+      { error: "Inspectors have read-only access and cannot update unions." },
+      { status: 403 },
+    );
+  }
 
   // 2. Parse the JSON body. Lenient on type, strict on JSON validity.
   let body: Record<string, unknown>;

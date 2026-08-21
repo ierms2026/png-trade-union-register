@@ -10,7 +10,6 @@ import {
   ListTodo,
   Calendar,
   ScrollText,
-  Archive,
   Users,
   Shield,
   Key,
@@ -82,7 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "tasks", label: "Tasks", icon: ListTodo, roles: ["REGISTRAR", "OFFICER"] },
   { id: "calendar", label: "Calendar", icon: Calendar, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"] },
   { id: "audit", label: "Audit Log", icon: ScrollText, roles: ["REGISTRAR", "INSPECTOR"] },
-  { id: "retention", label: "Retention", icon: Archive, roles: ["REGISTRAR", "INSPECTOR"] },
+  // Retention removed — disposal features omitted
   { id: "users", label: "Users", icon: Users, roles: ["REGISTRAR"] },
   { id: "security", label: "Security", icon: Shield, roles: ["REGISTRAR"] },
   { id: "api-keys", label: "API Keys", icon: Key, roles: ["REGISTRAR"] },

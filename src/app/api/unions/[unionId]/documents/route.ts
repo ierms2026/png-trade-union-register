@@ -184,11 +184,11 @@ export async function POST(
   const checksum = crypto.createHash("sha256").update(buffer).digest("hex");
 
   // 7. Find existing Document (if any) for this (unionId, documentType).
-  //    Includes only the latest version for duplicate comparison.
-  //    Uses findFirst (not findUnique) because there's no @@unique constraint
-  //    yet on (unionId, documentType) — see TODO in file header.
-  const existingDoc = await db.document.findFirst({
-    where: { unionId, documentType: documentType.trim() },
+  //    Uses findUnique with the @@unique([unionId, documentType]) constraint.
+  //    This is race-safe — two concurrent uploads can't create duplicate
+  //    Document rows because the DB enforces uniqueness.
+  const existingDoc = await db.document.findUnique({
+    where: { unionId_documentType: { unionId, documentType: documentType.trim() } },
     include: {
       versions: {
         orderBy: { versionNumber: "desc" },

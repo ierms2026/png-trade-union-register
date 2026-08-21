@@ -167,6 +167,8 @@ model Document {
   updatedAt        DateTime          @updatedAt
   union            Union             @relation(fields: [unionId], references: [id], onDelete: Cascade)
   versions         DocumentVersion[]
+
+  @@unique([unionId, documentType])
 }
 
 model DocumentVersion {

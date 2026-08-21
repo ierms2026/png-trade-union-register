@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/auth-guard";
+import { getAuthUser, getAuthUserOrApiKey } from "@/lib/auth/auth-guard";
 
 // =============================================================================
 // GET /api/unions
@@ -33,7 +33,7 @@ import { getAuthUser } from "@/lib/auth/auth-guard";
 // =============================================================================
 
 export async function GET(req: NextRequest) {
-  const user = await getAuthUser(req);
+  const user = await getAuthUserOrApiKey(req);
   if (!user) {
     return NextResponse.json(
       { error: "Authentication required." },

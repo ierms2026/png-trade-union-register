@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/auth-guard";
+import { getAuthUserOrApiKey } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
 
 // =============================================================================
@@ -33,7 +33,7 @@ const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 20;
 
 export async function GET(req: NextRequest) {
-  const user = await getAuthUser(req);
+  const user = await getAuthUserOrApiKey(req);
   if (!user) {
     return NextResponse.json(
       { error: "Authentication required." },

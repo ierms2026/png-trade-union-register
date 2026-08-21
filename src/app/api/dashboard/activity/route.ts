@@ -35,7 +35,20 @@ export async function GET() {
     );
   }
 
+  // Officer scoping: only show audit entries related to their union
+  // or their own actions. This prevents cross-union data leakage.
+  const where =
+    user.role === "OFFICER" && user.assignedUnionId
+      ? {
+          OR: [
+            { entityId: user.assignedUnionId, entityType: "Union" },
+            { actorId: user.id },
+          ],
+        }
+      : {};
+
   const entries = await db.auditLog.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     take: 20,
     select: {

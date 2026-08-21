@@ -36,13 +36,14 @@ export async function GET() {
     );
   }
 
+  // Fetch unread notifications (capped at 50 for the dropdown display)
   const notifications = await db.notification.findMany({
     where: {
       userId: user.id,
       readAt: null,
     },
     orderBy: { createdAt: "desc" },
-    take: 50, // cap at 50 — the bell dropdown shouldn't show hundreds
+    take: 50,
     select: {
       id: true,
       type: true,
@@ -53,6 +54,15 @@ export async function GET() {
     },
   });
 
+  // Separate count query for the TRUE unread count (not capped at 50).
+  // The bell badge needs the actual total, not the capped list length.
+  const trueUnreadCount = await db.notification.count({
+    where: {
+      userId: user.id,
+      readAt: null,
+    },
+  });
+
   const serialized = notifications.map((n) => ({
     ...n,
     createdAt: n.createdAt.toISOString(),
@@ -60,6 +70,6 @@ export async function GET() {
 
   return NextResponse.json({
     notifications: serialized,
-    unreadCount: serialized.length,
+    unreadCount: trueUnreadCount,
   });
 }

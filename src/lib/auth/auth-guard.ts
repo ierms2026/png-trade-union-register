@@ -1,10 +1,24 @@
 import { cookies } from "next/headers";
+import { createHash } from "node:crypto";
 import { db } from "@/lib/prisma";
+import { Role } from "@prisma/client";
 import {
   SESSION_COOKIE_NAME,
   verifySessionCookieValue,
 } from "@/lib/auth/session";
-import type { AuthUser } from "@/lib/auth/context";
+
+// =============================================================================
+// AuthUser interface — defined here (was previously in context.ts, which
+// has been deleted). All routes import AuthUser from auth-guard.
+// =============================================================================
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  assignedUnionId: string | null;
+}
 
 // =============================================================================
 // Real auth-guard — replaces the mock in context.ts.
@@ -150,4 +164,92 @@ export async function getAuthUser(_req?: Request): Promise<AuthUser | null> {
   };
 
   return user;
+}
+
+// =============================================================================
+// API Key Authentication
+// -----------------------------------------------------------------------------
+// getApiKeyUser(req) — reads the Authorization: Bearer header, hashes the
+// key with SHA-256, looks up the ApiKey by keyHash, checks revocation +
+// expiry + owner disabled, and returns the owner's AuthUser.
+//
+// Returns null if:
+//   - No Authorization header
+//   - Header doesn't start with "Bearer "
+//   - Key not found in DB (keyHash doesn't match)
+//   - Key is revoked (revokedAt IS NOT NULL)
+//   - Key is expired (expiresAt <= now)
+//   - Owner is disabled
+// =============================================================================
+
+export async function getApiKeyUser(req: Request): Promise<AuthUser | null> {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
+
+  const rawKey = authHeader.slice("Bearer ".length);
+  if (!rawKey.startsWith("urm_")) return null; // API keys always start with urm_
+
+  // SHA-256 hash the presented key — we only store the hash, never the raw key
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+
+  // Look up the ApiKey by hash, including the owner user
+  const apiKey = await db.apiKey.findUnique({
+    where: { keyHash },
+    select: {
+      id: true,
+      scopes: true,
+      expiresAt: true,
+      revokedAt: true,
+      creator: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          assignedUnionId: true,
+          disabled: true,
+        },
+      },
+    },
+  });
+
+  // Key not found
+  if (!apiKey) return null;
+
+  // Key revoked
+  if (apiKey.revokedAt) return null;
+
+  // Key expired
+  if (apiKey.expiresAt.getTime() <= Date.now()) return null;
+
+  // Owner disabled — key immediately stops authenticating
+  if (!apiKey.creator || apiKey.creator.disabled) return null;
+
+  // Return the owner's identity as an AuthUser
+  return {
+    id: apiKey.creator.id,
+    name: apiKey.creator.email,
+    email: apiKey.creator.email,
+    role: apiKey.creator.role,
+    assignedUnionId: apiKey.creator.assignedUnionId,
+  };
+}
+
+/**
+ * Get the authenticated user — tries session cookie first, then API key.
+ *
+ * This is the unified entry point for all API routes. Browser requests
+ * use session cookies; programmatic requests (scripts, integrations) use
+ * API keys via the Authorization header.
+ *
+ * Usage:
+ *   const user = await getAuthUserOrApiKey(req);
+ *   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ */
+export async function getAuthUserOrApiKey(req: Request): Promise<AuthUser | null> {
+  // Try session cookie first (browser requests)
+  const sessionUser = await getAuthUser(req);
+  if (sessionUser) return sessionUser;
+
+  // Fall back to API key (programmatic requests)
+  return getApiKeyUser(req);
 }

@@ -104,7 +104,7 @@ export async function POST(
 
   // Don't restore if it's already the current version
   const latestVersion = doc.versions[0];
-  if (latestVersion && versionToRestore.id === doc.id) {
+  if (latestVersion && versionToRestore.id === doc.currentVersionId) {
     return NextResponse.json(
       { error: "This is already the current version." },
       { status: 400 },

@@ -31,6 +31,25 @@ const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
 const STORAGE_ROOT =
   process.env.STORAGE_ROOT || path.join(process.cwd(), "storage");
 
+// --- Rate limiter (same pattern as /api/public/unions) ---
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX = 60;
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  }
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return { allowed: false, remaining: 0 };
+  }
+  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count };
+}
+
 const NOT_FOUND_RESPONSE = NextResponse.json(
   { error: "File not found." },
   { status: 404 },
@@ -41,6 +60,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+
+  // --- 0. Rate limit check ---
+  const ip = req.headers.get("x-forwarded-for") || "unknown";
+  const rateLimit = checkRateLimit(ip);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded." },
+      {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      },
+    );
+  }
 
   // --- 1. Load the version + its document + union ------------------------
   const version = await db.documentVersion.findUnique({

@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { LoginForm } from "@/components/app/login-form";
 import { AppShell } from "@/components/app/app-shell";
 import { PublicPortal } from "@/components/app/public-portal";
+import { SetPasswordForm } from "@/components/app/set-password-form";
 import { DashboardView } from "@/components/app/views/dashboard";
 import { ComplianceView } from "@/components/app/views/compliance";
 import { ConfigureRulesView } from "@/components/app/views/configure-rules";
@@ -13,7 +14,7 @@ import { UnionsView } from "@/components/app/views/unions";
 import { TasksView } from "@/components/app/views/tasks";
 import { CalendarView } from "@/components/app/views/calendar";
 import { AuditView } from "@/components/app/views/audit";
-import { RetentionView } from "@/components/app/views/retention";
+// Retention view removed — disposal features omitted
 import { UsersView } from "@/components/app/views/users";
 import { SecurityView } from "@/components/app/views/security";
 import { ApiKeysView } from "@/components/app/views/api-keys";
@@ -47,21 +48,40 @@ export default function Home() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [activeView, setActiveView] = useState("dashboard");
 
+  // Check for ?token=xxx in the URL — if present, show the Set Password form
+  // instead of the normal auth flow. This is how new users set their password.
+  const [resetToken, setResetToken] = useState<string | null>(null);
+
   useEffect(() => {
-    // Check if the user is authenticated.
-    fetch("/api/auth/me", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data: { user: AuthUser | null }) => {
+    let cancelled = false;
+    (async () => {
+      // Check for password reset token in the URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get("token");
+      if (token) {
+        if (!cancelled) {
+          setResetToken(token);
+          setMode("public-login");
+        }
+        return;
+      }
+
+      // Check if the user is authenticated.
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const data: { user: AuthUser | null } = await res.json();
+        if (cancelled) return;
         if (data.user) {
           setUser(data.user);
           setMode("auth");
         } else {
-          setMode("public-login"); // not authenticated → show login
+          setMode("public-login");
         }
-      })
-      .catch(() => {
-        setMode("public-login"); // network error → show login (let user retry)
-      });
+      } catch {
+        if (!cancelled) setMode("public-login");
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Loading state — full-screen spinner while we check auth.
@@ -80,6 +100,21 @@ export default function Home() {
   if (mode === "public") {
     return (
       <PublicPortal onBack={() => setMode("public-login")} />
+    );
+  }
+
+  // Set Password mode — user has a token in the URL
+  if (resetToken) {
+    return (
+      <SetPasswordForm
+        token={resetToken}
+        onSuccess={() => {
+          setResetToken(null);
+          // Clear the token from the URL
+          window.history.replaceState({}, "", "/");
+          window.location.href = "/";
+        }}
+      />
     );
   }
 
@@ -108,8 +143,7 @@ export default function Home() {
         return <CalendarView />;
       case "audit":
         return <AuditView />;
-      case "retention":
-        return <RetentionView user={user} />;
+      // Retention view removed — disposal features omitted
       case "users":
         return <UsersView />;
       case "security":

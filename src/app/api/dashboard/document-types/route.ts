@@ -17,9 +17,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Count documents per type, excluding disposed docs
+  // Count documents per type, excluding disposed docs.
+  // Officer scoping: only count documents from their assigned union.
+  const where: { disposedAt: null; unionId?: string } = { disposedAt: null };
+  if (user.role === "OFFICER" && user.assignedUnionId) {
+    where.unionId = user.assignedUnionId;
+  }
+
   const documents = await db.document.findMany({
-    where: { disposedAt: null },
+    where,
     select: { documentType: true },
   });
 

@@ -55,4 +55,21 @@ export async function register() {
       err instanceof Error ? err.message : err,
     );
   }
+
+  // --- pdftotext health check ---
+  // Text extraction depends on the system `pdftotext` binary (poppler-utils).
+  // If it's not installed, PDF uploads will silently fail text extraction
+  // (textContent stays null). Log a warning so the operator knows.
+  try {
+    const { exec } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execAsync = promisify(exec);
+    await execAsync("which pdftotext");
+    console.log("[instrumentation] pdftotext available — text extraction enabled.");
+  } catch {
+    console.warn(
+      "[instrumentation] pdftotext NOT found — PDF text extraction will be disabled. " +
+        "Install poppler-utils to enable full-text search.",
+    );
+  }
 }
