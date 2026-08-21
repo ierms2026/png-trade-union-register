@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser, getAuthUserOrApiKey } from "@/lib/auth/auth-guard";
+import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 
 // =============================================================================
 // GET /api/unions
@@ -38,6 +38,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { error: "Authentication required." },
       { status: 401 },
+    );
+  }
+  // API-key callers must have the `unions:read` scope. Session-cookie
+  // callers bypass this — they inherit their role's full permissions.
+  if (!hasScope(user, "unions:read")) {
+    return NextResponse.json(
+      { error: "Your API key does not have the 'unions:read' scope." },
+      { status: 403 },
     );
   }
 

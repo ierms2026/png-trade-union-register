@@ -246,3 +246,103 @@ export const SESSION_CLEAR_COOKIE_ATTRIBUTES = {
   path: "/",
   maxAge: 0, // Browser discards immediately
 } as const;
+
+// -----------------------------------------------------------------------------
+// 2FA Challenge Token — HMAC-signed
+// -----------------------------------------------------------------------------
+// The challenge token is the bridge between step 1 (password verified) and
+// step 2 (OTP verified) of the two-step login. It carries the userId so the
+// 2FA route knows whose OTP to check.
+//
+// SECURITY:
+//   - Format: base64url(payload).base64url(signature)
+//     where payload = JSON.stringify({ userId, iat })
+//   - Signed with the same SECRET as session cookies — one secret, multiple
+//     consumers. The signature binds the payload to the server; an attacker
+//     can't forge a token without the SECRET.
+//   - 30s TTL — tight enough that a stolen token (e.g. from a browser
+//     extension scraping the response) is nearly useless.
+//   - The 2FA route STILL re-loads the user from the DB before accepting
+//     the token, so a disabled user or a reset 2FA secret between steps 1
+//     and 2 is caught independently of the signature.
+//
+// WHY SIGN IT (when the prior unsigned version "worked"):
+//   - Without a signature, an attacker who learns a userId (e.g. from a
+//     leaked URL, log file, or social engineering) can forge a challenge
+//     token: `base64("userId:" + Date.now())`. They could then probe the
+//     2FA endpoint directly, bypassing the password check + lockout
+//     counter — a 6-digit OTP has only 10^6 space, and lockout only fires
+//     after 3 attempts. With signing, forging is impossible without the
+//     SECRET, so the password+lockout gate stays intact.
+// -----------------------------------------------------------------------------
+
+/** Challenge token TTL: 30 seconds. */
+export const CHALLENGE_TOKEN_TTL_MS = 30 * 1000;
+
+interface ChallengePayload {
+  userId: string;
+  iat: number; // issued-at (epoch ms)
+}
+
+/**
+ * Mint an HMAC-signed challenge token for the 2FA flow.
+ *
+ * Call this from the login route after the password is verified but 2FA
+ * is required. The client receives the token and POSTs it back to
+ * /api/auth/login/2fa along with the OTP code.
+ */
+export function signChallengeToken(userId: string): string {
+  const payload: ChallengePayload = { userId, iat: Date.now() };
+  const payloadJson = JSON.stringify(payload);
+  return `${b64url(payloadJson)}.${sign(payloadJson)}`;
+}
+
+/**
+ * Verify a challenge token's signature + TTL. Returns the userId if
+ * valid, `null` for any failure (bad signature, expired, malformed).
+ *
+ * As with `verifySessionCookieValue`, all failure modes return null so
+ * the caller treats them identically — no information leakage.
+ */
+export function parseChallengeToken(token: string): string | null {
+  // Format check: exactly one dot, separating payload and signature.
+  const dotIndex = token.indexOf(".");
+  if (dotIndex <= 0 || dotIndex === token.length - 1) return null;
+  if (token.indexOf(".", dotIndex + 1) !== -1) return null; // >1 dot
+
+  const payloadB64 = token.slice(0, dotIndex);
+  const signature = token.slice(dotIndex + 1);
+
+  // Decode payload
+  let payloadJson: string;
+  try {
+    payloadJson = b64urlDecode(payloadB64);
+  } catch {
+    return null;
+  }
+
+  // Verify signature (constant-time)
+  const expectedSignature = sign(payloadJson);
+  if (!safeEqual(signature, expectedSignature)) return null;
+
+  // Parse payload
+  let payload: ChallengePayload;
+  try {
+    payload = JSON.parse(payloadJson) as ChallengePayload;
+  } catch {
+    return null;
+  }
+  if (
+    typeof payload?.userId !== "string" ||
+    !payload.userId ||
+    typeof payload?.iat !== "number" ||
+    !Number.isFinite(payload.iat)
+  ) {
+    return null;
+  }
+
+  // TTL check
+  if (Date.now() - payload.iat > CHALLENGE_TOKEN_TTL_MS) return null;
+
+  return payload.userId;
+}

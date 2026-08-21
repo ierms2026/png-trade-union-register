@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth/password";
-import { verifyTwoFactorCode } from "@/lib/auth/totp";
 import {
   createSessionCookieValue,
   generateJTI,
   SESSION_COOKIE_ATTRIBUTES,
   SESSION_COOKIE_NAME,
   SESSION_TTL_MS,
+  signChallengeToken,
 } from "@/lib/auth/session";
 import { LOCKOUT_THRESHOLD, LOCKOUT_DURATION_MINS } from "@/lib/auth/constants";
 import { Severity } from "@prisma/client";
@@ -54,55 +54,22 @@ import { Severity } from "@prisma/client";
 const DUMMY_HASH =
   "$2a$12$uQqZyfGZ6o9kl4qYj3vUO.X.NdQ4HKPRtWQ7BD8rJm5p1Nc9oR8K.";
 
-// Challenge token TTL: 30 seconds. The user has 30s to fetch their
-// authenticator app and type the 6-digit code. Tight enough that a
-// stolen challenge token (e.g. from a browser extension) is nearly
-// useless, loose enough for a human.
-const CHALLENGE_TOKEN_TTL_MS = 30 * 1000;
+// Challenge token TTL is defined in session.ts (CHALLENGE_TOKEN_TTL_MS, 30s).
+// The user has 30s to fetch their authenticator app and type the 6-digit
+// code. Tight enough that a stolen challenge token (e.g. from a browser
+// extension scraping the response body) is nearly useless; loose enough
+// for a human.
 
 interface LoginRequestBody {
   email?: unknown;
   password?: unknown;
 }
 
-/**
- * Build a base64-encoded challenge token for the 2FA flow.
- *
- * Format: base64("{userId}:{issuedAt}")
- *
- * The token is NOT signed — it's only valid for 30s, and the 2fa route
- * re-loads the user from the DB to check `disabled` and `twoFactorEnabled`
- * before accepting the token. A forged token would need to know the
- * user's ID AND have a valid 2FA secret, which is the same security
- * level as the password itself.
- *
- * (A signed challenge token would be more robust, but adds complexity
- * for marginal benefit given the 30s expiry + DB re-check.)
- */
-function buildChallengeToken(userId: string): string {
-  const payload = `${userId}:${Date.now()}`;
-  return Buffer.from(payload, "utf8").toString("base64");
-}
-
-/**
- * Verify a challenge token's structure + expiry. Returns the userId
- * if valid, null otherwise.
- *
- * Exported so /api/auth/login/2fa can reuse it.
- */
-export function parseChallengeToken(token: string): string | null {
-  try {
-    const decoded = Buffer.from(token, "base64").toString("utf8");
-    const [userId, issuedAtStr] = decoded.split(":");
-    if (!userId || !issuedAtStr) return null;
-    const issuedAt = parseInt(issuedAtStr, 10);
-    if (!Number.isFinite(issuedAt)) return null;
-    if (Date.now() - issuedAt > CHALLENGE_TOKEN_TTL_MS) return null;
-    return userId;
-  } catch {
-    return null;
-  }
-}
+// Challenge token helpers live in session.ts so both this route and the
+// 2FA route share the same signing/verification logic. Re-exported here
+// for backwards compatibility with any code that imported it from this
+// module.
+export { parseChallengeToken } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   // --- 1. Parse the body ---------------------------------------------------
@@ -242,9 +209,9 @@ export async function POST(req: NextRequest) {
     data: { email, success: true, userId: user.id, ip, userAgent },
   });
 
-  // --- 8. If 2FA enabled, return a challenge token ------------------------
+  // --- 8. If 2FA enabled, return a signed challenge token --------------
   if (user.twoFactorEnabled && user.twoFactorSecret) {
-    const challengeToken = buildChallengeToken(user.id);
+    const challengeToken = signChallengeToken(user.id);
     return NextResponse.json({
       requiresTwoFactor: true,
       challengeToken,

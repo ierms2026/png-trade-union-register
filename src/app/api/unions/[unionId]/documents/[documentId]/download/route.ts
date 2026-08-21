@@ -99,7 +99,9 @@ export async function GET(
   const contentType = contentTypes[ext || ""] || "application/octet-stream";
   const fileName = latestVersion.fileName || "document";
 
-  return new NextResponse(fileBuffer, {
+  // Buffer → BodyInit: see /api/public/files/[id]/route.ts for the same
+  // cast rationale.
+  return new NextResponse(fileBuffer as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": contentType,

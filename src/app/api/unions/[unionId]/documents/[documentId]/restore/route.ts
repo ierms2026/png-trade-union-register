@@ -67,6 +67,7 @@ export async function POST(
     select: {
       id: true,
       documentType: true,
+      currentVersionId: true,
       disposedAt: true,
       versions: {
         orderBy: { versionNumber: "desc" },

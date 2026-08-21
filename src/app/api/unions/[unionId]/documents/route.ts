@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
+import { hasPdfMagicBytes, validatePdfIntegrity } from "@/lib/file-validation";
 
 // =============================================================================
 // POST /api/unions/[unionId]/documents
@@ -179,6 +180,38 @@ export async function POST(
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
+  // 5b. PDF integrity check — reject corrupt or fake PDFs at upload time.
+  //     For files claiming to be PDFs (by extension), we:
+  //       1. Verify the magic bytes (`%PDF-`) — catches "doc renamed to .pdf".
+  //       2. Run `pdfinfo` to verify structural integrity — catches truncated
+  //          or otherwise-broken PDFs.
+  //     Non-PDF files skip this check (we accept DOC/DOCX/JPG/PNG/etc).
+  //     If `pdfinfo` isn't installed on the host, we degrade gracefully
+  //     (magic-bytes check still runs).
+  if (fileExtension === ".pdf") {
+    if (!hasPdfMagicBytes(buffer)) {
+      return NextResponse.json(
+        {
+          error:
+            "File has a .pdf extension but is not a valid PDF (missing %PDF- magic bytes). " +
+            "Please upload the original file or convert it to PDF before uploading.",
+        },
+        { status: 400 },
+      );
+    }
+    const pdfValid = await validatePdfIntegrity(buffer);
+    if (!pdfValid) {
+      return NextResponse.json(
+        {
+          error:
+            "The PDF file appears to be corrupt or incomplete (pdfinfo failed to parse it). " +
+            "Please re-export or re-download the PDF and try uploading again.",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   // 6. SHA-256 checksum — the foundation of duplicate detection.
   //    Hex-encoded (64 chars) for storage + display.
   const checksum = crypto.createHash("sha256").update(buffer).digest("hex");
@@ -270,9 +303,11 @@ export async function POST(
   try {
     const result = await db.$transaction(async (tx) => {
       // If document doesn't exist yet, create it with the upfront-generated ID.
-      let document = existingDoc;
-      if (!document) {
-        document = await tx.document.create({
+      // (We always use the `documentId` computed earlier — either the existing
+      // doc's id or the freshly-generated UUID — so we don't need to track
+      // the created Document object, just the id.)
+      if (!existingDoc) {
+        await tx.document.create({
           data: {
             id: documentId,
             unionId,
@@ -284,7 +319,7 @@ export async function POST(
       // Create the DocumentVersion row
       const newVersion = await tx.documentVersion.create({
         data: {
-          documentId: document.id,
+          documentId,
           versionNumber,
           fileName: title.trim(),
           filePath: relativeFilePath,
@@ -300,11 +335,11 @@ export async function POST(
       // the version referenced by currentVersionId, without needing to
       // query "ORDER BY versionNumber DESC LIMIT 1" on every read.
       await tx.document.update({
-        where: { id: document.id },
+        where: { id: documentId },
         data: { currentVersionId: newVersion.id },
       });
 
-      return { document, newVersion };
+      return { documentId, documentType: documentType.trim(), newVersion };
     });
 
     // 14. Return 201 Created with the new version's metadata.
@@ -312,8 +347,8 @@ export async function POST(
     //     integrity and construct download URLs.
     return NextResponse.json(
       {
-        documentId: result.document.id,
-        documentType: result.document.documentType,
+        documentId: result.documentId,
+        documentType: result.documentType,
         version: {
           id: result.newVersion.id,
           versionNumber: result.newVersion.versionNumber,

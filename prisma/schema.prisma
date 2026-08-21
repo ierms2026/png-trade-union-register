@@ -46,6 +46,12 @@ model User {
   loginAttempts        LoginAttempt[]
   auditLogs            AuditLog[]
   apiKeys              ApiKey[]
+  // Session 6: back-relations for Task. Two FKs from Task → User exist
+  // (assignee + creator), so Prisma requires named relations to
+  // disambiguate which back-relation maps to which FK.
+  assignedTasks        Task[]         @relation("TaskAssignee")
+  createdTasks         Task[]         @relation("TaskCreator")
+  notifications        Notification[]
 }
 
 // -----------------------------------------------------------------------------
@@ -154,6 +160,7 @@ model Union {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   documents      Document[]
+  tasks          Task[]
 }
 
 model Document {
@@ -213,6 +220,29 @@ model Task {
   createdById String
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  // FK relations — added in Chunk 5 (schema integrity).
+  //
+  // unionId is OPTIONAL (general tasks aren't tied to a union), so we use
+  // onDelete: SetNull — deleting a Union nulls out the unionId of its
+  // tasks but keeps the task rows (they may still be assignee-scoped).
+  //
+  // assigneeId is OPTIONAL (unassigned tasks exist), so onDelete: SetNull
+  // — deleting a User nulls out the assigneeId of their tasks but keeps
+  // the rows (the creator and audit trail still reference the task).
+  //
+  // createdById is REQUIRED (every task has a creator), so onDelete:
+  // Restrict — deleting a User who created tasks fails loudly. This
+  // prevents silent loss of provenance. (In practice, the user-delete
+  // flow would reassign or soft-delete; for now the restrict acts as a
+  // guardrail.)
+  //
+  // Two FKs to User (assignee + creator) require Prisma's named-relations
+  // feature — see the back-relations on User (`assignedTasks`,
+  // `createdTasks`).
+  union       Union?     @relation(fields: [unionId], references: [id], onDelete: SetNull)
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator     User       @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
 }
 
 model Notification {
@@ -225,4 +255,9 @@ model Notification {
   linkUrl   String?
   readAt    DateTime?
   createdAt DateTime         @default(now())
+
+  // FK relation — added in Chunk 5. Cascade delete: when a User is deleted,
+  // their notifications are deleted too (notifications are personal —
+  // they have no value once the user is gone).
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

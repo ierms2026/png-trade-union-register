@@ -123,6 +123,12 @@ export default function Home() {
     return <LoginForm onPublicPortal={() => setMode("public")} />;
   }
 
+  // Capture the non-null user in a local const so TypeScript narrows it
+  // correctly inside `renderView()` — the closure over `user` (a state
+  // variable) doesn't narrow through the early-return above, but the
+  // local const does.
+  const currentUser = user;
+
   // Authenticated → render the app shell with the active view.
   function renderView() {
     switch (activeView) {
@@ -130,7 +136,7 @@ export default function Home() {
         return <DashboardView />;
       case "unions":
       case "my-union":
-        return <UnionsView user={user} />;
+        return <UnionsView user={currentUser} />;
       case "compliance":
         return <ComplianceView />;
       case "configure-rules":
@@ -151,14 +157,14 @@ export default function Home() {
       case "api-keys":
         return <ApiKeysView />;
       case "account-security":
-        return <AccountSecurityView user={user} />;
+        return <AccountSecurityView user={currentUser} />;
       default:
         return <DashboardView />;
     }
   }
 
   return (
-    <AppShell user={user} activeView={activeView} onNavigate={setActiveView}>
+    <AppShell user={currentUser} activeView={activeView} onNavigate={setActiveView}>
       {renderView()}
     </AppShell>
   );

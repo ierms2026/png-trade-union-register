@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth/auth-guard";
+import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 
 // =============================================================================
@@ -22,14 +22,26 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 // AUTH:
 // Any authenticated role can view the matrix. Officers get a scoped view;
 // Registrars + Inspectors see the full matrix.
+//
+// API KEY:
+// Programmatic callers may present an API key with the `compliance:read`
+// scope via the Authorization: Bearer header. The key resolves to its
+// owner's AuthUser, so Officer-scoped keys still get the scoped matrix.
 // =============================================================================
 
 export async function GET(req: Request) {
-  const user = await getAuthUser(req);
+  const user = await getAuthUserOrApiKey(req);
   if (!user) {
     return NextResponse.json(
       { error: "Authentication required." },
       { status: 401 },
+    );
+  }
+  // API-key callers must have the `compliance:read` scope.
+  if (!hasScope(user, "compliance:read")) {
+    return NextResponse.json(
+      { error: "Your API key does not have the 'compliance:read' scope." },
+      { status: 403 },
     );
   }
 

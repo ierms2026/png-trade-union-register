@@ -18,6 +18,39 @@ export interface AuthUser {
   email: string;
   role: Role;
   assignedUnionId: string | null;
+  /**
+   * API-key scopes (e.g. `["unions:read", "documents:read"]`).
+   *
+   * - `null` for session-cookie auth: browser sessions inherit the user's
+   *   full role permissions (no scope narrowing).
+   * - Populated for API-key auth: the key is restricted to these scopes
+   *   REGARDLESS of the owner's role. A REGISTRAR-owned key with only
+   *   `unions:read` cannot call `/api/audit` even though the owner could
+   *   via the browser.
+   *
+   * Routes that accept API keys MUST check `user.scopes` if non-null.
+   * The `hasScope` helper below makes this a one-liner.
+   */
+  scopes: string[] | null;
+}
+
+/**
+ * Returns true if the authenticated user is permitted to perform an action
+ * requiring the given scope.
+ *
+ * - Session-cookie users (scopes === null): always permitted — they
+ *   inherit the user's full role permissions. Role-based access control
+ *   is enforced separately by each route.
+ * - API-key users (scopes is an array): permitted only if the scope is
+ *   in the array.
+ *
+ * Usage:
+ *   const user = await getAuthUserOrApiKey(req);
+ *   if (!user || !hasScope(user, "audit:read")) return 401/403;
+ */
+export function hasScope(user: AuthUser, scope: string): boolean {
+  if (user.scopes === null) return true; // session-cookie auth — role check applies
+  return user.scopes.includes(scope);
 }
 
 // =============================================================================
@@ -161,6 +194,9 @@ export async function getAuthUser(_req?: Request): Promise<AuthUser | null> {
     email: session.user.email,
     role: session.user.role,
     assignedUnionId: session.user.assignedUnionId,
+    // Session-cookie auth: no scope narrowing. Role-based access control
+    // is enforced by each route.
+    scopes: null,
   };
 
   return user;
@@ -224,13 +260,21 @@ export async function getApiKeyUser(req: Request): Promise<AuthUser | null> {
   // Owner disabled — key immediately stops authenticating
   if (!apiKey.creator || apiKey.creator.disabled) return null;
 
-  // Return the owner's identity as an AuthUser
+  // Return the owner's identity as an AuthUser. The scopes from the
+  // ApiKey row are attached — routes that accept API keys MUST check
+  // `hasScope(user, "...")` to enforce scope narrowing.
   return {
     id: apiKey.creator.id,
     name: apiKey.creator.email,
     email: apiKey.creator.email,
     role: apiKey.creator.role,
     assignedUnionId: apiKey.creator.assignedUnionId,
+    // Split the comma-separated scopes string into an array.
+    // Empty/whitespace entries are filtered out defensively.
+    scopes: apiKey.scopes
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
   };
 }
 

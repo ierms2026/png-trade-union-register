@@ -5,10 +5,11 @@ import {
   createSessionCookieValue,
   generateJTI,
   SESSION_COOKIE_ATTRIBUTES,
+  SESSION_COOKIE_NAME,
   SESSION_TTL_MS,
+  parseChallengeToken,
 } from "@/lib/auth/session";
 import { LOCKOUT_THRESHOLD, LOCKOUT_DURATION_MINS } from "@/lib/auth/constants";
-import { parseChallengeToken } from "@/app/api/auth/login/route";
 import { Severity } from "@prisma/client";
 
 // =============================================================================

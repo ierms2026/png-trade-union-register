@@ -38,12 +38,13 @@ import QRCode from "qrcode";
 // Creating a new instance per request would be wasteful (the config doesn't
 // change) — but each call to .verify() is still independent (no shared
 // mutable state).
+//
+// otplib v13 API note: `epochTolerance` is NOT a constructor option (the
+// constructor's TOTPOptions type only accepts digits/period/algorithm/etc).
+// It's a per-call verify option. We pass it in `verifyTwoFactorCode` below.
 const totp = new TOTP({
   digits: 6,
   period: 30,
-  // 30 seconds of tolerance each way = 1 period window (matches v12's
-  // `window: 1`). Aligns with the spec's intent.
-  epochTolerance: 30,
 });
 
 /**
@@ -133,11 +134,15 @@ export async function verifyTwoFactorCode(
   if (!secret || !token) return false;
 
   try {
-    const result = await totp.verify(token, { secret });
-    // otplib v13 returns a VerifyResult object with a `valid` boolean.
-    // Older v12 returned a plain boolean. We handle both shapes for
-    // forward-compatibility.
-    if (typeof result === "boolean") return result;
+    // otplib v13: `epochTolerance` is a per-call option (NOT a constructor
+    // option). 30s symmetric tolerance = 1 period window each way, matching
+    // v12's `window: 1`. Handles clock drift between the user's phone and
+    // the server (a phone 20s slow would generate a "previous window"
+    // token that's still valid).
+    const result = await totp.verify(token, { secret, epochTolerance: 30 });
+    // v13 returns a discriminated union `VerifyResult`:
+    //   - { valid: true, delta, epoch, timeStep }
+    //   - { valid: false }
     return Boolean(result?.valid);
   } catch {
     // Any error (malformed secret, malformed token, plugin failure) →

@@ -127,7 +127,11 @@ export async function GET(
   // browser's print/save dialog.
   const fileName = `${version.fileName}${version.fileExtension ?? ""}`;
 
-  return new NextResponse(fileBuffer, {
+  // Buffer → BodyInit: Next.js accepts Buffer at runtime, but TS 5.9's
+  // lib.dom types use `Uint8Array<ArrayBufferLike>` which doesn't quite
+  // match the `ArrayBufferView` branch of `BodyInit`. Cast directly to
+  // `BodyInit` (the runtime is fine — Node's Buffer IS a valid BodyInit).
+  return new NextResponse(fileBuffer as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": contentType,

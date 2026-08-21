@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUserOrApiKey } from "@/lib/auth/auth-guard";
+import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
 
 // =============================================================================
@@ -38,6 +38,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { error: "Authentication required." },
       { status: 401 },
+    );
+  }
+  // API-key callers must have the `audit:read` scope. Session-cookie
+  // callers (scopes === null) bypass this check and fall through to the
+  // role check below.
+  if (!hasScope(user, "audit:read")) {
+    return NextResponse.json(
+      { error: "Your API key does not have the 'audit:read' scope." },
+      { status: 403 },
     );
   }
   if (user.role !== Role.REGISTRAR && user.role !== Role.INSPECTOR) {
