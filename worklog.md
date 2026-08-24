@@ -310,3 +310,81 @@ Stage Summary:
 - Officer scoping handled (My Union instead of Unions).
 - Accessibility: proper aria-label, aria-current, aria-disabled on the
   current-page element.
+
+---
+Task ID: 10
+Agent: main (continuation)
+Task: Admin password-reset UI button
+
+Work Log:
+- **10-a: Created `ResetPasswordDialog` component** in users.tsx.
+  Two-state dialog (same pattern as CreateUserDialog):
+  1. Confirm state: shows user email + role + a warning that the current
+     password is invalidated immediately. Three bullet points: password
+     stops working now, sessions NOT revoked, user sets new password via
+     link. "Cancel" and "Reset Password" buttons.
+  2. Token-display state: shows the one-time token (64-char hex) + a
+     ready-to-share URL (`/?token=xxx`). Each has a "Copy" button with
+     clipboard support + a 2s "Copied" feedback state. "Done" button
+     closes the dialog.
+  - Added amber warning box ("This token is shown once") to prevent
+    admins from closing the dialog before copying the token.
+  - Uses `navigator.clipboard.writeText()` with a fallback toast error
+    if clipboard access fails.
+
+- **10-b: Wired into UserRow.**
+  - Added `resetPwOpen` state to `UserRow`.
+  - Added "Reset Password" button (KeyRound icon) between the existing
+    "Reset 2FA" and "Disable/Enable" buttons.
+  - Renders `<ResetPasswordDialog>` when `resetPwOpen` is true.
+  - Passes `onReset={onUpdated}` to refetch the user list after the
+    dialog closes.
+
+- **Bug found + fixed during smoke test:**
+  The initial implementation called `onReset()` (which triggers
+  `refetch()`) inside `handleReset()` — right after the API succeeded.
+  This caused the `useFetch` hook to set `loading: true`, which made
+  `UsersView` return `<CardListSkeleton>` — unmounting all `UserRow`
+  components (and the dialog with them). The dialog would flash the
+  token for a frame, then disappear.
+  
+  Fix: moved the `onReset()` call from `handleReset()` to
+  `handleClose()`. The list now refreshes AFTER the admin clicks "Done"
+  and the dialog is safely closed. Added a `wasReset` flag so we only
+  refetch if a password was actually reset (not if the admin cancelled).
+  
+  Also added a comment explaining the root cause so the next person
+  reading the code doesn't reintroduce the bug.
+
+- **10-c: Visual smoke-tested via agent-browser.**
+  - Logged in as registrar@example.com
+  - Navigated to Users view — verified "Reset Password" button appears
+    on each user row (alongside "Reset 2FA" and "Disable/Enable")
+  - Clicked "Reset Password" on the third user → confirm dialog appeared
+    with the user's email, role, and the warning + 3 bullet points ✓
+  - Clicked "Reset Password" in the confirm dialog → API call succeeded
+    (200), toast appeared, dialog switched to token-display state ✓
+  - Token-display state showed:
+    * The 64-char hex token with a "Copy" button ✓
+    * The set-password URL (`/?token=xxx`) with a "Copy" button ✓
+    * The "This token is shown once" warning ✓
+    * A "Done" button ✓
+  - Clicked "Copy" on the token → button changed to "Copied" (with check
+    icon), toast "Copied to clipboard." appeared ✓
+  - Clicked "Done" → dialog closed, user list refreshed ✓
+  - Also tested Cancel button → dialog closed without API call ✓
+  - Screenshots saved to:
+    * download/reset-password-confirm.png (confirm state)
+    * download/reset-password-token.png (token-display state)
+  - `tsc --noEmit` clean.
+
+Stage Summary:
+- Admins can now reset any user's password from the Users view — no API
+  tooling required.
+- The two-state dialog (confirm → token display) matches the existing
+  CreateUserDialog pattern for consistency.
+- Copy-to-clipboard on both the token and the URL.
+- The refetch-timing bug (dialog unmounting during token display) is
+  fixed and documented.
+- Three screenshots captured: confirm dialog, token display, and the
+  Users view with the new button.

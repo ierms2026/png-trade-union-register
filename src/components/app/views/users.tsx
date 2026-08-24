@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Users, Plus, Shield, KeyRound, Loader2, UserCog } from "lucide-react";
+import { Users, Plus, Shield, KeyRound, Loader2, UserCog, Copy, Check, MailWarning } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,7 @@ export function UsersView() {
 
 function UserRow({ user, onUpdated }: { user: User; onUpdated: () => void }) {
   const [updating, setUpdating] = useState(false);
+  const [resetPwOpen, setResetPwOpen] = useState(false);
 
   async function toggleDisabled() {
     const action = user.disabled ? "enable" : "disable";
@@ -184,6 +185,16 @@ function UserRow({ user, onUpdated }: { user: User; onUpdated: () => void }) {
         <Button
           size="sm"
           variant="outline"
+          onClick={() => setResetPwOpen(true)}
+          disabled={updating}
+          title="Reset password"
+        >
+          <KeyRound className="mr-1 h-3 w-3" />
+          Reset Password
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
           onClick={reset2fa}
           disabled={updating || !user.twoFactorEnabled}
           title={!user.twoFactorEnabled ? "2FA not enabled" : "Reset 2FA"}
@@ -201,6 +212,15 @@ function UserRow({ user, onUpdated }: { user: User; onUpdated: () => void }) {
           {user.disabled ? "Enable" : "Disable"}
         </Button>
       </div>
+
+      {resetPwOpen && (
+        <ResetPasswordDialog
+          user={user}
+          open={resetPwOpen}
+          onClose={() => setResetPwOpen(false)}
+          onReset={onUpdated}
+        />
+      )}
     </div>
   );
 }
@@ -342,6 +362,227 @@ function CreateUserDialog({
               </Button>
             </DialogFooter>
           </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =============================================================================
+// ResetPasswordDialog — admin-initiated password reset.
+//
+// Two-state dialog (same pattern as CreateUserDialog):
+//   1. Confirm state: shows the user's email + a warning that the current
+//      password is invalidated IMMEDIATELY. Admin clicks "Reset Password"
+//      to proceed.
+//   2. Token-display state: shows the one-time reset token + a ready-to-
+//      share URL (`/?token=xxx`). Includes copy-to-clipboard buttons.
+//
+// The API call (POST /api/users/[id]/reset-password) happens when the
+// admin clicks "Reset Password" in the confirm state. On success, the
+// dialog switches to the token-display state.
+//
+// SECURITY NOTE:
+//   The token is shown ONE TIME. If the admin closes the dialog before
+//   sharing it, they'll need to reset the password again to get a new
+//   token. There is no way to retrieve the token after closing — by
+//   design (it's a one-time secret).
+// =============================================================================
+
+interface ResetPasswordDialogProps {
+  user: User;
+  open: boolean;
+  onClose: () => void;
+  onReset: () => void; // refetch the user list
+}
+
+function ResetPasswordDialog({ user, open, onClose, onReset }: ResetPasswordDialogProps) {
+  const [resetting, setResetting] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [setPasswordUrl, setSetPasswordUrl] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  async function handleReset() {
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/users/${user.id}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to reset password.");
+        return;
+      }
+      toast.success("Password reset. Share the token with the user.");
+      setToken(data.passwordResetToken);
+      setSetPasswordUrl(data.setPasswordUrl);
+      // NOTE: we do NOT call onReset() here. The parent's refetch would
+      // set loading=true, which causes UsersView to render <CardListSkeleton>
+      // — unmounting this dialog mid-token-display. Instead, we call
+      // onReset() in handleClose(), after the admin clicks "Done" and the
+      // dialog is safely closed.
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  function handleClose() {
+    // Reset all state when closing — if they reopen, they start fresh.
+    const wasReset = token !== null;
+    setToken(null);
+    setSetPasswordUrl(null);
+    setCopiedToken(false);
+    setCopiedUrl(false);
+    onClose();
+    // If a password was actually reset, refetch the user list now —
+    // after the dialog is closed, so the loading state doesn't unmount
+    // anything the user is looking at.
+    if (wasReset) onReset();
+  }
+
+  async function copyToClipboard(text: string, which: "token" | "url") {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (which === "token") {
+        setCopiedToken(true);
+        setTimeout(() => setCopiedToken(false), 2000);
+      } else {
+        setCopiedUrl(true);
+        setTimeout(() => setCopiedUrl(false), 2000);
+      }
+      toast.success("Copied to clipboard.");
+    } catch {
+      toast.error("Failed to copy. Select the text and copy manually.");
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {token ? "Password Reset" : "Reset Password?"}
+          </DialogTitle>
+          <DialogDescription>
+            {token
+              ? "Share this one-time token with the user. They'll use it to set a new password."
+              : `This will invalidate ${user.email}'s current password immediately. They won't be able to log in until they set a new one.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        {token ? (
+          // --- Token display state ---
+          <div className="space-y-4">
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/50">
+              <div className="flex items-start gap-2">
+                <MailWarning className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="text-xs text-amber-800 dark:text-amber-200">
+                  <p className="font-medium">This token is shown once.</p>
+                  <p className="mt-0.5">
+                    If you close this dialog, you won't be able to retrieve it.
+                    Copy it now and share it with the user out-of-band (email,
+                    in-person, etc.).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Token */}
+            <div className="rounded-md border bg-muted/30 p-3">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-xs font-medium">Reset Token</p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => copyToClipboard(token, "token")}
+                >
+                  {copiedToken ? (
+                    <><Check className="mr-1 h-3 w-3" /> Copied</>
+                  ) : (
+                    <><Copy className="mr-1 h-3 w-3" /> Copy</>
+                  )}
+                </Button>
+              </div>
+              <code className="block break-all text-xs">{token}</code>
+            </div>
+
+            {/* Set-password URL */}
+            {setPasswordUrl && (
+              <div className="rounded-md border bg-muted/30 p-3">
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-xs font-medium">Set-Password Link</p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => copyToClipboard(setPasswordUrl, "url")}
+                  >
+                    {copiedUrl ? (
+                      <><Check className="mr-1 h-3 w-3" /> Copied</>
+                    ) : (
+                      <><Copy className="mr-1 h-3 w-3" /> Copy</>
+                    )}
+                  </Button>
+                </div>
+                <code className="block break-all text-xs">{setPasswordUrl}</code>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button onClick={handleClose}>Done</Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          // --- Confirm state ---
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 p-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  {user.email.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{user.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {user.role}
+                    {user.twoFactorEnabled && " · 2FA enabled"}
+                    {user.disabled && " · disabled"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/50">
+              <div className="flex items-start gap-2">
+                <MailWarning className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="text-xs text-amber-800 dark:text-amber-200">
+                  <p className="font-medium">This action takes effect immediately.</p>
+                  <ul className="mt-1 list-inside list-disc space-y-0.5">
+                    <li>The user's current password stops working right now.</li>
+                    <li>Existing sessions are NOT automatically revoked.</li>
+                    <li>The user sets a new password via the link you'll receive.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose} disabled={resetting}>
+                Cancel
+              </Button>
+              <Button onClick={handleReset} disabled={resetting}>
+                {resetting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resetting...</>
+                ) : (
+                  <><KeyRound className="mr-2 h-4 w-4" /> Reset Password</>
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         )}
       </DialogContent>
     </Dialog>
