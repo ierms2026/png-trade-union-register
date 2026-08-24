@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, Fragment, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -21,6 +21,14 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,6 +99,64 @@ function buildNav(role: AuthUser["role"]): NavItem[] {
   return NAV_ITEMS.filter((item) => item.roles.includes(role));
 }
 
+// =============================================================================
+// Breadcrumb trail builder.
+//
+// Derives the trail from `activeView` + `user.role`. Page-level only —
+// in-view interactions (selecting a union, opening a dialog) do NOT
+// update the breadcrumb. This keeps the trail stable and predictable;
+// syncing it with dialog state is where breadcrumb implementations
+// usually go wrong.
+//
+// Officer scoping: Officers see "Home > My Union" instead of "Home >
+// Unions" (they don't have a unions list — just their own union).
+//
+// The first item is always "Home" (clickable → dashboard). The last
+// item is the current page (not clickable — rendered as BreadcrumbPage).
+// Intermediate items (e.g. "Compliance" when on "Configure Rules") are
+// clickable and navigate to that section.
+// =============================================================================
+
+interface Crumb {
+  label: string;
+  view?: string; // if present, clickable → navigates to this view
+}
+
+function buildBreadcrumbs(
+  activeView: string,
+  role: AuthUser["role"],
+): Crumb[] {
+  // "account-security" isn't in NAV_ITEMS (it's reached via the user menu,
+  // not the sidebar) so we handle it explicitly.
+  if (activeView === "account-security") {
+    return [{ label: "Home", view: "dashboard" }, { label: "Account Security" }];
+  }
+
+  // Find the current nav item to get its label.
+  const current = NAV_ITEMS.find((n) => n.id === activeView);
+  if (!current) {
+    // Unknown view — just show "Home" + the raw view id. Defensive;
+    // shouldn't happen in normal use.
+    return [{ label: "Home", view: "dashboard" }, { label: activeView }];
+  }
+
+  // Build the trail. Most views are just "Home > [Section]".
+  // "configure-rules" nests under "Compliance" conceptually.
+  const trail: Crumb[] = [{ label: "Home", view: "dashboard" }];
+
+  if (activeView === "configure-rules") {
+    trail.push({ label: "Compliance", view: "compliance" });
+  }
+
+  // For Officers, "my-union" is a top-level item (not nested under
+  // "Unions" — they don't have a Unions list). So we just add it
+  // directly. For Registrars/Inspectors viewing "unions", same thing —
+  // it's a top-level nav item.
+  trail.push({ label: current.label });
+
+  return trail;
+}
+
 // NavContent — extracted as a top-level component (not defined inside AppShell)
 // to avoid the "Cannot create components during render" lint error.
 interface NavContentProps {
@@ -137,6 +203,7 @@ interface AppShellProps {
 
 export function AppShell({ user, activeView, onNavigate, children }: AppShellProps) {
   const nav = buildNav(user.role);
+  const crumbs = buildBreadcrumbs(activeView, user.role);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const { data: notifData, loading: notifLoading, refetch: refetchNotifs } = useFetch<{
@@ -240,10 +307,31 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
             </SheetContent>
           </Sheet>
 
-          <div className="flex-1">
-            <h2 className="text-sm font-medium capitalize">
-              {nav.find((n) => n.id === activeView)?.label ?? activeView}
-            </h2>
+          <div className="flex-1 min-w-0">
+            <Breadcrumb>
+              <BreadcrumbList>
+                {crumbs.map((crumb, i) => {
+                  const isLast = i === crumbs.length - 1;
+                  return (
+                    <Fragment key={`${crumb.label}-${i}`}>
+                      <BreadcrumbItem>
+                        {isLast || !crumb.view ? (
+                          <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink
+                            onClick={() => crumb.view && onNavigate(crumb.view)}
+                            className="cursor-pointer"
+                          >
+                            {crumb.label}
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                      {!isLast && <BreadcrumbSeparator />}
+                    </Fragment>
+                  );
+                })}
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
 
           {/* Notification bell */}

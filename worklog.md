@@ -216,3 +216,97 @@ Stage Summary:
   429s) so polite clients can self-throttle.
 - 429s include `Retry-After` per RFC 7231.
 - Verified end-to-end: 200 → 200 → ... → 429 → 429 → (wait 60s) → 200.
+
+---
+Task ID: 9-a
+Agent: main (continuation)
+Task: Audit-log retention sweep (severity-tiered cron route)
+
+Work Log:
+- Created `POST /api/cron/audit-retention-sweep` — same cron-secret auth
+  pattern as compliance-sweep (constant-time `timingSafeEqual`).
+- Severity-tiered retention policy:
+  * INFO → prune after 365 days (routine logins, task updates)
+  * WARNING → prune after 1095 days (user updates, 2FA disables, key revokes)
+  * CRITICAL → NEVER auto-prune (security incidents — admin must archive)
+- Batched `deleteMany` in 1000-row chunks inside a loop with a 500-iteration
+  safety valve (500k rows max per sweep). Each transaction stays short so
+  other requests can interleave.
+- Writes a summary INFO audit entry after each run (actorName="System",
+  actorId=null) recording the policy + counts pruned. This entry itself
+  ages out after 1 year — correct, since sweep records are operational
+  meta-information, not security events.
+- Idempotent: re-running finds nothing to prune. Summary entry IS written
+  on every run (even 0-prune runs) so the audit trail confirms the cron
+  is firing.
+- Smoke-tested via `scripts/test-audit-retention.ts`: inserted 4 backdated
+  entries (INFO 400d, INFO 200d, WARNING 1100d, CRITICAL 1100d), ran the
+  prune logic directly (avoids needing CRON_SECRET + server restart),
+  verified all 4 cases pass:
+  * INFO 400d → pruned ✓
+  * INFO 200d → survived ✓
+  * WARNING 1100d → pruned ✓
+  * CRITICAL 1100d → survived ✓
+- Route returns 401 for unauthenticated requests (verified via curl).
+- `tsc --noEmit` clean.
+
+Stage Summary:
+- Audit log now auto-prunes on a severity-tiered schedule.
+- CRITICAL entries are permanent (never auto-deleted).
+- Sweep is idempotent and safe to run multiple times.
+- Smoke test script persisted at scripts/test-audit-retention.ts for
+  future regression testing.
+
+---
+Task ID: 9-b
+Agent: main (continuation)
+Task: UI breadcrumbs (page-level, role-aware)
+
+Work Log:
+- Added breadcrumb trail to AppShell, replacing the plain `<h2>` label
+  in the top bar. Uses the already-installed shadcn Breadcrumb component
+  (was sitting unused in src/components/ui/breadcrumb.tsx).
+- Built `buildBreadcrumbs(activeView, role)` helper inside AppShell —
+  derives the trail from the current view + user role. No view changes
+  needed; views don't know about breadcrumbs.
+- Page-level only: in-view interactions (selecting a union, opening a
+  dialog) do NOT update the breadcrumb. This keeps the trail stable and
+  predictable — syncing with dialog state is where breadcrumb impls
+  usually go wrong.
+- Trail shape:
+  * First item: "Home" (clickable → dashboard)
+  * Last item: current page (disabled, rendered as BreadcrumbPage with
+    aria-current="page")
+  * Intermediate items: clickable, navigate to that section
+  * "Configure Rules" nests under "Compliance" conceptually:
+    "Home > Compliance > Configure Rules" — both Home and Compliance
+    are clickable.
+- Officer scoping: Officers see "Home > My Union" (they don't have a
+  Unions list — just their own union). Other views are the same across
+  roles.
+- "Account Security" (reached via user menu, not sidebar) gets
+  "Home > Account Security".
+- Imported `Fragment` from React for the keyed list items (the `<>`
+  shorthand doesn't support `key`).
+- Verified visually via agent-browser:
+  * Logged in as registrar@example.com
+  * Dashboard: "Home > Dashboard" ✓
+  * Unions: "Home > Unions" ✓
+  * Configure Rules: "Home > Compliance > Configure Rules" ✓
+    (nested trail with clickable intermediate)
+  * Clicked "Compliance" intermediate link → navigated to Compliance
+    view, breadcrumb updated to "Home > Compliance" ✓
+  * Accessibility: nav has aria-label="breadcrumb", current page has
+    aria-disabled="true" + aria-current="page"
+  * Screenshots saved to download/breadcrumb-dashboard.png and
+    download/breadcrumb-compliance.png
+- `tsc --noEmit` clean.
+
+Stage Summary:
+- Breadcrumbs render in the top bar, replacing the old plain-text label.
+- Trail is derived from activeView + role — no state lifting, no view
+  changes.
+- Intermediate links are clickable and navigate correctly.
+- Officer scoping handled (My Union instead of Unions).
+- Accessibility: proper aria-label, aria-current, aria-disabled on the
+  current-page element.
