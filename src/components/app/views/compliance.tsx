@@ -251,25 +251,25 @@ export function ComplianceView() {
             Generated at {new Date(data.generatedAt).toLocaleString()}
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="overflow-x-auto p-0">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b">
-                <th className="sticky left-0 z-10 bg-background px-3 py-2 text-left font-medium">
+                <th className="sticky left-0 z-10 bg-card px-4 py-3 text-left font-medium min-w-[200px]">
                   Union
                 </th>
                 {data.documentTypes.map((dt) => (
-                  <th key={dt} className="px-2 py-2 text-center font-medium min-w-[100px]">
-                    <span className="block text-xs">{dt}</span>
+                  <th key={dt} className="px-3 py-3 text-center font-medium min-w-[140px]">
+                    <span className="block text-xs leading-tight">{dt}</span>
                   </th>
                 ))}
-                <th className="px-3 py-2 text-center font-medium">Score</th>
+                <th className="px-4 py-3 text-center font-medium min-w-[80px]">Score</th>
               </tr>
             </thead>
             <tbody>
               {data.unions.map((row) => (
                 <tr key={row.unionId} className="border-b hover:bg-muted/30">
-                  <td className="sticky left-0 z-10 bg-background px-3 py-2">
+                  <td className="sticky left-0 z-10 bg-card px-4 py-3">
                     <p className="font-medium">{row.unionName}</p>
                     <p className="text-xs text-muted-foreground">{row.status}</p>
                   </td>
@@ -277,9 +277,9 @@ export function ComplianceView() {
                     const cfg = STATUS_CONFIG[cell.status];
                     const dimmed = filter !== "ALL" && cell.status !== filter;
                     return (
-                      <td key={cell.documentType} className="px-2 py-2 text-center">
+                      <td key={cell.documentType} className="px-3 py-3 text-center">
                         <span
-                          className={`inline-flex min-w-[60px] items-center justify-center rounded border px-2 py-1 text-xs font-medium ${cfg.cell} ${dimmed ? "opacity-25" : ""}`}
+                          className={`inline-flex min-w-[100px] items-center justify-center rounded border px-3 py-1.5 text-xs font-medium ${cfg.cell} ${dimmed ? "opacity-25" : ""}`}
                           title={cell.expiresAt ? `Expires: ${new Date(cell.expiresAt).toLocaleDateString()}` : cfg.label}
                         >
                           {cfg.label}
@@ -287,7 +287,7 @@ export function ComplianceView() {
                       </td>
                     );
                   })}
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-4 py-3 text-center">
                     {row.overallScore === null ? (
                       <span className="text-muted-foreground">—</span>
                     ) : (

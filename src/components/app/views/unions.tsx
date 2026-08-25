@@ -253,33 +253,25 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {data.unions.map((u) => (
-          <Link key={u.id} href={`/unions/${u.registrationNo}`}>
-          <Card
-            className="cursor-pointer transition-colors hover:bg-muted/30"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="font-medium">{u.unionName}</p>
-                  <p className="text-sm text-muted-foreground">Reg. No: {u.registrationNo}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {u.documents.length} document{u.documents.length !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant={u.status === "ACTIVE" ? "default" : "secondary"}>
-                    {u.status}
-                  </Badge>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
+      <Card>
+        <CardContent className="divide-y p-0">
+          <div className="hidden grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid">
+            <span>Union Name</span><span>Reg. No.</span><span className="text-center">Documents</span><span className="text-center">Status</span><span />
+          </div>
+          {data.unions.map((u) => (
+            <Link key={u.id} href={`/unions/${u.registrationNo}`} className="grid w-full grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{u.unionName}</p>
+                <p className="truncate text-xs text-muted-foreground sm:hidden">{u.registrationNo} · {u.documents.length} doc{u.documents.length !== 1 ? "s" : ""}</p>
               </div>
-            </CardContent>
-          </Card>
-          </Link>
-        ))}
-      </div>
+              <span className="hidden truncate text-sm text-muted-foreground sm:inline">{u.registrationNo}</span>
+              <span className="hidden text-center text-sm text-muted-foreground sm:inline">{u.documents.length}</span>
+              <span className="hidden text-center sm:flex sm:justify-center"><Badge variant={u.status === "ACTIVE" ? "default" : "secondary"}>{u.status}</Badge></span>
+              <ChevronRight className="hidden h-4 w-4 justify-self-end text-muted-foreground sm:block" />
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }

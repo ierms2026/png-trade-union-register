@@ -162,60 +162,33 @@ export function AuditView() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            {data.entries.map((entry) => (
-              <Card key={entry.id}>
-                <CardContent className="p-4">
-                  <button
-                    className="flex w-full items-center justify-between text-left"
-                    onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      {expandedId === entry.id ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{entry.actorName}</span>
-                          <Badge variant="outline" className="text-xs">{entry.action}</Badge>
-                          <Badge variant="outline" className="text-xs">{entry.entityType}</Badge>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${SEVERITY_COLORS[entry.severity] ?? ""}`}
-                          >
-                            {entry.severity}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {new Date(entry.createdAt).toLocaleString()}
-                          {entry.entityId && ` · ID: ${entry.entityId.slice(0, 8)}...`}
-                        </p>
+          <Card>
+            <CardContent className="p-0">
+              <div className="hidden grid-cols-[160px_1fr_160px_120px_100px_24px] items-center gap-3 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
+                <span>Timestamp</span><span>Actor</span><span>Action</span><span>Entity</span><span className="text-center">Severity</span><span />
+              </div>
+              <div className="divide-y">
+                {data.entries.map((entry) => (
+                  <div key={entry.id}>
+                    <button className="grid w-full grid-cols-[160px_1fr_160px_120px_100px_24px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}>
+                      <span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
+                      <div className="min-w-0"><p className="truncate text-sm font-medium">{entry.actorName}</p><p className="truncate text-xs text-muted-foreground lg:hidden">{entry.action} · {entry.entityType}</p></div>
+                      <span className="hidden truncate text-sm text-muted-foreground lg:inline">{entry.action}</span>
+                      <span className="hidden truncate text-sm text-muted-foreground lg:inline">{entry.entityType}</span>
+                      <span className="hidden justify-self-center lg:flex lg:justify-center"><Badge variant="outline" className={`text-xs ${SEVERITY_COLORS[entry.severity] ?? ""}`}>{entry.severity}</Badge></span>
+                      <span className="hidden justify-self-end text-muted-foreground lg:block">{expandedId === entry.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</span>
+                    </button>
+                    {expandedId === entry.id && (
+                      <div className="grid gap-4 border-t bg-muted/20 px-4 py-4 md:grid-cols-2">
+                        <div><p className="mb-2 text-xs font-medium text-muted-foreground">BEFORE</p><pre className="overflow-x-auto rounded bg-card p-3 text-xs">{formatJson(entry.beforeJson)}</pre></div>
+                        <div><p className="mb-2 text-xs font-medium text-muted-foreground">AFTER</p><pre className="overflow-x-auto rounded bg-card p-3 text-xs">{formatJson(entry.afterJson)}</pre></div>
                       </div>
-                    </div>
-                  </button>
-
-                  {expandedId === entry.id && (
-                    <div className="mt-4 grid gap-4 border-t pt-4 md:grid-cols-2">
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-muted-foreground">BEFORE</p>
-                        <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-                          {formatJson(entry.beforeJson)}
-                        </pre>
-                      </div>
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-muted-foreground">AFTER</p>
-                        <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-                          {formatJson(entry.afterJson)}
-                        </pre>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </>
       ) : data ? (
         <EmptyState

@@ -312,7 +312,7 @@ export function SecurityView() {
         )}
       </div>
 
-      {/* Locked-out users */}
+      {/* Locked-out users — single-card list */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -321,45 +321,27 @@ export function SecurityView() {
           </CardTitle>
           <CardDescription>Users currently locked due to repeated failed login attempts.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {data.lockedOutUsers.length === 0 ? (
-            <EmptyState
-              icon={Shield}
-              title="No locked-out users"
-              description="All accounts are in good standing."
-            />
+            <div className="py-8"><EmptyState icon={Shield} title="No locked-out users" description="All accounts are in good standing." /></div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y">
+              <div className="hidden grid-cols-[1fr_120px_140px_80px] items-center gap-3 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid">
+                <span>User</span><span>Role</span><span>Locked Until</span><span className="text-center">Action</span>
+              </div>
               {data.lockedOutUsers.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/10">
-                      <Lock className="h-4 w-4 text-destructive" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{u.email}</p>
-                        <Badge variant="outline" className="text-xs">{u.role}</Badge>
-                        {u.disabled && (
-                          <Badge variant="destructive" className="text-xs">Also Disabled</Badge>
-                        )}
-                        {u.twoFactorEnabled && (
-                          <Badge variant="secondary" className="text-xs">2FA</Badge>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {u.failedLoginAttempts} failed attempts · Locked until{" "}
-                        {new Date(u.lockedUntil).toLocaleString()}
-                      </p>
-                    </div>
+                <div key={u.id} className="grid grid-cols-[1fr_120px_140px_80px] items-center gap-3 px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-destructive/10"><Lock className="h-4 w-4 text-destructive" /></div>
+                    <div className="min-w-0"><p className="truncate font-medium">{u.email}</p><p className="text-xs text-muted-foreground sm:hidden">{u.role} · {u.failedLoginAttempts} failed</p></div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => unlockUser(u.id)}>
-                    <Unlock className="mr-1 h-3 w-3" />
-                    Unlock
-                  </Button>
+                  <div className="hidden items-center gap-1.5 sm:flex">
+                    <Badge variant="outline" className="text-xs">{u.role}</Badge>
+                    {u.disabled && <Badge variant="destructive" className="text-xs">Disabled</Badge>}
+                    {u.twoFactorEnabled && <Badge variant="secondary" className="text-xs">2FA</Badge>}
+                  </div>
+                  <div className="hidden text-xs text-muted-foreground sm:block">{u.failedLoginAttempts} failed<br /><span className="text-muted-foreground/70">until {new Date(u.lockedUntil).toLocaleString()}</span></div>
+                  <div className="flex justify-center sm:justify-end"><Button size="sm" variant="outline" onClick={() => unlockUser(u.id)}><Unlock className="mr-1 h-3 w-3" /><span className="hidden sm:inline">Unlock</span></Button></div>
                 </div>
               ))}
             </div>
@@ -367,27 +349,29 @@ export function SecurityView() {
         </CardContent>
       </Card>
 
-      {/* Disabled users */}
+      {/* Disabled users — single-card list */}
       {data.disabledUsers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Disabled Users</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="h-5 w-5" />
+              Disabled Users
+            </CardTitle>
             <CardDescription>Users with admin-disabled accounts.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="p-0">
+            <div className="divide-y">
+              <div className="hidden grid-cols-[1fr_120px_100px] items-center gap-3 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid">
+                <span>User</span><span>Role</span><span className="text-center">Status</span>
+              </div>
               {data.disabledUsers.map((u) => (
-                <div key={u.id} className="flex items-center justify-between rounded-md border p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{u.email}</p>
-                      <p className="text-xs text-muted-foreground">{u.role}</p>
-                    </div>
+                <div key={u.id} className="grid grid-cols-[1fr_120px_100px] items-center gap-3 px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted"><Users className="h-4 w-4 text-muted-foreground" /></div>
+                    <div className="min-w-0"><p className="truncate font-medium">{u.email}</p><p className="text-xs text-muted-foreground sm:hidden">{u.role}</p></div>
                   </div>
-                  <Badge variant="destructive">Disabled</Badge>
+                  <span className="hidden sm:inline"><Badge variant="outline" className="text-xs">{u.role}</Badge></span>
+                  <div className="flex justify-center sm:justify-end"><Badge variant="destructive">Disabled</Badge></div>
                 </div>
               ))}
             </div>
