@@ -26,7 +26,7 @@ describe("test database setup", () => {
     }>;
     expect(result).toBeDefined();
     expect(Array.isArray(result)).toBe(true);
-    expect(result[0].one).toBe(1n);
+    expect(Number(result[0].one)).toBe(1);
   });
 
   it("resetDb clears the User table (and is called before each test)", async () => {
