@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity } from "@prisma/client";
+import { checkLastRegistrar } from "@/lib/last-registrar";
 
 // =============================================================================
 // GET /api/users/[id]  |  PUT /api/users/[id]  |  DELETE /api/users/[id]
@@ -51,59 +52,7 @@ const USER_PUBLIC_FIELDS = {
   disabled: true,
 } as const;
 
-// -----------------------------------------------------------------------------
-// Shared helper: last-Registrar protection
-// -----------------------------------------------------------------------------
-
-/**
- * Result of the last-Registrar check.
- * - `safe` = true: the action can proceed.
- * - `safe` = false: the action would leave 0 active Registrars; the
- *   caller should return 403 with the error message.
- *
- * The check is: "Is this user an active REGISTRAR? If yes, how many OTHER
- * active REGISTRARs exist? If 0, block."
- *
- * "Active" means role=REGISTRAR AND disabled=false. A locked Registrar
- * (lockedUntil set) is still active — the lock is temporary. A disabled
- * Registrar is already not active, so disabling them again is a no-op
- * for protection purposes.
- */
-async function checkLastRegistrar(
-  targetUserId: string,
-): Promise<{ safe: boolean; error?: string }> {
-  const targetUser = await db.user.findUnique({
-    where: { id: targetUserId },
-    select: { role: true, disabled: true },
-  });
-
-  // If the user doesn't exist or isn't an active Registrar, the action
-  // can't brick the system — it's safe.
-  if (!targetUser || targetUser.role !== Role.REGISTRAR || targetUser.disabled) {
-    return { safe: true };
-  }
-
-  // Count OTHER active Registrars (exclude the target user).
-  // This is the system-wide count — not a self-check.
-  const otherActiveRegistrars = await db.user.count({
-    where: {
-      role: Role.REGISTRAR,
-      disabled: false,
-      id: { not: targetUserId },
-    },
-  });
-
-  if (otherActiveRegistrars === 0) {
-    return {
-      safe: false,
-      error:
-        "You cannot disable the last remaining Registrar. " +
-        "Promote another user to Registrar first, or re-enable an existing Registrar.",
-    };
-  }
-
-  return { safe: true };
-}
+// last-Registrar protection logic lives in src/lib/last-registrar.ts (imported above).
 
 // -----------------------------------------------------------------------------
 // GET — fetch a single user
