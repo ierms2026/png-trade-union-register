@@ -7,6 +7,7 @@ import { ArrowLeft, FileText, ExternalLink, Shield, ArrowRight, LogIn } from "lu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PrintButton } from "@/components/app/print-button";
 import type { Metadata } from "next";
 
 const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
@@ -60,17 +61,33 @@ export default async function UnionDetailPage({ params }: PageProps) {
       </header>
 
       <main className="mx-auto max-w-4xl space-y-8 p-4 py-10">
+        {/* Print-only official header — hidden on screen, shown on paper */}
+        <div className="print-only text-center border-b-2 border-black pb-4 mb-6">
+          <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={60} height={49} className="mx-auto mb-2 h-14 w-auto" />
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-sm font-bold">Independent State of Papua New Guinea</p>
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-xs">Office of The Industrial Registrar</p>
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-xs">Department of Labour &amp; Industrial Relations</p>
+          <hr className="my-2 border-t border-black" />
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-xs font-semibold">OFFICIAL EXTRACT FROM THE REGISTER OF TRADE UNIONS</p>
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-xs">Printed: {new Date().toLocaleDateString("en-PG", { year: "numeric", month: "long", day: "numeric" })}</p>
+        </div>
+
         <div className="space-y-3 text-center">
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2 no-print">
             <Badge variant="outline" className="text-xs">Reg. No: {union.registrationNo}</Badge>
             <Badge variant={union.status === "ACTIVE" ? "default" : "secondary"}>{union.status}</Badge>
+            <PrintButton />
+          </div>
+          {/* Print-only: show reg number + status as plain text (badges don't print well) */}
+          <div className="print-only">
+            <p style={{ fontFamily: "Georgia, serif" }} className="text-sm">Registration No: {union.registrationNo} · Status: {union.status}</p>
           </div>
           <h1 className="text-4xl font-bold tracking-tight">{union.unionName}</h1>
           {union.fileNumber && <p className="text-sm text-muted-foreground">File Number: {union.fileNumber}</p>}
         </div>
 
         {authUser && (
-          <Card className="border-l-4 border-l-primary">
+          <Card className="border-l-4 border-l-primary no-print">
             <CardContent className="flex items-center justify-between py-4">
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-primary" />
@@ -84,23 +101,23 @@ export default async function UnionDetailPage({ params }: PageProps) {
         <div className="space-y-4">
           <div className="text-center">
             <h2 className="text-xl font-semibold">Published Documents</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Documents published by the Industrial Registrar for public verification.</p>
+            <p className="mt-1 text-sm text-muted-foreground no-print">Documents published by the Industrial Registrar for public verification.</p>
           </div>
           {union.documents.length === 0 ? (
-            <Card><CardContent className="py-8 text-center"><FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="text-sm font-medium">No public documents published</p><p className="mt-1 text-xs text-muted-foreground">The Registrar has not published any documents for this union yet.</p></CardContent></Card>
+            <Card className="print-card"><CardContent className="py-8 text-center"><FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground no-print" /><p className="text-sm font-medium">No public documents published</p><p className="mt-1 text-xs text-muted-foreground">The Registrar has not published any documents for this union yet.</p></CardContent></Card>
           ) : (
             <div className="space-y-3">
               {union.documents.map((doc) => {
                 const lv = doc.versions[0];
                 const dl = lv ? `/api/public/files/${lv.id}` : null;
                 return (
-                  <Card key={doc.id}>
+                  <Card key={doc.id} className="print-card print-avoid-break">
                     <CardContent className="flex items-center justify-between p-4">
                       <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        <FileText className="h-5 w-5 text-muted-foreground no-print" />
                         <div><p className="text-sm font-medium">{doc.documentType}</p>{lv && <p className="text-xs text-muted-foreground">Version {lv.versionNumber} · uploaded {new Date(lv.uploadedAt).toLocaleDateString()}{lv.fileExtension && ` · ${lv.fileExtension.toUpperCase()}`}</p>}</div>
                       </div>
-                      {dl && <Button asChild size="sm" variant="outline"><a href={dl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1 h-3 w-3" />View</a></Button>}
+                      {dl && <Button asChild size="sm" variant="outline" className="no-print"><a href={dl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1 h-3 w-3" />View</a></Button>}
                     </CardContent>
                   </Card>
                 );
@@ -109,7 +126,14 @@ export default async function UnionDetailPage({ params }: PageProps) {
           )}
         </div>
 
-        <Card className="bg-muted/30"><CardContent className="py-4"><p className="text-xs text-muted-foreground">For enquiries regarding this union, contact the Office of The Industrial Registrar, PNG Department of Labour &amp; Industrial Relations.</p></CardContent></Card>
+        <Card className="bg-muted/30 print-card"><CardContent className="py-4"><p className="text-xs text-muted-foreground">For enquiries regarding this union, contact the Office of The Industrial Registrar, PNG Department of Labour &amp; Industrial Relations.</p></CardContent></Card>
+
+        {/* Print-only footer — official certification line */}
+        <div className="print-only text-center mt-8 pt-4 border-t border-black">
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-xs">This extract is a true copy of the public register as maintained by the Industrial Registrar.</p>
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-xs">Published in accordance with Section 5 of the Industrial Organizations Act.</p>
+          <p style={{ fontFamily: "Georgia, serif" }} className="text-xs mt-4">© {new Date().getFullYear()} Independent State of Papua New Guinea</p>
+        </div>
       </main>
 
       <footer className="border-t bg-card">

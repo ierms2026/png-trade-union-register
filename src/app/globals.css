@@ -147,3 +147,83 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* =============================================================================
+   Print styles — for official government records.
+   
+   When a user prints a union detail page (/unions/[regNo]), the output
+   should look like an official document, not a web page screenshot. This
+   block:
+     - Hides all interactive chrome (header, nav, footer, buttons)
+     - Shows only the print-specific content (marked with .print-only)
+     - Uses serif typography + black text on white
+     - Adds proper page margins
+     - Prevents page breaks inside document cards
+   ============================================================================= */
+
+@media print {
+  /* Force white background + black text for print */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  /* Hide all interactive chrome */
+  header,
+  footer,
+  nav,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Show print-only content (hidden on screen) */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Headings: serif, black, no tracking */
+  h1, h2, h3, h4, h5, h6 {
+    color: black !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+  }
+
+  /* Page margins (physical paper) */
+  @page {
+    margin: 2cm 2.5cm;
+  }
+
+  /* Avoid page breaks inside document cards */
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Cards: remove shadows + borders, use simple lines */
+  .print-card {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Links: show URL in parentheses after the link text */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #666;
+  }
+
+  /* But don't show URLs for internal anchor links */
+  a[href^="#"]::after,
+  a[href^="javascript"]::after {
+    content: "";
+  }
+}
+
+/* On screen, hide print-only content */
+.print-only {
+  display: none;
+}
