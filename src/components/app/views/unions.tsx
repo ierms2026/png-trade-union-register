@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import { useState, type FormEvent } from "react";
 import {
@@ -82,9 +83,9 @@ interface Union {
   documents: UnionDocument[];
 }
 
-export function UnionsView({ user }: { user: { role: string; assignedUnionId: string | null } }) {
+export function UnionsView({ user, initialUnionId }: { user: { role: string; assignedUnionId: string | null }; initialUnionId?: string | null }) {
   const { data, loading, error, refetch } = useFetch<{ unions: Union[] }>("/api/unions");
-  const [selectedUnionId, setSelectedUnionId] = useState<string | null>(null);
+  const [selectedUnionId, setSelectedUnionId] = useState<string | null>(initialUnionId ?? null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadDocType, setUploadDocType] = useState<string>("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -254,10 +255,9 @@ export function UnionsView({ user }: { user: { role: string; assignedUnionId: st
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {data.unions.map((u) => (
+          <Link key={u.id} href={`/unions/${u.registrationNo}`}>
           <Card
-            key={u.id}
             className="cursor-pointer transition-colors hover:bg-muted/30"
-            onClick={() => setSelectedUnionId(u.id)}
           >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -277,6 +277,7 @@ export function UnionsView({ user }: { user: { role: string; assignedUnionId: st
               </div>
             </CardContent>
           </Card>
+          </Link>
         ))}
       </div>
     </div>

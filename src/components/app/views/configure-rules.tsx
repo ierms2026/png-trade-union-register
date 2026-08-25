@@ -86,7 +86,7 @@ export function ConfigureRulesView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configure Rules</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Configure Rules</h1>
         <p className="text-sm text-muted-foreground">
           Edit document-type compliance rules. Changes take effect immediately across all unions.
         </p>
@@ -306,8 +306,8 @@ function EditRuleDialog({ rule, open, onClose, onSaved }: EditRuleDialogProps) {
               <div className="mt-3 space-y-2 border-t pt-3">
                 <div className="flex gap-4 text-xs">
                   <span><strong>{preview.summary.totalChanged}</strong> unions change</span>
-                  <span className="text-red-600">+{preview.summary.escalated} escalate</span>
-                  <span className="text-green-600">+{preview.summary.improved} improve</span>
+                  <span className="text-destructive">+{preview.summary.escalated} escalate</span>
+                  <span className="text-chart-3">+{preview.summary.improved} improve</span>
                 </div>
                 {preview.diff.length > 0 && (
                   <div className="max-h-48 space-y-1 overflow-y-auto">

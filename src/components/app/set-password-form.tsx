@@ -63,10 +63,10 @@ export function SetPasswordForm({ token, onSuccess }: Props) {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
-            <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-green-500" />
+            <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-accent" />
             <h2 className="text-xl font-bold">Password Set!</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Your password has been set successfully. Redirecting to login...
@@ -78,7 +78,7 @@ export function SetPasswordForm({ token, onSuccess }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex items-center gap-2">
@@ -105,7 +105,7 @@ export function SetPasswordForm({ token, onSuccess }: Props) {
                 required
               />
               {password.length > 0 && password.length < 8 && (
-                <p className="text-xs text-red-600">Password must be at least 8 characters.</p>
+                <p className="text-xs text-destructive">Password must be at least 8 characters.</p>
               )}
             </div>
             <div className="space-y-2">
@@ -119,11 +119,11 @@ export function SetPasswordForm({ token, onSuccess }: Props) {
                 required
               />
               {confirmPassword.length > 0 && !passwordsMatch && (
-                <p className="text-xs text-red-600">Passwords don&apos;t match.</p>
+                <p className="text-xs text-destructive">Passwords don&apos;t match.</p>
               )}
             </div>
             {error && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive border border-destructive/30">
                 {error}
               </div>
             )}

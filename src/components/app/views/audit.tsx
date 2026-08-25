@@ -38,9 +38,9 @@ interface AuditEntry {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  INFO: "bg-blue-100 text-blue-700",
-  WARNING: "bg-amber-100 text-amber-700",
-  CRITICAL: "bg-red-100 text-red-700",
+  INFO: "bg-primary/10 text-primary",
+  WARNING: "bg-accent/20 text-accent-foreground",
+  CRITICAL: "bg-destructive/10 text-destructive",
 };
 
 function formatJson(json: string | null): string {

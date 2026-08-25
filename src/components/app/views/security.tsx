@@ -107,7 +107,7 @@ export function SecurityView() {
   if (loading) return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Security</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Security</h1>
         <p className="text-sm text-muted-foreground">Auth health metrics and account management.</p>
       </div>
       <StatsSkeleton />
@@ -140,7 +140,7 @@ export function SecurityView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Security</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Security</h1>
         <p className="text-sm text-muted-foreground">
           Auth health metrics and account management. Generated at{" "}
           {new Date(data.generatedAt).toLocaleString()}.
@@ -153,38 +153,38 @@ export function SecurityView() {
           label="Failed (24h)"
           value={data.failedLogins.last24h}
           icon={AlertTriangle}
-          color="bg-amber-100 text-amber-700"
+          color="bg-accent/20 text-accent-foreground"
         />
         <StatCard
           label="Failed (7d)"
           value={data.failedLogins.last7d}
           icon={AlertTriangle}
-          color="bg-amber-100 text-amber-700"
+          color="bg-accent/20 text-accent-foreground"
         />
         <StatCard
           label="Locked Out"
           value={data.lockedOutUsers.length}
           icon={Lock}
-          color="bg-red-100 text-red-700"
+          color="bg-destructive/10 text-destructive"
         />
         <StatCard
           label="Disabled"
           value={data.disabledUsers.length}
           icon={Users}
-          color="bg-gray-100 text-gray-700"
+          color="bg-muted text-muted-foreground"
         />
         <StatCard
           label="2FA Adoption"
           value={`${data.twoFactorAdoption.rate}%`}
           icon={KeyRound}
-          color="bg-green-100 text-green-700"
+          color="bg-chart-3/20 text-chart-3"
           sublabel={`${data.twoFactorAdoption.enabled}/${data.twoFactorAdoption.totalEligible} users`}
         />
         <StatCard
           label="Active Sessions"
           value={data.activeSessions}
           icon={Activity}
-          color="bg-blue-100 text-blue-700"
+          color="bg-primary/10 text-primary"
         />
       </div>
 
@@ -242,11 +242,11 @@ export function SecurityView() {
             {/* Legend */}
             <div className="mt-3 flex gap-4 text-xs">
               <div className="flex items-center gap-1">
-                <span className="h-2 w-4 rounded-full bg-red-500" />
+                <span className="h-2 w-4 rounded-full bg-destructive" />
                 <span className="text-muted-foreground">Failed</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="h-2 w-4 rounded-full bg-green-500" />
+                <span className="h-2 w-4 rounded-full bg-chart-3" />
                 <span className="text-muted-foreground">Successful</span>
               </div>
             </div>
@@ -288,19 +288,19 @@ export function SecurityView() {
                 </ChartContainer>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-3xl font-bold text-green-600">
+                    <p className="text-3xl font-bold text-chart-3">
                       {data.twoFactorAdoption.rate}%
                     </p>
                     <p className="text-xs text-muted-foreground">Adoption rate</p>
                   </div>
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
+                      <span className="h-2 w-2 rounded-full bg-chart-3" />
                       <span className="text-muted-foreground">Enabled:</span>
                       <span className="font-medium">{data.twoFactorAdoption.enabled}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-amber-500" />
+                      <span className="h-2 w-2 rounded-full bg-accent" />
                       <span className="text-muted-foreground">Not enrolled:</span>
                       <span className="font-medium">{data.twoFactorAdoption.totalEligible - data.twoFactorAdoption.enabled}</span>
                     </div>

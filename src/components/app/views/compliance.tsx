@@ -56,11 +56,11 @@ interface ComplianceMatrixResponse {
 type StatusFilter = "ALL" | "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
 
 const STATUS_CONFIG: Record<string, { label: string; cell: string; icon: typeof CheckCircle2 }> = {
-  COMPLIANT: { label: "Compliant", cell: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
-  EXPIRING: { label: "Expiring", cell: "bg-amber-100 text-amber-800 border-amber-200", icon: AlertTriangle },
-  OVERDUE: { label: "Overdue", cell: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
-  MISSING: { label: "Missing", cell: "bg-gray-100 text-gray-800 border-gray-200", icon: FileQuestion },
-  NOT_APPLICABLE: { label: "N/A", cell: "bg-slate-100 text-slate-600 border-slate-200", icon: Ban },
+  COMPLIANT: { label: "Compliant", cell: "bg-chart-3/15 text-chart-3 border-chart-3/30", icon: CheckCircle2 },
+  EXPIRING: { label: "Expiring", cell: "bg-accent/15 text-accent-foreground border-accent/30", icon: AlertTriangle },
+  OVERDUE: { label: "Overdue", cell: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
+  MISSING: { label: "Missing", cell: "bg-muted text-muted-foreground border-border", icon: FileQuestion },
+  NOT_APPLICABLE: { label: "N/A", cell: "bg-muted/50 text-muted-foreground border-border", icon: Ban },
 };
 
 export function ComplianceView() {

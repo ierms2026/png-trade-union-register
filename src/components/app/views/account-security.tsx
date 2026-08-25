@@ -61,7 +61,7 @@ export function AccountSecurityView({ user }: { user: AuthUser }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Account Security</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Account Security</h1>
         <p className="text-sm text-muted-foreground">
           Manage your two-factor authentication and active sessions.
         </p>
@@ -96,7 +96,7 @@ function TwoFactorSection({ user }: { user: AuthUser }) {
         <div className="flex items-center justify-between rounded-md border p-4">
           <div className="flex items-center gap-3">
             <div className={`flex h-10 w-10 items-center justify-center rounded-full ${user.twoFactorEnabled ? "bg-green-100" : "bg-muted"}`}>
-              {user.twoFactorEnabled ? <Shield className="h-5 w-5 text-green-700" /> : <Shield className="h-5 w-5 text-muted-foreground" />}
+              {user.twoFactorEnabled ? <Shield className="h-5 w-5 text-chart-3" /> : <Shield className="h-5 w-5 text-muted-foreground" />}
             </div>
             <div>
               <p className="font-medium">

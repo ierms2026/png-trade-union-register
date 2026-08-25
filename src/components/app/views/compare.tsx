@@ -61,11 +61,11 @@ const STATUS_LETTER: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  COMPLIANT: "bg-green-100 text-green-800 border-green-200",
-  EXPIRING: "bg-amber-100 text-amber-800 border-amber-200",
-  OVERDUE: "bg-red-100 text-red-800 border-red-200",
-  MISSING: "bg-gray-100 text-gray-800 border-gray-200",
-  NOT_APPLICABLE: "bg-slate-100 text-slate-600 border-slate-200",
+  COMPLIANT: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+  EXPIRING: "bg-accent/15 text-accent-foreground border-accent/30",
+  OVERDUE: "bg-destructive/10 text-destructive border-destructive/30",
+  MISSING: "bg-muted text-muted-foreground border-border",
+  NOT_APPLICABLE: "bg-muted/50 text-muted-foreground border-border",
 };
 
 export function CompareView() {
@@ -113,7 +113,7 @@ export function CompareView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Compare Unions</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Compare Unions</h1>
         <p className="text-sm text-muted-foreground">
           Select 2-6 unions to compare their compliance status side-by-side.
         </p>

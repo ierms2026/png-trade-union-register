@@ -35,9 +35,9 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 
 const EVENT_COLORS: Record<string, string> = {
-  task: "bg-blue-100 text-blue-800 border-blue-200",
-  document: "bg-purple-100 text-purple-800 border-purple-200",
-  compliance: "bg-amber-100 text-amber-800 border-amber-200",
+  task: "bg-primary/10 text-primary border-primary/30",
+  document: "bg-chart-4/15 text-chart-4 border-chart-4/30",
+  compliance: "bg-accent/15 text-accent-foreground border-accent/30",
 };
 
 export function CalendarView() {
@@ -100,7 +100,7 @@ export function CalendarView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
         <p className="text-sm text-muted-foreground">Tasks, document uploads, and compliance events.</p>
       </div>
 

@@ -78,9 +78,9 @@ function StatCard({ label, value, icon: Icon, color }: StatCardProps) {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  INFO: "bg-blue-100 text-blue-700",
-  WARNING: "bg-amber-100 text-amber-700",
-  CRITICAL: "bg-red-100 text-red-700",
+  INFO: "bg-primary/10 text-primary",
+  WARNING: "bg-accent/20 text-accent-foreground",
+  CRITICAL: "bg-destructive/10 text-destructive",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -153,7 +153,7 @@ export function DashboardView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
           Overview of the union registry and compliance status.
         </p>
@@ -167,11 +167,11 @@ export function DashboardView() {
       ) : stats ? (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           <StatCard label="Total Unions" value={stats.totalUnions} icon={Building2} color="bg-primary/10 text-primary" />
-          <StatCard label="Documents" value={stats.totalDocuments} icon={FileText} color="bg-blue-100 text-blue-700" />
-          <StatCard label="Compliant" value={stats.compliance.compliant} icon={CheckCircle2} color="bg-green-100 text-green-700" />
-          <StatCard label="Expiring" value={stats.compliance.expiring} icon={AlertTriangle} color="bg-amber-100 text-amber-700" />
-          <StatCard label="Overdue" value={stats.compliance.overdue} icon={XCircle} color="bg-red-100 text-red-700" />
-          <StatCard label="Missing" value={stats.compliance.missing} icon={FileQuestion} color="bg-gray-100 text-gray-700" />
+          <StatCard label="Documents" value={stats.totalDocuments} icon={FileText} color="bg-primary/10 text-primary" />
+          <StatCard label="Compliant" value={stats.compliance.compliant} icon={CheckCircle2} color="bg-chart-3/20 text-chart-3" />
+          <StatCard label="Expiring" value={stats.compliance.expiring} icon={AlertTriangle} color="bg-accent/20 text-accent-foreground" />
+          <StatCard label="Overdue" value={stats.compliance.overdue} icon={XCircle} color="bg-destructive/10 text-destructive" />
+          <StatCard label="Missing" value={stats.compliance.missing} icon={FileQuestion} color="bg-muted text-muted-foreground" />
         </div>
       ) : null}
 
@@ -295,22 +295,22 @@ export function DashboardView() {
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="h-2 w-2 rounded-full bg-chart-3" />
                   <span className="text-muted-foreground">Compliant:</span>
                   <span className="font-medium">{stats.compliance.compliant}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span className="h-2 w-2 rounded-full bg-accent" />
                   <span className="text-muted-foreground">Expiring:</span>
                   <span className="font-medium">{stats.compliance.expiring}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  <span className="h-2 w-2 rounded-full bg-destructive" />
                   <span className="text-muted-foreground">Overdue:</span>
                   <span className="font-medium">{stats.compliance.overdue}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-gray-400" />
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground" />
                   <span className="text-muted-foreground">Missing:</span>
                   <span className="font-medium">{stats.compliance.missing}</span>
                 </div>

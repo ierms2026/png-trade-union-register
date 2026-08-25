@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono, Lora } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 
@@ -13,35 +13,80 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const loraSerif = Lora({
+  variable: "--font-lora",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+export const viewport: Viewport = {
+  themeColor: "#1e3a5f",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "Union Records Management System",
+  title: {
+    default: "Register of Trade Unions — Papua New Guinea",
+    template: "%s — Register of Trade Unions",
+  },
   description:
-    "Secure registry for registered trade unions — Office of The Industrial Registrar, PNG Department of Labour & Industrial Relations.",
+    "The official public registry of trade unions registered under the Industrial Organizations Act. Published by the Office of The Industrial Registrar, PNG Department of Labour & Industrial Relations.",
   keywords: [
-    "union records",
-    "compliance",
+    "trade unions",
+    "union registry",
+    "industrial organizations act",
     "industrial registrar",
-    "labour registry",
-    "Next.js",
-    "TypeScript",
-    "Prisma",
+    "papua new guinea",
+    "labour relations",
+    "union registration",
   ],
   authors: [{ name: "Office of The Industrial Registrar" }],
+  creator: "Office of The Industrial Registrar",
+  publisher: "Office of The Industrial Registrar",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
+  manifest: "/site.webmanifest",
   openGraph: {
-    title: "Union Records Management System",
+    title: "Register of Trade Unions — Papua New Guinea",
     description:
-      "Secure registry for registered trade unions — Office of The Industrial Registrar.",
-    siteName: "Union Records Management System",
+      "The official public registry of trade unions registered under the Industrial Organizations Act. Published by the Office of The Industrial Registrar.",
+    siteName: "Register of Trade Unions",
     type: "website",
+    locale: "en_PG",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Register of Trade Unions — Office of The Industrial Registrar, Papua New Guinea",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Union Records Management System",
+    title: "Register of Trade Unions — Papua New Guinea",
     description:
-      "Secure registry for registered trade unions — Office of The Industrial Registrar.",
+      "The official public registry of trade unions registered under the Industrial Organizations Act.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
 };
 
@@ -53,7 +98,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${loraSerif.variable} antialiased bg-background text-foreground`}
       >
         {children}
         <Toaster position="bottom-right" richColors closeButton />
