@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -278,12 +279,42 @@ export function ComplianceView() {
                     const dimmed = filter !== "ALL" && cell.status !== filter;
                     return (
                       <td key={cell.documentType} className="px-3 py-3 text-center">
-                        <span
-                          className={`inline-flex min-w-[100px] items-center justify-center rounded border px-3 py-1.5 text-xs font-medium ${cfg.cell} ${dimmed ? "opacity-25" : ""}`}
-                          title={cell.expiresAt ? `Expires: ${new Date(cell.expiresAt).toLocaleDateString()}` : cfg.label}
-                        >
-                          {cfg.label}
-                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className={`inline-flex min-w-[100px] cursor-help items-center justify-center rounded border px-3 py-1.5 text-xs font-medium ${cfg.cell} ${dimmed ? "opacity-25" : ""}`}
+                            >
+                              {cfg.label}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[220px]">
+                            <div className="space-y-0.5 text-left">
+                              <p className="font-semibold">{row.unionName}</p>
+                              <p className="text-primary-foreground/80">{cell.documentType}</p>
+                              <p className="text-primary-foreground/80">Status: {cfg.label}</p>
+                              {cell.expiresAt && (
+                                <p className="text-primary-foreground/80">
+                                  Expires: {new Date(cell.expiresAt).toLocaleDateString()}
+                                </p>
+                              )}
+                              {cell.documentId && (
+                                <p className="text-primary-foreground/60">
+                                  Document ID: {cell.documentId.slice(0, 8)}…
+                                </p>
+                              )}
+                              {cell.status === "MISSING" && (
+                                <p className="text-primary-foreground/60 italic">
+                                  No document filed for this type.
+                                </p>
+                              )}
+                              {cell.status === "NOT_APPLICABLE" && (
+                                <p className="text-primary-foreground/60 italic">
+                                  This document type is not required for this union.
+                                </p>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
                       </td>
                     );
                   })}
