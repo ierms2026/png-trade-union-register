@@ -108,7 +108,7 @@ export default function Home() {
 
   function renderView() {
     switch (activeView) {
-      case "dashboard": return <DashboardView />;
+      case "dashboard": return <DashboardView onNavigate={setActiveView} />;
       case "unions":
       case "my-union": return <UnionsView user={currentUser} initialUnionId={initialUnionId} />;
       case "compliance": return <ComplianceView />;
@@ -121,7 +121,7 @@ export default function Home() {
       case "security": return <SecurityView />;
       case "api-keys": return <ApiKeysView />;
       case "account-security": return <AccountSecurityView user={currentUser} />;
-      default: return <DashboardView />;
+      default: return <DashboardView onNavigate={setActiveView} />;
     }
   }
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity } from "lucide-react";
+import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, Plus, Upload, ListTodo, ScrollText, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useFetch } from "@/components/app/use-fetch";
 import { StatsSkeleton, ActivitySkeleton, CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
@@ -106,7 +107,7 @@ const ACTION_LABELS: Record<string, string> = {
   session_revoke: "revoked session",
 };
 
-export function DashboardView() {
+export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const {
     data: stats,
     loading: statsLoading,
@@ -158,6 +159,29 @@ export function DashboardView() {
           Overview of the union registry and compliance status.
         </p>
       </div>
+
+      {/* Quick Actions — turns the dashboard from a passive report into an
+          active workspace. Each button navigates to the relevant view. */}
+      {onNavigate && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("unions")}>
+            <Plus className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium">Register Union</span>
+          </Button>
+          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("unions")}>
+            <Upload className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium">Upload Document</span>
+          </Button>
+          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("tasks")}>
+            <ListTodo className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium">Create Task</span>
+          </Button>
+          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("audit")}>
+            <ScrollText className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium">View Audit Log</span>
+          </Button>
+        </div>
+      )}
 
       {/* Stat cards */}
       {statsLoading ? (
