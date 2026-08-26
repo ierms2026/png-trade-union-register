@@ -101,7 +101,28 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${loraSerif.variable} antialiased bg-background text-foreground`}
       >
         {children}
-        <Toaster position="bottom-right" richColors closeButton />
+        <Toaster
+          position="bottom-right"
+          closeButton
+          toastOptions={{
+            // Theme toasts with the navy/gold design palette.
+            // Info/default: navy background, white text.
+            // Success: sage green accent (chart-3).
+            // Warning: gold accent.
+            // Error: red accent (destructive).
+            style: {
+              background: "oklch(0.32 0.09 255)",
+              color: "oklch(0.98 0.008 80)",
+              border: "1px solid oklch(0.74 0.15 85 / 0.3)",
+              fontFamily: "var(--font-geist-sans), sans-serif",
+            },
+            classNames: {
+              success: "!bg-chart-3 !text-white !border-chart-3/50",
+              warning: "!bg-accent !text-accent-foreground !border-accent/50",
+              error: "!bg-destructive !text-destructive-foreground !border-destructive/50",
+            },
+          }}
+        />
       </body>
     </html>
   );
