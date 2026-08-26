@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   // Default to current month if not provided.
   const now = new Date();
   const year = monthStr ? parseInt(monthStr.slice(0, 4), 10) : now.getFullYear();
-  const month = monthStr ? parseInt(monthStr.slice(5, 2), 10) - 1 : now.getMonth();
+  const month = monthStr ? parseInt(monthStr.slice(5, 7), 10) - 1 : now.getMonth();
 
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
