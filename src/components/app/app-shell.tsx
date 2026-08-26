@@ -3,7 +3,7 @@
 import { Fragment, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
-  ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck,
+  ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck, Home,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -223,8 +223,10 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
           <Breadcrumb><BreadcrumbList>
             {crumbs.map((crumb, i) => {
               const isLast = i === crumbs.length - 1;
+              const isHome = crumb.label === "Home";
+              const content = isHome ? <Home className="h-3.5 w-3.5" /> : crumb.label;
               return (<Fragment key={`${crumb.label}-${i}`}>
-                <BreadcrumbItem>{isLast || !crumb.view ? <BreadcrumbPage>{crumb.label}</BreadcrumbPage> : <BreadcrumbLink onClick={() => crumb.view && onNavigate(crumb.view)} className="cursor-pointer">{crumb.label}</BreadcrumbLink>}</BreadcrumbItem>
+                <BreadcrumbItem>{isLast || !crumb.view ? <BreadcrumbPage>{content}</BreadcrumbPage> : <BreadcrumbLink onClick={() => crumb.view && onNavigate(crumb.view)} className="cursor-pointer">{content}</BreadcrumbLink>}</BreadcrumbItem>
                 {!isLast && <BreadcrumbSeparator />}
               </Fragment>);
             })}
