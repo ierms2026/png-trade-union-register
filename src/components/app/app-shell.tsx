@@ -108,6 +108,36 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
     window.location.href = "/";
   }
 
+  // Group notifications by date category for scannability.
+  // Returns an ordered array of { label, items } groups.
+  function groupNotifications(notifs: Notification[]): Array<{ label: string; items: Notification[] }> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 86400000);
+    const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+    const groups: Record<string, Notification[]> = {
+      Today: [],
+      Yesterday: [],
+      "This Week": [],
+      Earlier: [],
+    };
+
+    for (const n of notifs) {
+      const d = new Date(n.createdAt);
+      if (d >= today) groups.Today.push(n);
+      else if (d >= yesterday) groups.Yesterday.push(n);
+      else if (d >= weekAgo) groups["This Week"].push(n);
+      else groups.Earlier.push(n);
+    }
+
+    return Object.entries(groups)
+      .filter(([, items]) => items.length > 0)
+      .map(([label, items]) => ({ label, items }));
+  }
+
+  const groupedNotifications = groupNotifications(notifications);
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-30 border-b bg-card">
@@ -141,16 +171,25 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
                 <DropdownMenuSeparator />
                 {notifLoading ? <div className="p-2"><NotificationsSkeleton /></div>
                 : notifications.length === 0 ? <div className="px-3 py-6 text-center text-sm text-muted-foreground">No unread notifications.</div>
-                : <div className="max-h-96 overflow-y-auto">{notifications.map((n) => (
-                  <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-1 p-3" onClick={() => markAsRead(n.id, n.linkUrl)}>
-                    <div className="flex w-full items-center gap-2">
-                      <span className="text-xs font-medium uppercase text-muted-foreground">{n.type}</span>
-                      <span className="ml-auto text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleDateString()}</span>
+                : <div className="max-h-96 overflow-y-auto">
+                  {groupedNotifications.map((group) => (
+                    <div key={group.label}>
+                      <div className="sticky top-0 bg-card px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b">
+                        {group.label}
+                      </div>
+                      {group.items.map((n) => (
+                        <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-1 p-3" onClick={() => markAsRead(n.id, n.linkUrl)}>
+                          <div className="flex w-full items-center gap-2">
+                            <span className="text-xs font-medium uppercase text-muted-foreground">{n.type}</span>
+                            <span className="ml-auto text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <p className="text-sm font-medium leading-tight">{n.title}</p>
+                          <p className="text-xs text-muted-foreground">{n.body}</p>
+                        </DropdownMenuItem>
+                      ))}
                     </div>
-                    <p className="text-sm font-medium leading-tight">{n.title}</p>
-                    <p className="text-xs text-muted-foreground">{n.body}</p>
-                  </DropdownMenuItem>
-                ))}</div>}
+                  ))}
+                </div>}
               </DropdownMenuContent>
             </DropdownMenu>
             <DropdownMenu>
