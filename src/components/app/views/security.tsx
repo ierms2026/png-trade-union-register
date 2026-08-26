@@ -92,15 +92,15 @@ export function SecurityView() {
   }));
 
   const loginTrendConfig: ChartConfig = {
-    failed: { label: "Failed", color: "#ef4444" },
-    successful: { label: "Successful", color: "#22c55e" },
+    failed: { label: "Failed", color: "var(--status-overdue)" },
+    successful: { label: "Successful", color: "var(--status-compliant)" },
   };
 
   // Chart data for 2FA adoption donut
   const twoFactorData = data
     ? [
-        { name: "2FA Enabled", value: data.twoFactorAdoption.enabled, fill: "#22c55e" },
-        { name: "Not Enrolled", value: data.twoFactorAdoption.totalEligible - data.twoFactorAdoption.enabled, fill: "#f59e0b" },
+        { name: "2FA Enabled", value: data.twoFactorAdoption.enabled, fill: "var(--status-compliant)" },
+        { name: "Not Enrolled", value: data.twoFactorAdoption.totalEligible - data.twoFactorAdoption.enabled, fill: "var(--status-expiring)" },
       ]
     : [];
 
@@ -223,17 +223,17 @@ export function SecurityView() {
                   <Line
                     type="monotone"
                     dataKey="failed"
-                    stroke="#ef4444"
+                    stroke="var(--status-overdue)"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: "#ef4444" }}
+                    dot={{ r: 3, fill: "var(--status-overdue)" }}
                     name="Failed"
                   />
                   <Line
                     type="monotone"
                     dataKey="successful"
-                    stroke="#22c55e"
+                    stroke="var(--status-compliant)"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: "#22c55e" }}
+                    dot={{ r: 3, fill: "var(--status-compliant)" }}
                     name="Successful"
                   />
                 </LineChart>

@@ -69,10 +69,11 @@ export function ComplianceView() {
   const [filter, setFilter] = useState<StatusFilter>("ALL");
 
   // --- Chart data: union status distribution (donut) ---
+  // Uses design-system chart tokens + semantic status colors.
   const STATUS_COLORS: Record<string, string> = {
-    ACTIVE: "#22c55e",
-    SUSPENDED: "#f59e0b",
-    DEREGISTERED: "#9ca3af",
+    ACTIVE: "var(--status-compliant)",
+    SUSPENDED: "var(--status-expiring)",
+    DEREGISTERED: "var(--status-missing)",
   };
   const unionStatusData = data
     ? Object.entries(
@@ -80,16 +81,16 @@ export function ComplianceView() {
           acc[u.status] = (acc[u.status] || 0) + 1;
           return acc;
         }, {} as Record<string, number>),
-      ).map(([status, count]) => ({ name: status, value: count, fill: STATUS_COLORS[status] || "#9ca3af" }))
+      ).map(([status, count]) => ({ name: status, value: count, fill: STATUS_COLORS[status] || "var(--status-missing)" }))
     : [];
 
   // --- Chart data: per-union compliance breakdown (stacked bar) ---
   const COMPLIANCE_COLORS: Record<string, string> = {
-    COMPLIANT: "#22c55e",
-    EXPIRING: "#f59e0b",
-    OVERDUE: "#ef4444",
-    MISSING: "#9ca3af",
-    NOT_APPLICABLE: "#cbd5e1",
+    COMPLIANT: "var(--status-compliant)",
+    EXPIRING: "var(--status-expiring)",
+    OVERDUE: "var(--status-overdue)",
+    MISSING: "var(--status-missing)",
+    NOT_APPLICABLE: "var(--muted)",
   };
   const stackedBarData = data
     ? data.unions.map((u) => {
@@ -106,10 +107,10 @@ export function ComplianceView() {
     : [];
 
   const stackedBarConfig: ChartConfig = {
-    Compliant: { label: "Compliant", color: "#22c55e" },
-    Expiring: { label: "Expiring", color: "#f59e0b" },
-    Overdue: { label: "Overdue", color: "#ef4444" },
-    Missing: { label: "Missing", color: "#9ca3af" },
+    Compliant: { label: "Compliant", color: "var(--status-compliant)" },
+    Expiring: { label: "Expiring", color: "var(--status-expiring)" },
+    Overdue: { label: "Overdue", color: "var(--status-overdue)" },
+    Missing: { label: "Missing", color: "var(--status-missing)" },
   };
 
   if (loading) return <TableSkeleton rows={6} />;
@@ -234,10 +235,10 @@ export function ComplianceView() {
                   iconType="circle"
                   iconSize={8}
                 />
-                <Bar dataKey="Compliant" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Expiring" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Overdue" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Missing" stackId="a" fill="#9ca3af" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Compliant" stackId="a" fill="var(--status-compliant)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Expiring" stackId="a" fill="var(--status-expiring)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Overdue" stackId="a" fill="var(--status-overdue)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Missing" stackId="a" fill="var(--status-missing)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           </CardContent>

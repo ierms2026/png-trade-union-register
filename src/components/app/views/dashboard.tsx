@@ -130,12 +130,13 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
   } = useFetch<{ documentTypes: Array<{ documentType: string; count: number }>; total: number }>("/api/dashboard/document-types");
 
   // --- Chart data: compliance status distribution ---
+  // Uses CSS variables for semantic status colors (defined in globals.css).
   const complianceChartData = stats
     ? [
-        { status: "Compliant", count: stats.compliance.compliant, fill: "#22c55e" },
-        { status: "Expiring", count: stats.compliance.expiring, fill: "#f59e0b" },
-        { status: "Overdue", count: stats.compliance.overdue, fill: "#ef4444" },
-        { status: "Missing", count: stats.compliance.missing, fill: "#9ca3af" },
+        { status: "Compliant", count: stats.compliance.compliant, fill: "var(--status-compliant)" },
+        { status: "Expiring", count: stats.compliance.expiring, fill: "var(--status-expiring)" },
+        { status: "Overdue", count: stats.compliance.overdue, fill: "var(--status-overdue)" },
+        { status: "Missing", count: stats.compliance.missing, fill: "var(--status-missing)" },
       ]
     : [];
 
@@ -144,7 +145,11 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
   };
 
   // --- Chart data: documents by type (donut) ---
-  const DONUT_COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5", "#0d9488", "#be185d", "#92400e"];
+  // Uses the 5-chart palette from the design system, cycling for >5 types.
+  const DONUT_COLORS = [
+    "var(--chart-1)", "var(--chart-2)", "var(--chart-3)",
+    "var(--chart-4)", "var(--chart-5)",
+  ];
   const docTypeChartData = (docTypesData?.documentTypes || []).map((d, i) => ({
     name: d.documentType,
     value: d.count,
@@ -319,22 +324,22 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-chart-3" />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-compliant)" }} />
                   <span className="text-muted-foreground">Compliant:</span>
                   <span className="font-medium">{stats.compliance.compliant}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-accent" />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-expiring)" }} />
                   <span className="text-muted-foreground">Expiring:</span>
                   <span className="font-medium">{stats.compliance.expiring}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-destructive" />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-overdue)" }} />
                   <span className="text-muted-foreground">Overdue:</span>
                   <span className="font-medium">{stats.compliance.overdue}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-missing)" }} />
                   <span className="text-muted-foreground">Missing:</span>
                   <span className="font-medium">{stats.compliance.missing}</span>
                 </div>
