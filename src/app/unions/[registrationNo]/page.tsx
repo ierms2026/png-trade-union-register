@@ -3,11 +3,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { ArrowLeft, FileText, ExternalLink, Shield, ArrowRight, LogIn } from "lucide-react";
+import { ArrowLeft, FileText, Shield, ArrowRight, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/app/print-button";
+import { DocumentList } from "@/components/app/document-list";
 import type { Metadata } from "next";
 
 const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
@@ -103,27 +104,7 @@ export default async function UnionDetailPage({ params }: PageProps) {
             <h2 className="text-xl font-semibold">Published Documents</h2>
             <p className="mt-1 text-sm text-muted-foreground no-print">Documents published by the Industrial Registrar for public verification.</p>
           </div>
-          {union.documents.length === 0 ? (
-            <Card className="print-card"><CardContent className="py-8 text-center"><FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground no-print" /><p className="text-sm font-medium">No public documents published</p><p className="mt-1 text-xs text-muted-foreground">The Registrar has not published any documents for this union yet.</p></CardContent></Card>
-          ) : (
-            <div className="space-y-3">
-              {union.documents.map((doc) => {
-                const lv = doc.versions[0];
-                const dl = lv ? `/api/public/files/${lv.id}` : null;
-                return (
-                  <Card key={doc.id} className="print-card print-avoid-break">
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground no-print" />
-                        <div><p className="text-sm font-medium">{doc.documentType}</p>{lv && <p className="text-xs text-muted-foreground">Version {lv.versionNumber} · uploaded {new Date(lv.uploadedAt).toLocaleDateString()}{lv.fileExtension && ` · ${lv.fileExtension.toUpperCase()}`}</p>}</div>
-                      </div>
-                      {dl && <Button asChild size="sm" variant="outline" className="no-print"><a href={dl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1 h-3 w-3" />View</a></Button>}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+          <DocumentList documents={union.documents} />
         </div>
 
         <Card className="bg-muted/30 print-card"><CardContent className="py-4"><p className="text-xs text-muted-foreground">For enquiries regarding this union, contact the Office of The Industrial Registrar, PNG Department of Labour &amp; Industrial Relations.</p></CardContent></Card>
