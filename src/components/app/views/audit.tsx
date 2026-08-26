@@ -170,7 +170,7 @@ export function AuditView() {
               <div className="divide-y">
                 {data.entries.map((entry) => (
                   <div key={entry.id}>
-                    <button className="grid w-full grid-cols-[160px_1fr_160px_120px_100px_24px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}>
+                    <button className="grid w-full grid-cols-[160px_1fr_160px_120px_100px_24px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 border-l-2 border-solid border-l-transparent hover:border-l-accent" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}>
                       <span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
                       <div className="min-w-0"><p className="truncate text-sm font-medium">{entry.actorName}</p><p className="truncate text-xs text-muted-foreground lg:hidden">{entry.action} · {entry.entityType}</p></div>
                       <span className="hidden truncate text-sm text-muted-foreground lg:inline">{entry.action}</span>

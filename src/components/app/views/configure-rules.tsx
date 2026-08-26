@@ -102,7 +102,7 @@ export function ConfigureRulesView() {
             {data.rules.map((rule) => (
               <div
                 key={rule.id}
-                className="flex items-center justify-between rounded-md border p-3 hover:bg-muted/30"
+                className="flex items-center justify-between rounded-md border p-3 hover:bg-muted/30 border-l-2 border-solid border-l-transparent hover:border-l-accent"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">

@@ -189,7 +189,7 @@ export function CompareView() {
               </thead>
               <tbody>
                 {data.documentTypes.map((docType) => (
-                  <tr key={docType} className="border-b hover:bg-muted/30">
+                  <tr key={docType} className="border-b hover:bg-muted/30 hover:shadow-[inset_2px_0_0_0_oklch(0.74_0.15_85)]">
                     <td className="sticky left-0 z-10 bg-background px-3 py-2 text-xs font-medium">
                       {docType}
                     </td>

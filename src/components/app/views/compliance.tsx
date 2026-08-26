@@ -269,7 +269,7 @@ export function ComplianceView() {
             </thead>
             <tbody>
               {data.unions.map((row) => (
-                <tr key={row.unionId} className="border-b hover:bg-muted/30">
+                <tr key={row.unionId} className="border-b hover:bg-muted/30 hover:shadow-[inset_2px_0_0_0_oklch(0.74_0.15_85)]">
                   <td className="sticky left-0 z-10 bg-card px-4 py-3">
                     <p className="font-medium">{row.unionName}</p>
                     <p className="text-xs text-muted-foreground">{row.status}</p>
