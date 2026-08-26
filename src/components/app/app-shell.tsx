@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useFetch } from "@/components/app/use-fetch";
 import { NotificationsSkeleton } from "@/components/app/skeletons";
+import { ScrollToTop } from "@/components/app/scroll-to-top";
 
 interface AuthUser {
   id: string; email: string;
@@ -193,6 +194,8 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-7xl p-4 lg:p-6">{children}</div>
       </main>
+
+      <ScrollToTop />
     </div>
   );
 }
