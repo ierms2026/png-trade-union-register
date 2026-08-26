@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Download,
   Pencil,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,8 +91,22 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadDocType, setUploadDocType] = useState<string>("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const selectedUnion = data?.unions.find((u) => u.id === selectedUnionId);
+
+  // Client-side filter — same pattern as the public portal. Instant, no
+  // network round-trip. Filters by union name or registration number.
+  const filteredUnions = (() => {
+    const all = data?.unions ?? [];
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter(
+      (u) =>
+        u.unionName.toLowerCase().includes(q) ||
+        u.registrationNo.toLowerCase().includes(q),
+    );
+  })();
 
   if (loading) return <CardListSkeleton count={6} />;
   if (error) return <ErrorState description={error} onRetry={refetch} />;
@@ -248,31 +263,51 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Union Registry</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Registered Unions</h1>
         <p className="text-sm text-muted-foreground">
           {data.unions.length} registered union{data.unions.length !== 1 ? "s" : ""}.
         </p>
       </div>
 
-      <Card>
-        <CardContent className="divide-y p-0">
-          <div className="hidden grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid">
-            <span>Union Name</span><span>Reg. No.</span><span className="text-center">Documents</span><span className="text-center">Status</span><span />
-          </div>
-          {data.unions.map((u) => (
-            <Link key={u.id} href={`/unions/${u.registrationNo}`} className="grid w-full grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30">
-              <div className="min-w-0">
-                <p className="truncate font-medium">{u.unionName}</p>
-                <p className="truncate text-xs text-muted-foreground sm:hidden">{u.registrationNo} · {u.documents.length} doc{u.documents.length !== 1 ? "s" : ""}</p>
-              </div>
-              <span className="hidden truncate text-sm text-muted-foreground sm:inline">{u.registrationNo}</span>
-              <span className="hidden text-center text-sm text-muted-foreground sm:inline">{u.documents.length}</span>
-              <span className="hidden text-center sm:flex sm:justify-center"><StatusBadge status={u.status} /></span>
-              <ChevronRight className="hidden h-4 w-4 justify-self-end text-muted-foreground sm:block" />
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+      {/* Filter box — reactive, no submit button (same pattern as public portal) */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Filter by name or registration number..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {filteredUnions.length === 0 && searchQuery.trim() ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-sm font-medium">No unions match your filter</p>
+            <p className="mt-1 text-xs text-muted-foreground">Try a different search term.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="divide-y p-0">
+            <div className="hidden grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid">
+              <span>Union Name</span><span>Reg. No.</span><span className="text-center">Documents</span><span className="text-center">Status</span><span />
+            </div>
+            {filteredUnions.map((u) => (
+              <Link key={u.id} href={`/unions/${u.registrationNo}`} className="grid w-full grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{u.unionName}</p>
+                  <p className="truncate text-xs text-muted-foreground sm:hidden">{u.registrationNo} · {u.documents.length} doc{u.documents.length !== 1 ? "s" : ""}</p>
+                </div>
+                <span className="hidden truncate text-sm text-muted-foreground sm:inline">{u.registrationNo}</span>
+                <span className="hidden text-center text-sm text-muted-foreground sm:inline">{u.documents.length}</span>
+                <span className="hidden text-center sm:flex sm:justify-center"><StatusBadge status={u.status} /></span>
+                <ChevronRight className="hidden h-4 w-4 justify-self-end text-muted-foreground sm:block" />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
