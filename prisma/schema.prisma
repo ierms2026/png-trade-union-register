@@ -187,6 +187,7 @@ model DocumentVersion {
   fileSize       Int
   checksum       String   // SHA-256 hash
   fileExtension  String?
+  textContent    String?  // Extracted text for full-text search (null if not extracted)
   uploadedById   String?
   uploadedAt     DateTime @default(now())
   document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
