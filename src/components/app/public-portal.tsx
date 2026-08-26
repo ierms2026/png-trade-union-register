@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/app/status-badge";
 import { useFetch } from "@/components/app/use-fetch";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
@@ -79,7 +80,7 @@ export function PublicPortal({ onStaffLogin }: Props) {
                 <Card className="cursor-pointer transition-colors hover:bg-muted/50">
                   <CardContent className="flex items-center justify-between p-4">
                     <div><p className="font-medium">{u.unionName}</p><p className="text-sm text-muted-foreground">Reg. No: {u.registrationNo}</p></div>
-                    <Badge variant={u.status === "ACTIVE" ? "default" : "secondary"}>{u.status}</Badge>
+                    <StatusBadge status={u.status} />
                   </CardContent>
                 </Card>
               </Link>

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/app/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -266,7 +267,7 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
               </div>
               <span className="hidden truncate text-sm text-muted-foreground sm:inline">{u.registrationNo}</span>
               <span className="hidden text-center text-sm text-muted-foreground sm:inline">{u.documents.length}</span>
-              <span className="hidden text-center sm:flex sm:justify-center"><Badge variant={u.status === "ACTIVE" ? "default" : "secondary"}>{u.status}</Badge></span>
+              <span className="hidden text-center sm:flex sm:justify-center"><StatusBadge status={u.status} /></span>
               <ChevronRight className="hidden h-4 w-4 justify-self-end text-muted-foreground sm:block" />
             </Link>
           ))}

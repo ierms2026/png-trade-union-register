@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/app/print-button";
 import { DocumentList } from "@/components/app/document-list";
+import { StatusBadge } from "@/components/app/status-badge";
 import type { Metadata } from "next";
 
 const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
@@ -76,7 +77,7 @@ export default async function UnionDetailPage({ params }: PageProps) {
         <div className="space-y-3 text-center">
           <div className="flex items-center justify-center gap-2 no-print">
             <Badge variant="outline" className="text-xs">Reg. No: {union.registrationNo}</Badge>
-            <Badge variant={union.status === "ACTIVE" ? "default" : "secondary"}>{union.status}</Badge>
+            <StatusBadge status={union.status} />
             <PrintButton />
           </div>
           {/* Print-only: show reg number + status as plain text (badges don't print well) */}
