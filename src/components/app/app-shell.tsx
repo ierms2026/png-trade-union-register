@@ -20,6 +20,7 @@ import {
 import { useFetch } from "@/components/app/use-fetch";
 import { NotificationsSkeleton } from "@/components/app/skeletons";
 import { ScrollToTop } from "@/components/app/scroll-to-top";
+import { ThemeToggle } from "@/components/app/theme-toggle";
 
 interface AuthUser {
   id: string; email: string;
@@ -151,6 +152,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="hidden text-xs md:inline-flex">{user.role}</Badge>
+            <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
