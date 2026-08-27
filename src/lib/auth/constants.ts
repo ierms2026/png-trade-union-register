@@ -41,6 +41,22 @@ export const LOCKOUT_THRESHOLD = 3;
  */
 export const LOCKOUT_DURATION_MINS = 15;
 
+/**
+ * Preview/test bypass for the lockout policy.
+ *
+ * When `DISABLE_LOGIN_LOCKOUT=true` is set in the environment, the login
+ * and 2FA routes SKIP the lockout check and never set `lockedUntil`. This
+ * lets testers iterate freely without being blocked after 3 failed attempts.
+ *
+ * - Preview / dev / staging: set DISABLE_LOGIN_LOCKOUT=true
+ * - Production: leave DISABLE_LOGIN_LOCKOUT unset (or =false)
+ *
+ * The failed-attempt counter and LoginAttempt audit rows are still recorded
+ * either way, so the Security Dashboard continues to show real data.
+ */
+export const LOCKOUT_DISABLED =
+  process.env.DISABLE_LOGIN_LOCKOUT === "true";
+
 // -----------------------------------------------------------------------------
 // Reserved for later sessions — declared here so importers can plan ahead,
 // but the values are intentionally NOT used yet (Phase A only needs the two

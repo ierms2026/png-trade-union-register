@@ -9,6 +9,11 @@ import {
   SESSION_TTL_MS,
   signChallengeToken,
 } from "@/lib/auth/session";
+import {
+  LOCKOUT_THRESHOLD,
+  LOCKOUT_DURATION_MINS,
+  LOCKOUT_DISABLED,
+} from "@/lib/auth/constants";
 import { Severity } from "@prisma/client";
 
 // =============================================================================
@@ -135,39 +140,83 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // --- 5. (Lockout disabled for preview environment) ----------------------
-  // The 3-failures → 15-min lockout has been removed for the preview/test
-  // environment so testers can iterate freely. We still log every attempt
-  // for the Security Dashboard; we just never set `lockedUntil`.
-  // If an account was previously locked (carry-over from prod data), we
-  // clear it here so the user can sign in immediately.
-  if (user.lockedUntil) {
-    await db.user.update({
-      where: { id: user.id },
-      data: { failedLoginAttempts: 0, lockedUntil: null },
+  // --- 5. Check lockout (3 failures → 15min lock) -------------------------
+  // The lockout is checked AFTER the disabled check so a disabled user
+  // gets the "disabled" message (more specific) rather than the generic
+  // "locked" message.
+  //
+  // Preview bypass: when DISABLE_LOGIN_LOCKOUT=true is set in the env,
+  // we skip the lockout entirely AND clear any carry-over lock from a
+  // previous production deployment. In production the env var is unset
+  // and the full 3-strike / 15-min policy is enforced.
+  if (LOCKOUT_DISABLED) {
+    if (user.lockedUntil || user.failedLoginAttempts > 0) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
+    }
+  } else if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+    await db.loginAttempt.create({
+      data: { email, success: false, userId: user.id, ip, userAgent },
     });
-    user.failedLoginAttempts = 0;
-    user.lockedUntil = null;
+    const remainingMs = user.lockedUntil.getTime() - Date.now();
+    const remainingMin = Math.ceil(remainingMs / 60000);
+    return NextResponse.json(
+      {
+        error: `Account locked due to repeated failed attempts. Try again in ${remainingMin} minute(s).`,
+      },
+      { status: 423 }, // 423 Locked
+    );
   }
 
   // --- 6. Verify the password ---------------------------------------------
   const passwordOk = await verifyPassword(body.password, user.passwordHash);
 
   if (!passwordOk) {
-    // Track failed attempts for audit/Security Dashboard, but DO NOT lock
-    // the account — lockout is disabled in the preview environment.
+    // Increment the failed-attempt counter. If it crosses the threshold,
+    // set lockedUntil. We do this in a single update to avoid a race
+    // where two concurrent failed attempts both see count=2 and both
+    // write count=3 without setting the lock.
+    //
+    // Preview bypass: when DISABLE_LOGIN_LOCKOUT=true, we still bump the
+    // counter (for the Security Dashboard) but never set lockedUntil.
     const newCount = user.failedLoginAttempts + 1;
+    const shouldLock = !LOCKOUT_DISABLED && newCount >= LOCKOUT_THRESHOLD;
     await db.user.update({
       where: { id: user.id },
-      data: { failedLoginAttempts: newCount },
+      data: {
+        failedLoginAttempts: shouldLock ? 0 : newCount,
+        lockedUntil: shouldLock
+          ? new Date(Date.now() + LOCKOUT_DURATION_MINS * 60 * 1000)
+          : user.lockedUntil,
+      },
     });
 
     await db.loginAttempt.create({
       data: { email, success: false, userId: user.id, ip, userAgent },
     });
 
+    // Inform the client of remaining attempts (helpful UX, doesn't leak
+    // anything the attacker doesn't already know — they know how many
+    // times they've tried). Suppressed in preview mode.
+    if (LOCKOUT_DISABLED) {
+      return NextResponse.json(
+        { error: "Invalid email or password." },
+        { status: 401 },
+      );
+    }
+    const remaining = shouldLock
+      ? 0
+      : Math.max(0, LOCKOUT_THRESHOLD - newCount);
     return NextResponse.json(
-      { error: "Invalid email or password." },
+      {
+        error: shouldLock
+          ? `Account locked for ${LOCKOUT_DURATION_MINS} minutes due to repeated failed attempts.`
+          : `Invalid email or password. ${remaining} attempt(s) remaining.`,
+      },
       { status: 401 },
     );
   }

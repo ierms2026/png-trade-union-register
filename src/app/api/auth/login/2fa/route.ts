@@ -9,6 +9,11 @@ import {
   SESSION_TTL_MS,
   parseChallengeToken,
 } from "@/lib/auth/session";
+import {
+  LOCKOUT_THRESHOLD,
+  LOCKOUT_DURATION_MINS,
+  LOCKOUT_DISABLED,
+} from "@/lib/auth/constants";
 import { Severity } from "@prisma/client";
 
 // =============================================================================
@@ -98,14 +103,28 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
   }
-  if (user.lockedUntil) {
-    // Lockout disabled in preview environment — clear any carry-over lock.
-    await db.user.update({
-      where: { id: user.id },
-      data: { failedLoginAttempts: 0, lockedUntil: null },
-    });
-    user.failedLoginAttempts = 0;
-    user.lockedUntil = null;
+  // Lockout check — enforced in production, skipped in preview when
+  // DISABLE_LOGIN_LOCKOUT=true. Carry-over locks from a production
+  // deployment are cleared in preview mode so testers can sign in.
+  if (LOCKOUT_DISABLED) {
+    if (user.lockedUntil || user.failedLoginAttempts > 0) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
+    }
+  } else if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+    const remainingMin = Math.ceil(
+      (user.lockedUntil.getTime() - Date.now()) / 60000,
+    );
+    return NextResponse.json(
+      {
+        error: `Account locked. Try again in ${remainingMin} minute(s).`,
+      },
+      { status: 423 },
+    );
   }
   if (!user.twoFactorEnabled || !user.twoFactorSecret) {
     // 2FA was reset between step 1 and step 2. Don't leak details —
@@ -123,12 +142,19 @@ export async function POST(req: NextRequest) {
   );
 
   if (!otpOk) {
-    // Track failed attempts for audit/Security Dashboard, but DO NOT lock
-    // the account — lockout is disabled in the preview environment.
+    // Increment the shared failure counter (same as password failures).
+    // Preview bypass: when DISABLE_LOGIN_LOCKOUT=true, we still bump the
+    // counter for the Security Dashboard but never set lockedUntil.
     const newCount = user.failedLoginAttempts + 1;
+    const shouldLock = !LOCKOUT_DISABLED && newCount >= LOCKOUT_THRESHOLD;
     await db.user.update({
       where: { id: user.id },
-      data: { failedLoginAttempts: newCount },
+      data: {
+        failedLoginAttempts: shouldLock ? 0 : newCount,
+        lockedUntil: shouldLock
+          ? new Date(Date.now() + LOCKOUT_DURATION_MINS * 60 * 1000)
+          : user.lockedUntil,
+      },
     });
 
     const ip =
@@ -138,8 +164,21 @@ export async function POST(req: NextRequest) {
       data: { email: user.email, success: false, userId: user.id, ip, userAgent },
     });
 
+    if (LOCKOUT_DISABLED) {
+      return NextResponse.json(
+        { error: "Invalid code. Please try again." },
+        { status: 401 },
+      );
+    }
+    const remaining = shouldLock
+      ? 0
+      : Math.max(0, LOCKOUT_THRESHOLD - newCount);
     return NextResponse.json(
-      { error: "Invalid code. Please try again." },
+      {
+        error: shouldLock
+          ? `Account locked for ${LOCKOUT_DURATION_MINS} minutes due to repeated failed attempts.`
+          : `Invalid code. ${remaining} attempt(s) remaining.`,
+      },
       { status: 401 },
     );
   }
