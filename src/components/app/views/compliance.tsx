@@ -97,7 +97,7 @@ export function ComplianceView() {
         const counts: Record<string, number> = { COMPLIANT: 0, EXPIRING: 0, OVERDUE: 0, MISSING: 0, NOT_APPLICABLE: 0 };
         u.scores.forEach((s) => { counts[s.status]++; });
         return {
-          name: u.unionName.length > 20 ? u.unionName.slice(0, 18) + "…" : u.unionName,
+          name: u.unionName,
           Compliant: counts.COMPLIANT,
           Expiring: counts.EXPIRING,
           Overdue: counts.OVERDUE,
@@ -204,30 +204,33 @@ export function ComplianceView() {
           </CardContent>
         </Card>
 
-        {/* Per-union compliance breakdown — stacked bar */}
+        {/* Per-union compliance breakdown — HORIZONTAL stacked bar.
+            Horizontal layout handles long union names on the y-axis
+            without rotation, and scales gracefully: 20+ unions just
+            means a taller chart, not an unreadable one. */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg">Compliance by Union</CardTitle>
             <CardDescription>Stacked breakdown of document statuses per union.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={stackedBarConfig} className="h-[240px] w-full">
-              <BarChart data={stackedBarData} margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+            <ChartContainer config={stackedBarConfig} className="h-[300px] w-full">
+              <BarChart data={stackedBarData} layout="vertical" margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
                 <XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11 }}
-                  interval={0}
-                  angle={-15}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis
+                  type="number"
                   tickLine={false}
                   axisLine={false}
                   tick={{ fontSize: 12 }}
                   allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                  width={140}
+                  interval={0}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Legend
@@ -238,7 +241,7 @@ export function ComplianceView() {
                 <Bar dataKey="Compliant" stackId="a" fill="var(--status-compliant)" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="Expiring" stackId="a" fill="var(--status-expiring)" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="Overdue" stackId="a" fill="var(--status-overdue)" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Missing" stackId="a" fill="var(--status-missing)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Missing" stackId="a" fill="var(--status-missing)" radius={[0, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           </CardContent>
