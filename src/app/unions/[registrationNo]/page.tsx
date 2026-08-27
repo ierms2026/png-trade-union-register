@@ -12,7 +12,7 @@ import { DocumentList } from "@/components/app/document-list";
 import { StatusBadge } from "@/components/app/status-badge";
 import type { Metadata } from "next";
 
-const PUBLIC_DOC_TYPES = ["IO-02", "IO-03"];
+const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
 
 interface PageProps { params: Promise<{ registrationNo: string }>; }
 

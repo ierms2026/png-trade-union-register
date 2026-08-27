@@ -242,45 +242,45 @@ interface DocSeed {
   disposed?: boolean;
 }
 
-// Document types use sequential codes (IO-00 through IO-11, AW) that match
+// Document types use descriptive names. IO-# convention applies to file names only.
 // compliance rules. File names include the union's numeric registration
 // number: IO-[regNum]-[code] e.g. IO-1-02, or A[regNum] e.g. A1
 const DOC_SEEDS: DocSeed[] = [
   // Papua Maritime Workers Union (regNum=1) — mostly compliant
-  { unionName: "Papua Maritime Workers Union", documentType: "IO-02", fileName: "IO-1-02", filedDaysAgo: 365 * 5 },
-  { unionName: "Papua Maritime Workers Union", documentType: "IO-03", fileName: "IO-1-03", filedDaysAgo: 365 * 2 },
-  { unionName: "Papua Maritime Workers Union", documentType: "IO-07", fileName: "IO-1-07", filedDaysAgo: 60 },
-  { unionName: "Papua Maritime Workers Union", documentType: "IO-05", fileName: "IO-1-05", filedDaysAgo: 365 },
-  { unionName: "Papua Maritime Workers Union", documentType: "IO-04", fileName: "IO-1-04", filedDaysAgo: 30 },
-  { unionName: "Papua Maritime Workers Union", documentType: "AW", fileName: "A1", filedDaysAgo: 200 },
+  { unionName: "Papua Maritime Workers Union", documentType: "Registration Certificate", fileName: "IO-1-02", filedDaysAgo: 365 * 5 },
+  { unionName: "Papua Maritime Workers Union", documentType: "Constitution", fileName: "IO-1-03", filedDaysAgo: 365 * 2 },
+  { unionName: "Papua Maritime Workers Union", documentType: "Financial Return", fileName: "IO-1-07", filedDaysAgo: 60 },
+  { unionName: "Papua Maritime Workers Union", documentType: "Election of Office Bearers", fileName: "IO-1-05", filedDaysAgo: 365 },
+  { unionName: "Papua Maritime Workers Union", documentType: "Financial Membership List", fileName: "IO-1-04", filedDaysAgo: 30 },
+  { unionName: "Papua Maritime Workers Union", documentType: "Awards", fileName: "A1", filedDaysAgo: 200 },
 
   // Highlands Coffee Growers (regNum=2) — some expiring
-  { unionName: "Highlands Coffee Growers Association", documentType: "IO-02", fileName: "IO-2-02", filedDaysAgo: 365 * 4 },
-  { unionName: "Highlands Coffee Growers Association", documentType: "IO-03", fileName: "IO-2-03", filedDaysAgo: 365 * 3 },
-  { unionName: "Highlands Coffee Growers Association", documentType: "IO-07", fileName: "IO-2-07", filedDaysAgo: 320 }, // expiring soon
-  { unionName: "Highlands Coffee Growers Association", documentType: "IO-08", fileName: "IO-2-08", filedDaysAgo: 350 }, // expiring
-  { unionName: "Highlands Coffee Growers Association", documentType: "AW", fileName: "A2", filedDaysAgo: 365 * 2 }, // overdue
+  { unionName: "Highlands Coffee Growers Association", documentType: "Registration Certificate", fileName: "IO-2-02", filedDaysAgo: 365 * 4 },
+  { unionName: "Highlands Coffee Growers Association", documentType: "Constitution", fileName: "IO-2-03", filedDaysAgo: 365 * 3 },
+  { unionName: "Highlands Coffee Growers Association", documentType: "Financial Return", fileName: "IO-2-07", filedDaysAgo: 320 }, // expiring soon
+  { unionName: "Highlands Coffee Growers Association", documentType: "Affiliations", fileName: "IO-2-08", filedDaysAgo: 350 }, // expiring
+  { unionName: "Highlands Coffee Growers Association", documentType: "Awards", fileName: "A2", filedDaysAgo: 365 * 2 }, // overdue
 
   // Port Moresby Teachers Federation (regNum=3, suspended) — overdue
-  { unionName: "Port Moresby Teachers Federation", documentType: "IO-02", fileName: "IO-3-02", filedDaysAgo: 365 * 6 },
-  { unionName: "Port Moresby Teachers Federation", documentType: "IO-03", fileName: "IO-3-03", filedDaysAgo: 365 * 5 },
-  { unionName: "Port Moresby Teachers Federation", documentType: "IO-07", fileName: "IO-3-07", filedDaysAgo: 400 }, // overdue
-  { unionName: "Port Moresby Teachers Federation", documentType: "IO-05", fileName: "IO-3-05", filedDaysAgo: 365 * 4 }, // overdue
+  { unionName: "Port Moresby Teachers Federation", documentType: "Registration Certificate", fileName: "IO-3-02", filedDaysAgo: 365 * 6 },
+  { unionName: "Port Moresby Teachers Federation", documentType: "Constitution", fileName: "IO-3-03", filedDaysAgo: 365 * 5 },
+  { unionName: "Port Moresby Teachers Federation", documentType: "Financial Return", fileName: "IO-3-07", filedDaysAgo: 400 }, // overdue
+  { unionName: "Port Moresby Teachers Federation", documentType: "Election of Office Bearers", fileName: "IO-3-05", filedDaysAgo: 365 * 4 }, // overdue
 
   // New Ireland Mining (regNum=4) — mixed
-  { unionName: "New Ireland Mining Employees Union", documentType: "IO-02", fileName: "IO-4-02", filedDaysAgo: 365 * 3 },
-  { unionName: "New Ireland Mining Employees Union", documentType: "IO-03", fileName: "IO-4-03", filedDaysAgo: 100 },
-  { unionName: "New Ireland Mining Employees Union", documentType: "IO-07", fileName: "IO-4-07", filedDaysAgo: 20 },
-  // MISSING: IO-04 (Financial Membership List — no seed entry → MISSING)
+  { unionName: "New Ireland Mining Employees Union", documentType: "Registration Certificate", fileName: "IO-4-02", filedDaysAgo: 365 * 3 },
+  { unionName: "New Ireland Mining Employees Union", documentType: "Constitution", fileName: "IO-4-03", filedDaysAgo: 100 },
+  { unionName: "New Ireland Mining Employees Union", documentType: "Financial Return", fileName: "IO-4-07", filedDaysAgo: 20 },
+  // MISSING: Financial Membership List
 
   // East Sepik Fisherfolk (regNum=5, deregistered) — disposed docs
-  { unionName: "East Sepik Fisherfolk Cooperative", documentType: "IO-02", fileName: "IO-5-02", filedDaysAgo: 365 * 7, disposed: true },
-  { unionName: "East Sepik Fisherfolk Cooperative", documentType: "IO-03", fileName: "IO-5-03", filedDaysAgo: 365 * 7, disposed: true },
+  { unionName: "East Sepik Fisherfolk Cooperative", documentType: "Registration Certificate", fileName: "IO-5-02", filedDaysAgo: 365 * 7, disposed: true },
+  { unionName: "East Sepik Fisherfolk Cooperative", documentType: "Constitution", fileName: "IO-5-03", filedDaysAgo: 365 * 7, disposed: true },
 
   // Southern Highlands Energy (regNum=6) — new, mostly missing
-  { unionName: "Southern Highlands Energy Workers Union", documentType: "IO-02", fileName: "IO-6-02", filedDaysAgo: 60 },
-  { unionName: "Southern Highlands Energy Workers Union", documentType: "IO-03", fileName: "IO-6-03", filedDaysAgo: 60 },
-  // MISSING: IO-07, IO-05, etc. (new union, hasn't filed yet)
+  { unionName: "Southern Highlands Energy Workers Union", documentType: "Registration Certificate", fileName: "IO-6-02", filedDaysAgo: 60 },
+  { unionName: "Southern Highlands Energy Workers Union", documentType: "Constitution", fileName: "IO-6-03", filedDaysAgo: 60 },
+  // MISSING: Financial Return, etc.
 ];
 
 async function seedDocuments(unionIdByName: Record<string, string>, userIdByEmail: Record<string, string>) {

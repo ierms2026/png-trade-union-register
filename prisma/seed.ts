@@ -34,106 +34,32 @@ interface RuleSeed {
   rationale: string; // why these values — for future tuning
 }
 
-// Document types follow the IO naming convention:
-//   IO-00 through IO-11 — Industrial Organisation document types
-//   AW — Awards (separate prefix)
+// Document types use descriptive names for display (compliance matrix,
+// charts, etc.). The IO-# naming convention applies ONLY to file names:
+//   IO-[regNum]-[code] e.g. IO-1-02, or A[regNum] e.g. A1
 //
-// File names per-union use: IO-[regNum]-[code] e.g. IO-1-00 for union 1
-// Awards file names: A[regNum] e.g. A1
-//
-// Compliance rules use the sequential code only (shared across all unions).
+// Code mapping (for file names only, not displayed in UI):
+//   IO-00 = General Matters          IO-06 = Secret Ballots
+//   IO-01 = Application for Registration  IO-07 = Financial Return
+//   IO-02 = Registration Certificate     IO-08 = Affiliations
+//   IO-03 = Constitution                 IO-09 = Inspection Reports
+//   IO-04 = Financial Membership List    IO-10 = General Secretary Appointments
+//   IO-05 = Election of Office Bearers   IO-11 = Welfare Fund
+//   AW = Awards
 const RULES: RuleSeed[] = [
-  {
-    documentType: "IO-00",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 5,
-    rationale: "General Matters — routine correspondence, annual check.",
-  },
-  {
-    documentType: "IO-01",
-    required: true,
-    renewalYears: 99,
-    retentionYrs: 99,
-    rationale: "Application for Registration — one-time, permanent.",
-  },
-  {
-    documentType: "IO-02",
-    required: true,
-    renewalYears: 99,
-    retentionYrs: 99,
-    rationale: "Registration Certificate — one-time issuance, permanent.",
-  },
-  {
-    documentType: "IO-03",
-    required: true,
-    renewalYears: 99,
-    retentionYrs: 50,
-    rationale: "Constitution — one-time filing, 50-year retention.",
-  },
-  {
-    documentType: "IO-04",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Financial Membership List — annual, 7-year retention.",
-  },
-  {
-    documentType: "IO-05",
-    required: true,
-    renewalYears: 3,
-    retentionYrs: 7,
-    rationale: "Election of Office Bearers — term-based (3yr), 7yr retention.",
-  },
-  {
-    documentType: "IO-06",
-    required: true,
-    renewalYears: 3,
-    retentionYrs: 7,
-    rationale: "Secret Ballots — term-based, 7-year retention.",
-  },
-  {
-    documentType: "IO-07",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Financial Return — annual audited, 7-year retention.",
-  },
-  {
-    documentType: "IO-08",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Affiliations — annual declaration, 7-year retention.",
-  },
-  {
-    documentType: "IO-09",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Inspection Reports — annual, 7-year retention.",
-  },
-  {
-    documentType: "IO-10",
-    required: true,
-    renewalYears: 3,
-    retentionYrs: 7,
-    rationale: "General Secretary Appointments — term-based, 7yr retention.",
-  },
-  {
-    documentType: "IO-11",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Welfare Fund — annual statement, 7-year retention.",
-  },
-  {
-    documentType: "AW",
-    required: true,
-    renewalYears: 3,
-    retentionYrs: 7,
-    rationale: "Awards — industrial awards, 3yr renewal, 7yr retention.",
-  },
+  { documentType: "General Matters", required: true, renewalYears: 1, retentionYrs: 5, rationale: "Routine correspondence, annual check." },
+  { documentType: "Application for Registration", required: true, renewalYears: 99, retentionYrs: 99, rationale: "One-time, permanent." },
+  { documentType: "Registration Certificate", required: true, renewalYears: 99, retentionYrs: 99, rationale: "One-time issuance, permanent." },
+  { documentType: "Constitution", required: true, renewalYears: 99, retentionYrs: 50, rationale: "One-time filing, 50-year retention." },
+  { documentType: "Financial Membership List", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual, 7-year retention." },
+  { documentType: "Election of Office Bearers", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Term-based (3yr), 7yr retention." },
+  { documentType: "Secret Ballots", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Term-based, 7-year retention." },
+  { documentType: "Financial Return", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual audited, 7-year retention." },
+  { documentType: "Affiliations", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual declaration, 7-year retention." },
+  { documentType: "Inspection Reports", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual, 7-year retention." },
+  { documentType: "General Secretary Appointments", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Term-based, 7yr retention." },
+  { documentType: "Welfare Fund", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual statement, 7-year retention." },
+  { documentType: "Awards", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Industrial awards, 3yr renewal, 7yr retention." },
 ];
 
 async function main() {
