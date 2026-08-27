@@ -93,7 +93,7 @@ interface DemoUnion {
 const DEMO_UNIONS: DemoUnion[] = [
   {
     unionName: "Papua Maritime Workers Union",
-    registrationNo: "PNG-TU-0001",
+    registrationNo: "IO-01",
     fileNumber: "DLIR-2018-001",
     status: UnionStatus.ACTIVE,
     address: "Port Moresby, National Capital District",
@@ -104,7 +104,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "Highlands Coffee Growers Association",
-    registrationNo: "PNG-TU-0002",
+    registrationNo: "IO-02",
     fileNumber: "DLIR-2019-014",
     status: UnionStatus.ACTIVE,
     address: "Goroka, Eastern Highlands Province",
@@ -115,7 +115,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "Port Moresby Teachers Federation",
-    registrationNo: "PNG-TU-0003",
+    registrationNo: "IO-03",
     fileNumber: "DLIR-2017-027",
     status: UnionStatus.SUSPENDED,
     address: "Port Moresby, National Capital District",
@@ -126,7 +126,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "New Ireland Mining Employees Union",
-    registrationNo: "PNG-TU-0004",
+    registrationNo: "IO-04",
     fileNumber: "DLIR-2020-008",
     status: UnionStatus.ACTIVE,
     address: "Kavieng, New Ireland Province",
@@ -137,7 +137,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "East Sepik Fisherfolk Cooperative",
-    registrationNo: "PNG-TU-0005",
+    registrationNo: "IO-05",
     fileNumber: "DLIR-2016-019",
     status: UnionStatus.DEREGISTERED,
     address: "Wewak, East Sepik Province",
@@ -148,7 +148,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "Southern Highlands Energy Workers Union",
-    registrationNo: "PNG-TU-0006",
+    registrationNo: "IO-06",
     fileNumber: "DLIR-2021-033",
     status: UnionStatus.ACTIVE,
     address: "Mendi, Southern Highlands Province",
