@@ -20,7 +20,7 @@ import { db } from "@/lib/prisma";
 //   — the secure download endpoint that serves the file content.
 // =============================================================================
 
-const PUBLIC_DOC_TYPES = ["IO-3", "IO-4"];
+const PUBLIC_DOC_TYPES = ["IO-02", "IO-03"];
 
 export async function GET(
   req: NextRequest,
