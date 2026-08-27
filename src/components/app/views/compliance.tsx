@@ -56,12 +56,12 @@ interface ComplianceMatrixResponse {
 
 type StatusFilter = "ALL" | "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
 
-const STATUS_CONFIG: Record<string, { label: string; cell: string; icon: typeof CheckCircle2 }> = {
-  COMPLIANT: { label: "Compliant", cell: "bg-chart-3/15 text-chart-3 border-chart-3/30", icon: CheckCircle2 },
-  EXPIRING: { label: "Expiring", cell: "bg-accent/15 text-accent-foreground border-accent/30", icon: AlertTriangle },
-  OVERDUE: { label: "Overdue", cell: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
-  MISSING: { label: "Missing", cell: "bg-muted text-muted-foreground border-border", icon: FileQuestion },
-  NOT_APPLICABLE: { label: "N/A", cell: "bg-muted/50 text-muted-foreground border-border", icon: Ban },
+const STATUS_CONFIG: Record<string, { label: string; cell: string; dot: string; icon: typeof CheckCircle2 }> = {
+  COMPLIANT: { label: "Compliant", cell: "bg-chart-3/15 text-chart-3 border-chart-3/30", dot: "bg-chart-3", icon: CheckCircle2 },
+  EXPIRING: { label: "Expiring", cell: "bg-accent/15 text-accent-foreground border-accent/30", dot: "bg-accent", icon: AlertTriangle },
+  OVERDUE: { label: "Overdue", cell: "bg-destructive/10 text-destructive border-destructive/30", dot: "bg-destructive", icon: XCircle },
+  MISSING: { label: "Missing", cell: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground/40", icon: FileQuestion },
+  NOT_APPLICABLE: { label: "N/A", cell: "bg-muted/50 text-muted-foreground border-border", dot: "bg-muted-foreground/20", icon: Ban },
 };
 
 export function ComplianceView() {
@@ -152,16 +152,13 @@ export function ComplianceView() {
         </Select>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3">
+      {/* Legend — dots only, no text badges */}
+      <div className="flex flex-wrap gap-4">
         {Object.entries(STATUS_CONFIG).map(([status, cfg]) => {
-          const Icon = cfg.icon;
           return (
-            <div key={status} className="flex items-center gap-1.5 text-xs">
-              <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 ${cfg.cell}`}>
-                <Icon className="h-3 w-3" />
-                {cfg.label}
-              </span>
+            <div key={status} className="flex items-center gap-2 text-xs">
+              <span className={`h-3 w-3 rounded-full ${cfg.dot}`} />
+              <span className="text-muted-foreground">{cfg.label}</span>
             </div>
           );
         })}
@@ -262,7 +259,7 @@ export function ComplianceView() {
                   Union
                 </th>
                 {data.documentTypes.map((dt) => (
-                  <th key={dt} className="px-3 py-3 text-center font-medium min-w-[140px]">
+                  <th key={dt} className="px-2 py-3 text-center font-medium min-w-[100px]">
                     <span className="block text-xs leading-tight">{dt}</span>
                   </th>
                 ))}
@@ -284,9 +281,9 @@ export function ComplianceView() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span
-                              className={`inline-flex min-w-[100px] cursor-help items-center justify-center rounded border px-3 py-1.5 text-xs font-medium ${cfg.cell} ${dimmed ? "opacity-25" : ""}`}
+                              className={`inline-flex h-7 w-7 cursor-help items-center justify-center rounded-full border ${cfg.cell} ${dimmed ? "opacity-25" : ""}`}
                             >
-                              {cfg.label}
+                              <span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-[220px]">
