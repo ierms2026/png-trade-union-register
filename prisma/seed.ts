@@ -123,16 +123,14 @@ const RULES: RuleSeed[] = [
     rationale: "Annual welfare-fund statement — 7-year retention.",
   },
   {
-    documentType: "Legislation",
+    documentType: "Awards",
     required: true,
-    renewalYears: 99,
-    retentionYrs: 99,
+    renewalYears: 3,
+    retentionYrs: 7,
     rationale:
-      "The specific industrial legislation the union is registered under " +
-      "(e.g. Maritime Industry Act). Permanent — statutes rarely change, " +
-      "and historical legal context must be retained forever. Distinct from " +
-      "the Session 7 Legislation Library, which is a department-wide static " +
-      "config, not a per-union filing.",
+      "Industrial awards applicable to the union's coverage. " +
+      "3-year renewal cycle (awards are typically renegotiated per " +
+      "bargaining cycle). 7-year retention for audit defense.",
   },
 ];
 

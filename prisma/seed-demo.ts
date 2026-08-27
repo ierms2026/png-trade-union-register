@@ -251,12 +251,14 @@ const DOC_SEEDS: DocSeed[] = [
   { unionName: "Papua Maritime Workers Union", documentType: "Financial Return", fileName: "PMWU-Financial-2025", filedDaysAgo: 60 },
   { unionName: "Papua Maritime Workers Union", documentType: "Election of Office Bearers", fileName: "PMWU-Election-2024", filedDaysAgo: 365 },
   { unionName: "Papua Maritime Workers Union", documentType: "Financial Membership List", fileName: "PMWU-Members-2025", filedDaysAgo: 30 },
+  { unionName: "Papua Maritime Workers Union", documentType: "Awards", fileName: "PMWU-Awards-2024", filedDaysAgo: 200 },
 
   // Highlands Coffee Growers — some expiring
   { unionName: "Highlands Coffee Growers Association", documentType: "Registration Certificate", fileName: "HCGWA-Certificate", filedDaysAgo: 365 * 4 },
   { unionName: "Highlands Coffee Growers Association", documentType: "Constitution", fileName: "HCGWA-Constitution", filedDaysAgo: 365 * 3 },
   { unionName: "Highlands Coffee Growers Association", documentType: "Financial Return", fileName: "HCGWA-Financial-2024", filedDaysAgo: 320 }, // expiring soon (1yr renewal, 320d filed)
   { unionName: "Highlands Coffee Growers Association", documentType: "Affiliations", fileName: "HCGWA-Affil-2024", filedDaysAgo: 350 }, // expiring
+  { unionName: "Highlands Coffee Growers Association", documentType: "Awards", fileName: "HCGWA-Awards-2023", filedDaysAgo: 365 * 2 }, // overdue (3yr renewal)
 
   // Port Moresby Teachers Federation (suspended) — overdue
   { unionName: "Port Moresby Teachers Federation", documentType: "Registration Certificate", fileName: "POMTF-Certificate", filedDaysAgo: 365 * 6 },
