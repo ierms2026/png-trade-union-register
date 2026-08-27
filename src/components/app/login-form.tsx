@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import { Loader2, ShieldCheck, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,17 +75,6 @@ export function LoginForm({ onBackToPortal }: Props) {
                 <div className="space-y-2"><Label htmlFor="password">Password</Label><Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /><FieldError error={errors.password} /></div>
                 <Button type="submit" className="w-full" disabled={loading}>{loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : "Sign in"}</Button>
               </form>
-              {process.env.NODE_ENV !== "production" && (
-                <div className="mt-6 rounded-md bg-muted/50 p-3 text-xs">
-                  <p className="mb-2 flex items-center gap-1.5 font-medium"><ShieldCheck className="h-3.5 w-3.5" />Demo credentials</p>
-                  <div className="space-y-1 text-muted-foreground">
-                    <p><code className="font-mono">registrar@example.com</code> — full admin</p>
-                    <p><code className="font-mono">inspector@example.com</code> — read-only</p>
-                    <p><code className="font-mono">officer@example.com</code> — scoped to one union</p>
-                    <p className="pt-1 font-medium">Password: <code className="font-mono">Test!2345</code></p>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         ) : (
