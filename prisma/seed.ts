@@ -34,103 +34,102 @@ interface RuleSeed {
   rationale: string; // why these values — for future tuning
 }
 
+// Document types follow the IO-# naming convention:
+//   IO-1, IO-2, IO-3, ... IO-14
+// Each IO number maps to a specific Industrial Organizations document
+// classification. File names use the format: "IO-# [Registration No]"
+// e.g., "IO-3 PNG-TU-0001"
 const RULES: RuleSeed[] = [
   {
-    documentType: "General Matters",
+    documentType: "IO-1",
     required: true,
     renewalYears: 1,
     retentionYrs: 5,
-    rationale: "Routine correspondence — short retention, annual check.",
+    rationale: "General Matters — routine correspondence, annual check.",
   },
   {
-    documentType: "Application for Registration",
-    required: true,
-    renewalYears: 99, // one-time filing
-    retentionYrs: 99, // permanent
-    rationale: "One-time application — permanent record of the union's founding.",
-  },
-  {
-    documentType: "Registration Certificate",
+    documentType: "IO-2",
     required: true,
     renewalYears: 99,
     retentionYrs: 99,
-    rationale: "One-time issuance — permanent evidence of legal registration.",
+    rationale: "Application for Registration — one-time, permanent.",
   },
   {
-    documentType: "Constitution",
+    documentType: "IO-3",
     required: true,
     renewalYears: 99,
-    retentionYrs: 50, // per user spec
-    rationale:
-      "One-time filing (amendments create new versions, not renewals). " +
-      "50-year retention per spec — long enough to cover any historical " +
-      "legal challenge to the union's governing rules.",
+    retentionYrs: 99,
+    rationale: "Registration Certificate — one-time issuance, permanent.",
   },
   {
-    documentType: "Financial Membership List",
+    documentType: "IO-4",
+    required: true,
+    renewalYears: 99,
+    retentionYrs: 50,
+    rationale: "Constitution — one-time filing, 50-year retention.",
+  },
+  {
+    documentType: "IO-5",
     required: true,
     renewalYears: 1,
     retentionYrs: 7,
-    rationale: "Annual roster — 7-year retention aligns with tax/audit cycles.",
+    rationale: "Financial Membership List — annual, 7-year retention.",
   },
   {
-    documentType: "Election of Office Bearers",
-    required: true,
-    renewalYears: 3, // typical PNG office-bearer term
-    retentionYrs: 7,
-    rationale: "Term-based (3-year office bearer cycle). 7-year retention.",
-  },
-  {
-    documentType: "Secret Ballots",
+    documentType: "IO-6",
     required: true,
     renewalYears: 3,
     retentionYrs: 7,
-    rationale: "Term-based — ballots happen alongside office-bearer elections.",
+    rationale: "Election of Office Bearers — term-based (3yr), 7yr retention.",
   },
   {
-    documentType: "Financial Return",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Annual audited return — 7-year retention for audit defense.",
-  },
-  {
-    documentType: "Affiliations",
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Annual declaration of external affiliations.",
-  },
-  {
-    documentType: "Inspection Reports", // user typo "Inspectin" corrected
-    required: true,
-    renewalYears: 1,
-    retentionYrs: 7,
-    rationale: "Annual inspection by the Registrar's office.",
-  },
-  {
-    documentType: "General Secretary Appointments", // user typo "Secretray" corrected
+    documentType: "IO-7",
     required: true,
     renewalYears: 3,
     retentionYrs: 7,
-    rationale: "Term-based — appointment runs with the office-bearer cycle.",
+    rationale: "Secret Ballots — term-based, 7-year retention.",
   },
   {
-    documentType: "Welfare Fund",
+    documentType: "IO-8",
     required: true,
     renewalYears: 1,
     retentionYrs: 7,
-    rationale: "Annual welfare-fund statement — 7-year retention.",
+    rationale: "Financial Return — annual audited, 7-year retention.",
   },
   {
-    documentType: "Awards",
+    documentType: "IO-9",
+    required: true,
+    renewalYears: 1,
+    retentionYrs: 7,
+    rationale: "Affiliations — annual declaration, 7-year retention.",
+  },
+  {
+    documentType: "IO-10",
+    required: true,
+    renewalYears: 1,
+    retentionYrs: 7,
+    rationale: "Inspection Reports — annual, 7-year retention.",
+  },
+  {
+    documentType: "IO-11",
     required: true,
     renewalYears: 3,
     retentionYrs: 7,
-    rationale:
-      "Industrial awards applicable to the union's coverage. " +
-      "3-year renewal cycle (awards are typically renegotiated per " +
-      "bargaining cycle). 7-year retention for audit defense.",
+    rationale: "General Secretary Appointments — term-based, 7yr retention.",
+  },
+  {
+    documentType: "IO-12",
+    required: true,
+    renewalYears: 1,
+    retentionYrs: 7,
+    rationale: "Welfare Fund — annual statement, 7-year retention.",
+  },
+  {
+    documentType: "IO-13",
+    required: true,
+    renewalYears: 3,
+    retentionYrs: 7,
+    rationale: "Awards — industrial awards, 3yr renewal, 7yr retention.",
   },
 ];
 
