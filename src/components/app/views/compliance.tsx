@@ -92,25 +92,28 @@ export function ComplianceView() {
     MISSING: "var(--status-missing)",
     NOT_APPLICABLE: "var(--muted)",
   };
-  const stackedBarData = data
-    ? data.unions.map((u) => {
-        const counts: Record<string, number> = { COMPLIANT: 0, EXPIRING: 0, OVERDUE: 0, MISSING: 0, NOT_APPLICABLE: 0 };
-        u.scores.forEach((s) => { counts[s.status]++; });
-        return {
-          name: u.unionName,
-          Compliant: counts.COMPLIANT,
-          Expiring: counts.EXPIRING,
-          Overdue: counts.OVERDUE,
-          Missing: counts.MISSING,
-        };
-      })
+  // Aggregate compliance counts across ALL unions — drives the summary bar chart.
+  // This replaces the per-union stacked bar (which didn't scale) with 4 fixed
+  // horizontal bars showing the registry-wide status distribution.
+  const summaryBarData = data
+    ? (() => {
+        const totals = { COMPLIANT: 0, EXPIRING: 0, OVERDUE: 0, MISSING: 0 };
+        for (const u of data.unions) {
+          for (const s of u.scores) {
+            if (s.status in totals) totals[s.status as keyof typeof totals]++;
+          }
+        }
+        return [
+          { name: "Compliant", count: totals.COMPLIANT, fill: "var(--status-compliant)" },
+          { name: "Expiring", count: totals.EXPIRING, fill: "var(--status-expiring)" },
+          { name: "Overdue", count: totals.OVERDUE, fill: "var(--status-overdue)" },
+          { name: "Missing", count: totals.MISSING, fill: "var(--status-missing)" },
+        ];
+      })()
     : [];
 
-  const stackedBarConfig: ChartConfig = {
-    Compliant: { label: "Compliant", color: "var(--status-compliant)" },
-    Expiring: { label: "Expiring", color: "var(--status-expiring)" },
-    Overdue: { label: "Overdue", color: "var(--status-overdue)" },
-    Missing: { label: "Missing", color: "var(--status-missing)" },
+  const summaryBarConfig: ChartConfig = {
+    count: { label: "Documents" },
   };
 
   if (loading) return <TableSkeleton rows={6} />;
@@ -204,18 +207,17 @@ export function ComplianceView() {
           </CardContent>
         </Card>
 
-        {/* Per-union compliance breakdown — HORIZONTAL stacked bar.
-            Horizontal layout handles long union names on the y-axis
-            without rotation, and scales gracefully: 20+ unions just
-            means a taller chart, not an unreadable one. */}
+        {/* Compliance Summary — 4 horizontal bars showing aggregate counts.
+            Fixed size (always 4 bars) regardless of how many unions exist.
+            Replaces the per-union stacked bar that didn't scale. */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg">Compliance by Union</CardTitle>
-            <CardDescription>Stacked breakdown of document statuses per union.</CardDescription>
+            <CardTitle className="text-lg">Compliance Summary</CardTitle>
+            <CardDescription>Aggregate document status across all unions.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={stackedBarConfig} className="h-[300px] w-full">
-              <BarChart data={stackedBarData} layout="vertical" margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+            <ChartContainer config={summaryBarConfig} className="h-[240px] w-full">
+              <BarChart data={summaryBarData} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
                 <XAxis
                   type="number"
                   tickLine={false}
@@ -228,20 +230,16 @@ export function ComplianceView() {
                   dataKey="name"
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11 }}
-                  width={140}
+                  tick={{ fontSize: 13, fontWeight: 500 }}
+                  width={90}
                   interval={0}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-                <Bar dataKey="Compliant" stackId="a" fill="var(--status-compliant)" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Expiring" stackId="a" fill="var(--status-expiring)" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Overdue" stackId="a" fill="var(--status-overdue)" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Missing" stackId="a" fill="var(--status-missing)" radius={[0, 4, 0, 0]} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {summaryBarData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
