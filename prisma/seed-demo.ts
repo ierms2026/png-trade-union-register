@@ -93,7 +93,7 @@ interface DemoUnion {
 const DEMO_UNIONS: DemoUnion[] = [
   {
     unionName: "Papua Maritime Workers Union",
-    registrationNo: "PNG-TU-0001",
+    registrationNo: "1",
     fileNumber: "DLIR-2018-001",
     status: UnionStatus.ACTIVE,
     address: "Port Moresby, National Capital District",
@@ -104,7 +104,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "Highlands Coffee Growers Association",
-    registrationNo: "PNG-TU-0002",
+    registrationNo: "2",
     fileNumber: "DLIR-2019-014",
     status: UnionStatus.ACTIVE,
     address: "Goroka, Eastern Highlands Province",
@@ -115,7 +115,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "Port Moresby Teachers Federation",
-    registrationNo: "PNG-TU-0003",
+    registrationNo: "3",
     fileNumber: "DLIR-2017-027",
     status: UnionStatus.SUSPENDED,
     address: "Port Moresby, National Capital District",
@@ -126,7 +126,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "New Ireland Mining Employees Union",
-    registrationNo: "PNG-TU-0004",
+    registrationNo: "4",
     fileNumber: "DLIR-2020-008",
     status: UnionStatus.ACTIVE,
     address: "Kavieng, New Ireland Province",
@@ -137,7 +137,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "East Sepik Fisherfolk Cooperative",
-    registrationNo: "PNG-TU-0005",
+    registrationNo: "5",
     fileNumber: "DLIR-2016-019",
     status: UnionStatus.DEREGISTERED,
     address: "Wewak, East Sepik Province",
@@ -148,7 +148,7 @@ const DEMO_UNIONS: DemoUnion[] = [
   },
   {
     unionName: "Southern Highlands Energy Workers Union",
-    registrationNo: "PNG-TU-0006",
+    registrationNo: "6",
     fileNumber: "DLIR-2021-033",
     status: UnionStatus.ACTIVE,
     address: "Mendi, Southern Highlands Province",
@@ -246,7 +246,7 @@ interface DocSeed {
 // compliance rules. File names include the union's numeric registration
 // number: IO-[regNum]-[code] e.g. IO-1-02, or A[regNum] e.g. A1
 const DOC_SEEDS: DocSeed[] = [
-  // Papua Maritime Workers Union (PNG-TU-0001, regNum=1) — mostly compliant
+  // Papua Maritime Workers Union (regNum=1) — mostly compliant
   { unionName: "Papua Maritime Workers Union", documentType: "IO-02", fileName: "IO-1-02", filedDaysAgo: 365 * 5 },
   { unionName: "Papua Maritime Workers Union", documentType: "IO-03", fileName: "IO-1-03", filedDaysAgo: 365 * 2 },
   { unionName: "Papua Maritime Workers Union", documentType: "IO-07", fileName: "IO-1-07", filedDaysAgo: 60 },
@@ -254,30 +254,30 @@ const DOC_SEEDS: DocSeed[] = [
   { unionName: "Papua Maritime Workers Union", documentType: "IO-04", fileName: "IO-1-04", filedDaysAgo: 30 },
   { unionName: "Papua Maritime Workers Union", documentType: "AW", fileName: "A1", filedDaysAgo: 200 },
 
-  // Highlands Coffee Growers (PNG-TU-0002, regNum=2) — some expiring
+  // Highlands Coffee Growers (regNum=2) — some expiring
   { unionName: "Highlands Coffee Growers Association", documentType: "IO-02", fileName: "IO-2-02", filedDaysAgo: 365 * 4 },
   { unionName: "Highlands Coffee Growers Association", documentType: "IO-03", fileName: "IO-2-03", filedDaysAgo: 365 * 3 },
   { unionName: "Highlands Coffee Growers Association", documentType: "IO-07", fileName: "IO-2-07", filedDaysAgo: 320 }, // expiring soon
   { unionName: "Highlands Coffee Growers Association", documentType: "IO-08", fileName: "IO-2-08", filedDaysAgo: 350 }, // expiring
   { unionName: "Highlands Coffee Growers Association", documentType: "AW", fileName: "A2", filedDaysAgo: 365 * 2 }, // overdue
 
-  // Port Moresby Teachers Federation (PNG-TU-0003, regNum=3, suspended) — overdue
+  // Port Moresby Teachers Federation (regNum=3, suspended) — overdue
   { unionName: "Port Moresby Teachers Federation", documentType: "IO-02", fileName: "IO-3-02", filedDaysAgo: 365 * 6 },
   { unionName: "Port Moresby Teachers Federation", documentType: "IO-03", fileName: "IO-3-03", filedDaysAgo: 365 * 5 },
   { unionName: "Port Moresby Teachers Federation", documentType: "IO-07", fileName: "IO-3-07", filedDaysAgo: 400 }, // overdue
   { unionName: "Port Moresby Teachers Federation", documentType: "IO-05", fileName: "IO-3-05", filedDaysAgo: 365 * 4 }, // overdue
 
-  // New Ireland Mining (PNG-TU-0004, regNum=4) — mixed
+  // New Ireland Mining (regNum=4) — mixed
   { unionName: "New Ireland Mining Employees Union", documentType: "IO-02", fileName: "IO-4-02", filedDaysAgo: 365 * 3 },
   { unionName: "New Ireland Mining Employees Union", documentType: "IO-03", fileName: "IO-4-03", filedDaysAgo: 100 },
   { unionName: "New Ireland Mining Employees Union", documentType: "IO-07", fileName: "IO-4-07", filedDaysAgo: 20 },
   // MISSING: IO-04 (Financial Membership List — no seed entry → MISSING)
 
-  // East Sepik Fisherfolk (PNG-TU-0005, regNum=5, deregistered) — disposed docs
+  // East Sepik Fisherfolk (regNum=5, deregistered) — disposed docs
   { unionName: "East Sepik Fisherfolk Cooperative", documentType: "IO-02", fileName: "IO-5-02", filedDaysAgo: 365 * 7, disposed: true },
   { unionName: "East Sepik Fisherfolk Cooperative", documentType: "IO-03", fileName: "IO-5-03", filedDaysAgo: 365 * 7, disposed: true },
 
-  // Southern Highlands Energy (PNG-TU-0006, regNum=6) — new, mostly missing
+  // Southern Highlands Energy (regNum=6) — new, mostly missing
   { unionName: "Southern Highlands Energy Workers Union", documentType: "IO-02", fileName: "IO-6-02", filedDaysAgo: 60 },
   { unionName: "Southern Highlands Energy Workers Union", documentType: "IO-03", fileName: "IO-6-03", filedDaysAgo: 60 },
   // MISSING: IO-07, IO-05, etc. (new union, hasn't filed yet)
