@@ -9,7 +9,6 @@ import {
   SESSION_TTL_MS,
   signChallengeToken,
 } from "@/lib/auth/session";
-import { LOCKOUT_THRESHOLD, LOCKOUT_DURATION_MINS } from "@/lib/auth/constants";
 import { Severity } from "@prisma/client";
 
 // =============================================================================
@@ -136,60 +135,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // --- 5. Check lockout (3 failures → 15min lock) -------------------------
-  // The lockout is checked AFTER the disabled check so a disabled user
-  // gets the "disabled" message (more specific) rather than the generic
-  // "locked" message.
-  if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-    await db.loginAttempt.create({
-      data: { email, success: false, userId: user.id, ip, userAgent },
+  // --- 5. (Lockout disabled for preview environment) ----------------------
+  // The 3-failures → 15-min lockout has been removed for the preview/test
+  // environment so testers can iterate freely. We still log every attempt
+  // for the Security Dashboard; we just never set `lockedUntil`.
+  // If an account was previously locked (carry-over from prod data), we
+  // clear it here so the user can sign in immediately.
+  if (user.lockedUntil) {
+    await db.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
     });
-    const remainingMs = user.lockedUntil.getTime() - Date.now();
-    const remainingMin = Math.ceil(remainingMs / 60000);
-    return NextResponse.json(
-      {
-        error: `Account locked due to repeated failed attempts. Try again in ${remainingMin} minute(s).`,
-      },
-      { status: 423 }, // 423 Locked
-    );
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
   }
 
   // --- 6. Verify the password ---------------------------------------------
   const passwordOk = await verifyPassword(body.password, user.passwordHash);
 
   if (!passwordOk) {
-    // Increment the failed-attempt counter. If it crosses the threshold,
-    // set lockedUntil. We do this in a single update to avoid a race
-    // where two concurrent failed attempts both see count=2 and both
-    // write count=3 without setting the lock.
+    // Track failed attempts for audit/Security Dashboard, but DO NOT lock
+    // the account — lockout is disabled in the preview environment.
     const newCount = user.failedLoginAttempts + 1;
-    const shouldLock = newCount >= LOCKOUT_THRESHOLD;
     await db.user.update({
       where: { id: user.id },
-      data: {
-        failedLoginAttempts: shouldLock ? 0 : newCount,
-        lockedUntil: shouldLock
-          ? new Date(Date.now() + LOCKOUT_DURATION_MINS * 60 * 1000)
-          : user.lockedUntil,
-      },
+      data: { failedLoginAttempts: newCount },
     });
 
     await db.loginAttempt.create({
       data: { email, success: false, userId: user.id, ip, userAgent },
     });
 
-    // Inform the client of remaining attempts (helpful UX, doesn't leak
-    // anything the attacker doesn't already know — they know how many
-    // times they've tried).
-    const remaining = shouldLock
-      ? 0
-      : Math.max(0, LOCKOUT_THRESHOLD - newCount);
     return NextResponse.json(
-      {
-        error: shouldLock
-          ? `Account locked for ${LOCKOUT_DURATION_MINS} minutes due to repeated failed attempts.`
-          : `Invalid email or password. ${remaining} attempt(s) remaining.`,
-      },
+      { error: "Invalid email or password." },
       { status: 401 },
     );
   }
