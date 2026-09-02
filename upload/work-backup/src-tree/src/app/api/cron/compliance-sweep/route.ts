@@ -201,7 +201,6 @@ export async function POST(req: NextRequest) {
         } catch { /* task creation failure shouldn't block sweep */ }
       }
     }
-    }
   }
 
   return NextResponse.json({
