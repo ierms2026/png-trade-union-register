@@ -1,1 +1,0 @@
-../upload/work-backup/scripts/backup-work.ts

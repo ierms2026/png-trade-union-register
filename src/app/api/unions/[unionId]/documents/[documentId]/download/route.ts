@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
+import { Severity } from "@prisma/client";
 import {
   checkRateLimit,
   rateLimitedResponse,
@@ -65,14 +66,25 @@ export async function GET(
   }
   const rlHeaders = rateLimitHeaders(rl);
 
-  // --- 3. Fetch the document + its current version -------------------------
+  // --- 3. Fetch the document + versions -----------------------------------
+  // By default we serve the LATEST version. If a `?version=N` query param
+  // is present, we serve that specific historical version.
+  const requestedVersion = req.nextUrl.searchParams.get("version");
+  const requestedVersionNum = requestedVersion
+    ? parseInt(requestedVersion, 10)
+    : null;
+
   const doc = await db.document.findFirst({
     where: { id: documentId, unionId },
     include: {
       versions: {
+        where:
+          requestedVersionNum !== null && !Number.isNaN(requestedVersionNum)
+            ? { versionNumber: requestedVersionNum }
+            : undefined,
         orderBy: { versionNumber: "desc" },
         take: 1,
-        select: { id: true, filePath: true, fileName: true, fileExtension: true },
+        select: { id: true, filePath: true, fileName: true, fileExtension: true, versionNumber: true },
       },
     },
   });
@@ -84,8 +96,8 @@ export async function GET(
     );
   }
 
-  const latestVersion = doc.versions[0];
-  if (!latestVersion || !latestVersion.filePath) {
+  const targetVersion = doc.versions[0];
+  if (!targetVersion || !targetVersion.filePath) {
     return NextResponse.json(
       { error: "No file available for this document." },
       { status: 404 },
@@ -93,7 +105,7 @@ export async function GET(
   }
 
   // --- 4. Read the file from disk ------------------------------------------
-  const absoluteFilePath = path.join(STORAGE_ROOT, latestVersion.filePath);
+  const absoluteFilePath = path.join(STORAGE_ROOT, targetVersion.filePath);
 
   let fileBuffer: Buffer;
   try {
@@ -106,9 +118,7 @@ export async function GET(
   }
 
   // --- 5. Serve the file ---------------------------------------------------
-  // Content-Type: use the file extension to determine the type.
-  // Default to application/pdf (the most common upload type).
-  const ext = latestVersion.fileExtension?.toLowerCase();
+  const ext = targetVersion.fileExtension?.toLowerCase();
   const contentTypes: Record<string, string> = {
     ".pdf": "application/pdf",
     ".doc": "application/msword",
@@ -118,11 +128,28 @@ export async function GET(
     ".png": "image/png",
   };
   const contentType = contentTypes[ext || ""] || "application/octet-stream";
-  const fileName = latestVersion.fileName || "document";
+  const fileName = targetVersion.fileName || "document";
 
-  // Buffer → BodyInit: see /api/public/files/[id]/route.ts for the same
-  // cast rationale. Rate-limit headers attached so polite clients can
-  // self-throttle.
+  // AUDIT: log the download
+  const isDisposed = !!doc.disposedAt;
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const userAgent = req.headers.get("user-agent") ?? null;
+  await db.auditLog.create({
+    data: {
+      actorId: user.id,
+      actorName: user.email,
+      action: "document_download",
+      entityType: "DocumentVersion",
+      entityId: targetVersion.id,
+      afterJson: JSON.stringify({
+        documentId, documentType: doc.documentType, unionId,
+        versionNumber: targetVersion.versionNumber,
+        fileName: targetVersion.fileName, disposed: isDisposed, ip, userAgent,
+      }),
+      severity: isDisposed ? Severity.WARNING : Severity.INFO,
+    },
+  }).catch(() => { /* audit-log failures must never block download */ });
+
   return new NextResponse(fileBuffer as unknown as BodyInit, {
     status: 200,
     headers: {

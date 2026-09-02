@@ -4,8 +4,9 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Role } from "@prisma/client";
+import { Role, Severity, NotificationType, ReviewStatus } from "@prisma/client";
 import { hasPdfMagicBytes, validatePdfIntegrity } from "@/lib/file-validation";
+import { checkArchival } from "@/lib/document-archive";
 import {
   checkRateLimit,
   rateLimitedResponse,
@@ -153,6 +154,19 @@ export async function POST(
   const file = formData.get("file");
   const documentType = formData.get("documentType");
   const title = formData.get("title");
+  const effectiveDateStr = formData.get("effectiveDate");
+
+  let effectiveDate: Date | null = null;
+  if (effectiveDateStr && typeof effectiveDateStr === "string" && effectiveDateStr.trim().length > 0) {
+    const parsed = new Date(effectiveDateStr.trim());
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json(
+        { error: "Invalid 'effectiveDate'. Expected an ISO 8601 date string (e.g., 2026-01-01)." },
+        { status: 400 },
+      );
+    }
+    effectiveDate = parsed;
+  }
 
   // Validate `file` — must be a File (not a string, not null)
   if (!file || !(file instanceof File)) {
@@ -248,12 +262,15 @@ export async function POST(
   const existingDoc = await db.document.findUnique({
     where: { unionId_documentType: { unionId, documentType: documentType.trim() } },
     include: {
-      versions: {
-        orderBy: { versionNumber: "desc" },
-        take: 1, // just the latest version
-      },
+      versions: { orderBy: { versionNumber: "desc" }, take: 1 },
     },
   });
+
+  // Archival lockdown — block uploads to archived documents.
+  if (existingDoc) {
+    const archivalCheck = checkArchival(existingDoc);
+    if (archivalCheck) return archivalCheck;
+  }
 
   // 8. Duplicate detection: if checksum matches the LATEST version → 409.
   //    We compare only against the latest, not older versions — re-uploading
@@ -352,20 +369,72 @@ export async function POST(
           checksum,
           fileExtension,
           uploadedById: user.id,
+          supersedesVersionId: existingDoc?.currentVersionId ?? null,
+          effectiveDate: effectiveDate,
         },
       });
 
-      // Update Document.currentVersionId to point to the new version.
-      // This is the "live pointer" — reads of the document always fetch
-      // the version referenced by currentVersionId, without needing to
-      // query "ORDER BY versionNumber DESC LIMIT 1" on every read.
+      // REVIEW WORKFLOW: a new upload always resets review to PENDING.
       await tx.document.update({
         where: { id: documentId },
-        data: { currentVersionId: newVersion.id },
+        data: {
+          currentVersionId: newVersion.id,
+          reviewStatus: ReviewStatus.PENDING,
+          reviewedById: null,
+          reviewedAt: null,
+          rejectionReason: null,
+        },
       });
 
       return { documentId, documentType: documentType.trim(), newVersion };
     });
+
+    // Side-effects: notify Registrars + audit log (best-effort)
+    try {
+      const registrars = await db.user.findMany({
+        where: { role: Role.REGISTRAR, disabled: false },
+        select: { id: true, email: true },
+      });
+      const notifTitle = `${existingUnion.unionName}: ${documentType.trim()} uploaded for review`;
+      const notifBody = `Version ${versionNumber} of "${documentType.trim()}" was uploaded by ${user.email}. Please review it in the Review Queue.`;
+      for (const registrar of registrars) {
+        try {
+          await db.notification.create({
+            data: {
+              userId: registrar.id,
+              type: NotificationType.TASK,
+              title: notifTitle,
+              body: notifBody,
+              dedupKey: `review:${documentId}:${versionNumber}:${registrar.id}`,
+              linkUrl: `/reviews`,
+            },
+          });
+        } catch { /* dedup */ }
+      }
+      await db.auditLog.create({
+        data: {
+          actorId: user.id,
+          actorName: user.email,
+          action: "document_upload",
+          entityType: "Document",
+          entityId: documentId,
+          afterJson: JSON.stringify({
+            documentType: documentType.trim(),
+            unionId,
+            unionName: existingUnion.unionName,
+            versionNumber,
+            versionId: result.newVersion.id,
+            fileName: result.newVersion.fileName,
+            fileSize: result.newVersion.fileSize,
+            checksum: result.newVersion.checksum,
+            reviewStatus: "PENDING",
+          }),
+          severity: Severity.INFO,
+        },
+      });
+    } catch (sideEffectErr) {
+      console.error("[documents/upload] Side-effect failed:", sideEffectErr);
+    }
 
     // 14. Return 201 Created with the new version's metadata.
     //     Includes the checksum + filePath so the client can verify

@@ -3,7 +3,7 @@
 import { Fragment, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
-  ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck, Home,
+  ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck, Home, FileCheck,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -38,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "configure-rules", label: "Rules", icon: Settings2, roles: ["REGISTRAR"] },
   { id: "compare", label: "Compare", icon: GitCompare, roles: ["REGISTRAR", "INSPECTOR"] },
   { id: "tasks", label: "Tasks", icon: ListTodo, roles: ["REGISTRAR", "OFFICER"] },
+  { id: "reviews", label: "Review Queue", icon: FileCheck, roles: ["REGISTRAR"] },
   { id: "calendar", label: "Calendar", icon: Calendar, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"] },
   { id: "audit", label: "Audit", icon: ScrollText, roles: ["REGISTRAR", "INSPECTOR"] },
   { id: "users", label: "Users", icon: Users, roles: ["REGISTRAR"] },

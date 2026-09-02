@@ -64,9 +64,11 @@ const STATUS_CONFIG: Record<string, { label: string; cell: string; dot: string; 
   NOT_APPLICABLE: { label: "N/A", cell: "bg-muted/50 text-muted-foreground border-border", dot: "bg-muted-foreground/20", icon: Ban },
 };
 
-export function ComplianceView() {
+export function ComplianceView({ initialFilter }: { initialFilter?: string | null }) {
   const { data, loading, error, refetch } = useFetch<ComplianceMatrixResponse>("/api/compliance");
-  const [filter, setFilter] = useState<StatusFilter>("ALL");
+  const [filter, setFilter] = useState<StatusFilter>(
+    (initialFilter as StatusFilter) || "ALL"
+  );
 
   // --- Chart data: union status distribution (donut) ---
   // Uses design-system chart tokens + semantic status colors.

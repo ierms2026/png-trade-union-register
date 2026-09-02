@@ -12,6 +12,7 @@ import {
   History,
   RotateCcw,
   Download,
+  Eye,
   Pencil,
   Search,
 } from "lucide-react";
@@ -42,6 +43,7 @@ import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton, TableSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
+import { DocumentPreviewModal } from "@/components/app/document-preview-modal";
 
 // =============================================================================
 // Unions view — registry list + detail with document tiles + upload dialog.
@@ -66,6 +68,9 @@ interface UnionDocument {
   currentVersionId: string | null;
   disposedAt: string | null;
   snoozedUntil: string | null;
+  reviewStatus: "PENDING" | "APPROVED" | "REJECTED";
+  reviewedAt: string | null;
+  rejectionReason: string | null;
   latestVersion: DocumentVersion | null;
 }
 
@@ -215,6 +220,7 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
                       key={doc.id}
                       doc={doc}
                       unionId={selectedUnion.id}
+                      userRole={user.role}
                       onUploadVersion={() => {
                         setUploadDocType(doc.documentType);
                         setUploadDialogOpen(true);
@@ -319,15 +325,26 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
 function DocumentTile({
   doc,
   unionId,
+  userRole,
   onUploadVersion,
 }: {
   doc: UnionDocument;
   unionId: string;
+  userRole: string;
   onUploadVersion: () => void;
 }) {
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState<unknown[] | null>(null);
   const [versionsLoading, setVersionsLoading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{
+    documentType: string;
+    version: number;
+    fileName: string;
+    fileExtension: string | null;
+    downloadUrl: string;
+  } | null>(null);
+
+  const canMutate = userRole !== "INSPECTOR";
 
   async function loadVersions() {
     setVersionsLoading(true);
@@ -380,27 +397,64 @@ function DocumentTile({
             {doc.disposedAt ? (
               <Badge variant="destructive" className="mt-1 text-xs">Disposed</Badge>
             ) : doc.latestVersion ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                v{doc.latestVersion.versionNumber} · {new Date(doc.latestVersion.uploadedAt).toLocaleDateString()}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  v{doc.latestVersion.versionNumber} · {new Date(doc.latestVersion.uploadedAt).toLocaleDateString()}
+                </p>
+                {doc.reviewStatus === "PENDING" && (
+                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200">Pending Review</Badge>
+                )}
+                {doc.reviewStatus === "APPROVED" && (
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 border-green-200">Approved</Badge>
+                )}
+                {doc.reviewStatus === "REJECTED" && (
+                  <Badge variant="secondary" className="text-xs bg-red-100 text-red-800 border-red-200 cursor-help" title={doc.rejectionReason ?? "Rejected by Registrar"}>
+                    Rejected
+                  </Badge>
+                )}
+              </div>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">No version uploaded</p>
+            )}
+            {doc.reviewStatus === "REJECTED" && doc.rejectionReason && (
+              <p className="mt-1 text-xs text-red-600">Reason: {doc.rejectionReason}</p>
             )}
           </div>
         </div>
       </div>
-      <div className="mt-3 flex gap-1">
-        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onUploadVersion}>
-          <Upload className="mr-1 h-3 w-3" />
-          New version
-        </Button>
+      <div className="mt-3 flex flex-wrap gap-1">
+        {canMutate && (
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onUploadVersion}>
+            <Upload className="mr-1 h-3 w-3" />
+            New version
+          </Button>
+        )}
         {doc.latestVersion && !doc.disposedAt && (
-          <a href={`/api/unions/${unionId}/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
-            <Button size="sm" variant="ghost" className="h-7 text-xs">
-              <Download className="mr-1 h-3 w-3" />
-              Download
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={() =>
+                setPreviewDoc({
+                  documentType: doc.documentType,
+                  version: doc.latestVersion!.versionNumber,
+                  fileName: doc.latestVersion!.fileName,
+                  fileExtension: doc.latestVersion!.fileExtension,
+                  downloadUrl: `/api/unions/${unionId}/documents/${doc.id}/download`,
+                })
+              }
+            >
+              <Eye className="mr-1 h-3 w-3" />
+              View
             </Button>
-          </a>
+            <a href={`/api/unions/${unionId}/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="ghost" className="h-7 text-xs">
+                <Download className="mr-1 h-3 w-3" />
+                Download
+              </Button>
+            </a>
+          </>
         )}
         <Button
           size="sm"
@@ -438,7 +492,7 @@ function DocumentTile({
                     {v.isCurrent && <Badge className="ml-1 text-[10px]">Current</Badge>}
                     <p className="text-muted-foreground">{new Date(v.uploadedAt).toLocaleString()}</p>
                   </div>
-                  {!v.isCurrent && (
+                  {!v.isCurrent && canMutate && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -456,6 +510,18 @@ function DocumentTile({
             <p className="text-xs text-muted-foreground">No versions.</p>
           )}
         </div>
+      )}
+
+      {previewDoc && (
+        <DocumentPreviewModal
+          open={!!previewDoc}
+          onOpenChange={(open) => !open && setPreviewDoc(null)}
+          documentType={previewDoc.documentType}
+          version={previewDoc.version}
+          fileName={previewDoc.fileName}
+          fileExtension={previewDoc.fileExtension}
+          downloadUrl={previewDoc.downloadUrl}
+        />
       )}
     </div>
   );

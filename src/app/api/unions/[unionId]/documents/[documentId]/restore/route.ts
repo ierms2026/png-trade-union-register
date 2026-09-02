@@ -4,7 +4,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Role } from "@prisma/client";
+import { Role, Severity } from "@prisma/client";
+import { checkArchival } from "@/lib/document-archive";
 import {
   checkRateLimit,
   rateLimitedResponse,
@@ -85,15 +86,9 @@ export async function POST(
   const doc = await db.document.findFirst({
     where: { id: documentId, unionId },
     select: {
-      id: true,
-      documentType: true,
-      currentVersionId: true,
-      disposedAt: true,
-      versions: {
-        orderBy: { versionNumber: "desc" },
-        take: 1,
-        select: { versionNumber: true },
-      },
+      id: true, documentType: true, currentVersionId: true,
+      disposedAt: true, archivedAt: true,
+      versions: { orderBy: { versionNumber: "desc" }, take: 1, select: { versionNumber: true } },
     },
   });
 
@@ -110,6 +105,10 @@ export async function POST(
       { status: 400 },
     );
   }
+
+  // Archival lockdown
+  const archivalCheck = checkArchival(doc);
+  if (archivalCheck) return archivalCheck;
 
   // Find the version to restore
   const versionToRestore = await db.documentVersion.findUnique({
@@ -140,6 +139,30 @@ export async function POST(
   } catch {
     return NextResponse.json(
       { error: "The original file could not be read from disk." },
+      { status: 500 },
+    );
+  }
+
+  // --- Tamper detection: recompute SHA-256 and compare to stored checksum ---
+  const actualChecksum = crypto.createHash("sha256").update(fileBuffer).digest("hex");
+  if (actualChecksum !== versionToRestore.checksum) {
+    await db.auditLog.create({
+      data: {
+        actorId: user.id, actorName: user.email,
+        action: "document_tamper_detected",
+        entityType: "DocumentVersion", entityId: versionToRestore.id,
+        afterJson: JSON.stringify({
+          documentId, documentType: doc.documentType,
+          versionNumber: versionToRestore.versionNumber,
+          filePath: versionToRestore.filePath,
+          expectedChecksum: versionToRestore.checksum, actualChecksum,
+          detectedDuring: "restore",
+        }),
+        severity: Severity.CRITICAL,
+      },
+    });
+    return NextResponse.json(
+      { error: "Tamper detected: the file on disk does not match the stored checksum. The restore has been blocked. A CRITICAL audit event has been logged for investigation." },
       { status: 500 },
     );
   }

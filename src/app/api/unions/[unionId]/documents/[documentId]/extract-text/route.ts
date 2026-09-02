@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Role } from "@prisma/client";
+import { Role, Severity } from "@prisma/client";
+import { checkArchival } from "@/lib/document-archive";
 import { extractTextFromFile } from "@/lib/auth/text-extraction";
 
 // =============================================================================
@@ -67,6 +68,10 @@ export async function POST(
     );
   }
 
+  // Archival lockdown — block text extraction on archived documents.
+  const archivalCheck = checkArchival(doc);
+  if (archivalCheck) return archivalCheck;
+
   // If text is already extracted, return it (idempotent)
   if (latestVersion.textContent) {
     return NextResponse.json({
@@ -100,6 +105,20 @@ export async function POST(
   await db.documentVersion.update({
     where: { id: latestVersion.id },
     data: { textContent },
+  });
+
+  // Audit log: record the text extraction
+  await db.auditLog.create({
+    data: {
+      actorId: user.id, actorName: user.email,
+      action: "document_text_extracted",
+      entityType: "DocumentVersion", entityId: latestVersion.id,
+      afterJson: JSON.stringify({
+        documentId, documentType: doc.documentType, unionId,
+        versionNumber: latestVersion.versionNumber, textLength: textContent.length,
+      }),
+      severity: Severity.INFO,
+    },
   });
 
   return NextResponse.json({

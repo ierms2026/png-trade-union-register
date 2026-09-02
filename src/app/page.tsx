@@ -12,6 +12,7 @@ import { ConfigureRulesView } from "@/components/app/views/configure-rules";
 import { CompareView } from "@/components/app/views/compare";
 import { UnionsView } from "@/components/app/views/unions";
 import { TasksView } from "@/components/app/views/tasks";
+import { ReviewsView } from "@/components/app/views/reviews";
 import { CalendarView } from "@/components/app/views/calendar";
 import { AuditView } from "@/components/app/views/audit";
 import { UsersView } from "@/components/app/views/users";
@@ -34,6 +35,7 @@ export default function Home() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [activeView, setActiveView] = useState("dashboard");
   const [initialUnionId, setInitialUnionId] = useState<string | null>(null);
+  const [initialStatusFilter, setInitialStatusFilter] = useState<string | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,20 +110,39 @@ export default function Home() {
 
   function renderView() {
     switch (activeView) {
-      case "dashboard": return <DashboardView onNavigate={setActiveView} />;
+      case "dashboard": return (
+        <DashboardView
+          user={currentUser}
+          onNavigate={setActiveView}
+          onFilterCompliance={(status) => {
+            setInitialStatusFilter(status);
+            setActiveView("compliance");
+          }}
+        />
+      );
       case "unions":
       case "my-union": return <UnionsView user={currentUser} initialUnionId={initialUnionId} />;
-      case "compliance": return <ComplianceView />;
+      case "compliance": return <ComplianceView initialFilter={initialStatusFilter} />;
       case "configure-rules": return <ConfigureRulesView />;
       case "compare": return <CompareView />;
       case "tasks": return <TasksView />;
+      case "reviews": return <ReviewsView />;
       case "calendar": return <CalendarView />;
       case "audit": return <AuditView />;
       case "users": return <UsersView />;
       case "security": return <SecurityView />;
       case "api-keys": return <ApiKeysView />;
       case "account-security": return <AccountSecurityView user={currentUser} />;
-      default: return <DashboardView onNavigate={setActiveView} />;
+      default: return (
+        <DashboardView
+          user={currentUser}
+          onNavigate={setActiveView}
+          onFilterCompliance={(status) => {
+            setInitialStatusFilter(status);
+            setActiveView("compliance");
+          }}
+        />
+      );
     }
   }
 

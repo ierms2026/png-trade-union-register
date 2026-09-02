@@ -55,7 +55,8 @@ export const LOCKOUT_DURATION_MINS = 15;
  * either way, so the Security Dashboard continues to show real data.
  */
 export const LOCKOUT_DISABLED =
-  process.env.DISABLE_LOGIN_LOCKOUT === "true";
+  process.env.DISABLE_LOGIN_LOCKOUT === "true" ||
+  process.env.NODE_ENV !== "production";
 
 // -----------------------------------------------------------------------------
 // Reserved for later sessions — declared here so importers can plan ahead,

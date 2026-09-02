@@ -9,13 +9,6 @@ import { StatsSkeleton, ActivitySkeleton, CardListSkeleton } from "@/components/
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -78,6 +71,41 @@ function StatCard({ label, value, icon: Icon, color }: StatCardProps) {
   );
 }
 
+interface LollipopDatum {
+  name: string;
+  value: number;
+  fill: string;
+}
+
+function LollipopChart({ data }: { data: LollipopDatum[] }) {
+  if (data.length === 0) return null;
+  const maxValue = Math.max(...data.map((d) => d.value));
+  const chartMax = Math.max(maxValue + 1, 5);
+  const STEM_AREA_WIDTH_PCT = 72;
+  return (
+    <div className="space-y-2.5">
+      {data.map((d, i) => {
+        const stemPct = (d.value / chartMax) * STEM_AREA_WIDTH_PCT;
+        return (
+          <div key={`${d.name}-${i}`} className="flex items-center gap-3">
+            <span className="shrink-0 truncate text-xs text-muted-foreground" style={{ width: "28%" }} title={d.name}>
+              {d.name}
+            </span>
+            <div className="relative flex-1" style={{ height: "16px" }}>
+              <div className="absolute top-1/2 -translate-y-1/2 rounded-full bg-muted" style={{ width: `${STEM_AREA_WIDTH_PCT}%`, height: "2px" }} />
+              <div className="absolute top-1/2 -translate-y-1/2 rounded-full" style={{ width: `${stemPct}%`, height: "2px", backgroundColor: d.fill, opacity: 0.5 }} />
+              <div className="absolute top-1/2 -translate-y-1/2 rounded-full border-2 border-background" style={{ left: `calc(${stemPct}% - 7px)`, width: "14px", height: "14px", backgroundColor: d.fill, boxShadow: "0 1px 2px rgba(0,0,0,0.08)" }} />
+              <span className="absolute top-1/2 -translate-y-1/2 text-xs font-semibold" style={{ left: `calc(${stemPct}% + 12px)`, color: d.fill }}>
+                {d.value}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: "bg-primary/10 text-primary",
   WARNING: "bg-accent/20 text-accent-foreground",
@@ -101,13 +129,30 @@ const ACTION_LABELS: Record<string, string> = {
   api_key_revoke: "revoked API key",
   retention_dispose: "disposed document",
   retention_snooze: "snoozed disposal",
+  document_upload: "uploaded document",
+  document_review_approve: "approved document",
+  document_review_reject: "rejected document",
+  document_restore: "restored document version",
+  document_download: "downloaded document",
+  document_text_extracted: "extracted text from document",
+  document_tamper_detected: "TAMPER DETECTED on document",
+  legal_hold_placed: "placed legal hold on document",
+  legal_hold_lifted: "lifted legal hold on document",
+  disposition_scheduled: "scheduled disposition (14-day cooldown)",
+  disposition_cancelled: "cancelled disposition",
+  disposition_executed: "EXECUTED disposition — document destroyed",
+  disposition_blocked_legal_hold: "disposition blocked by legal hold",
   task_create: "created task",
   task_update: "updated task",
   task_delete: "deleted task",
   session_revoke: "revoked session",
 };
 
-export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => void }) {
+export function DashboardView({ user, onNavigate, onFilterCompliance }: {
+  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" };
+  onNavigate?: (view: string) => void;
+  onFilterCompliance?: (status: string) => void;
+}) {
   const {
     data: stats,
     loading: statsLoading,
@@ -165,26 +210,33 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
         </p>
       </div>
 
-      {/* Quick Actions — turns the dashboard from a passive report into an
-          active workspace. Each button navigates to the relevant view. */}
+      {/* Quick Actions — role-gated per NAV_ITEMS in app-shell.tsx */}
       {onNavigate && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("unions")}>
-            <Plus className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium">Register Union</span>
-          </Button>
-          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("unions")}>
-            <Upload className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium">Upload Document</span>
-          </Button>
-          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("tasks")}>
-            <ListTodo className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium">Create Task</span>
-          </Button>
-          <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("audit")}>
-            <ScrollText className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium">View Audit Log</span>
-          </Button>
+          {(user.role === "REGISTRAR" || user.role === "INSPECTOR") && (
+            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("unions")}>
+              <Plus className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Register Union</span>
+            </Button>
+          )}
+          {(user.role === "REGISTRAR" || user.role === "OFFICER") && (
+            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate(user.role === "OFFICER" ? "my-union" : "unions")}>
+              <Upload className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Upload Document</span>
+            </Button>
+          )}
+          {(user.role === "REGISTRAR" || user.role === "OFFICER") && (
+            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("tasks")}>
+              <ListTodo className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Create Task</span>
+            </Button>
+          )}
+          {(user.role === "REGISTRAR" || user.role === "INSPECTOR") && (
+            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("audit")}>
+              <ScrollText className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">View Audit Log</span>
+            </Button>
+          )}
         </div>
       )}
 
@@ -206,7 +258,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
 
       {/* Charts row */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Compliance status distribution — horizontal bar chart */}
+        {/* Compliance status distribution — 4 KPI stat tiles (clickable) */}
         {stats && (
           <Card>
             <CardHeader>
@@ -214,29 +266,44 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
               <CardDescription>Document compliance status across all unions.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={complianceChartConfig} className="h-[240px] w-full">
-                <BarChart data={complianceChartData} layout="vertical" margin={{ left: 20, right: 20, top: 10, bottom: 10 }}>
-                  <XAxis type="number" tickLine={false} axisLine={false} />
-                  <YAxis
-                    type="category"
-                    dataKey="status"
-                    tickLine={false}
-                    axisLine={false}
-                    width={70}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" radius={4}>
-                    {complianceChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { status: "COMPLIANT", label: "Compliant", count: stats.compliance.compliant, fill: "var(--status-compliant)", icon: CheckCircle2 },
+                  { status: "EXPIRING", label: "Expiring", count: stats.compliance.expiring, fill: "var(--status-expiring)", icon: AlertTriangle },
+                  { status: "OVERDUE", label: "Overdue", count: stats.compliance.overdue, fill: "var(--status-overdue)", icon: XCircle },
+                  { status: "MISSING", label: "Missing", count: stats.compliance.missing, fill: "var(--status-missing)", icon: FileQuestion },
+                ].map((tile) => {
+                  const Icon = tile.icon;
+                  const clickable = !!onFilterCompliance;
+                  return (
+                    <button
+                      key={tile.status}
+                      type="button"
+                      onClick={() => onFilterCompliance?.(tile.status)}
+                      disabled={!clickable}
+                      title={clickable ? `Filter document list by ${tile.label} status` : undefined}
+                      className="group relative overflow-hidden rounded-lg border p-3 text-left transition-all hover:shadow-sm disabled:cursor-default"
+                      style={{ borderTop: `3px solid ${tile.fill}`, background: `color-mix(in srgb, ${tile.fill} 6%, white)` }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-2xl font-bold leading-none tracking-tight" style={{ color: tile.fill }}>{tile.count}</p>
+                          <p className="mt-1.5 text-xs font-medium text-muted-foreground">{tile.label}</p>
+                        </div>
+                        <Icon className="h-4 w-4 shrink-0 opacity-60" style={{ color: tile.fill }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {onFilterCompliance && (
+                <p className="mt-2 text-xs text-muted-foreground">Click a tile to filter the Compliance matrix.</p>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Documents by type — donut chart */}
+        {/* Documents by type — horizontal lollipop chart */}
         {docTypesLoading ? (
           <Card>
             <CardHeader>
@@ -257,35 +324,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={{ value: { label: "Documents" } }} className="h-[240px] w-full">
-                <PieChart>
-                  <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                  <Pie
-                    data={docTypeChartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {docTypeChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ChartContainer>
-              {/* Legend */}
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                {docTypeChartData.map((d) => (
-                  <div key={d.name} className="flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
-                    <span className="text-muted-foreground">{d.name}</span>
-                    <span className="font-medium">{d.value}</span>
-                  </div>
-                ))}
-              </div>
+              <LollipopChart data={[...docTypeChartData].sort((a, b) => b.value - a.value)} />
             </CardContent>
           </Card>
         ) : null}

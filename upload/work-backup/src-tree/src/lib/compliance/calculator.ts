@@ -169,6 +169,7 @@ export interface ComplianceRuleInput {
  */
 export interface DocumentInput {
   disposedAt: Date | null;
+  reviewStatus?: "PENDING" | "APPROVED" | "REJECTED" | null;
 }
 
 /**
@@ -253,6 +254,14 @@ export function calculateStatus(
   //    MISSING (not OVERDUE) is the correct signal: the union needs to
   //    file a NEW document, not "renew" the disposed one.
   if (!document || document.disposedAt) {
+    return "MISSING";
+  }
+
+  // 2b. MISSING if the document is not APPROVED (PENDING or REJECTED).
+  //     Review workflow (Option A): an un-reviewed upload doesn't count
+  //     toward compliance. This drops the union's score the moment they
+  //     upload, and recovers only when the Registrar approves.
+  if (document.reviewStatus !== "APPROVED") {
     return "MISSING";
   }
 
@@ -438,7 +447,7 @@ export function computeUnionScore(
  */
 export function calculateStatusFromRows(
   rule: Pick<ComplianceRule, "required" | "renewalYears" | "retentionYrs"> | null,
-  document: Pick<Document, "disposedAt"> | null,
+  document: Pick<Document, "disposedAt" | "reviewStatus"> | null,
   latestVersion: Pick<DocumentVersion, "uploadedAt"> | null,
   now: Date = new Date(),
 ): ComplianceStatus {

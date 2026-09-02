@@ -61,7 +61,7 @@ export interface MatrixData {
   unions: Array<{ id: string; unionName: string; status: string }>;
   rules: Array<ComplianceRule>;
   documents: Array<
-    Pick<Document, "id" | "unionId" | "documentType" | "currentVersionId" | "disposedAt">
+    Pick<Document, "id" | "unionId" | "documentType" | "currentVersionId" | "disposedAt" | "reviewStatus">
   >;
   versions: Array<Pick<DocumentVersion, "id" | "uploadedAt">>;
 }
@@ -94,6 +94,7 @@ export async function fetchMatrixData(): Promise<MatrixData> {
         documentType: true,
         currentVersionId: true,
         disposedAt: true,
+        reviewStatus: true,
       },
     }),
   ]);

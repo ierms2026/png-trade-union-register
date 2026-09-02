@@ -51,6 +51,12 @@ model User {
   // disambiguate which back-relation maps to which FK.
   assignedTasks        Task[]         @relation("TaskAssignee")
   createdTasks         Task[]         @relation("TaskCreator")
+  reviewedDocuments    Document[]     @relation("DocumentReviewer")
+  legalHoldsPlaced     LegalHold[]    @relation("LegalHoldPlacer")
+  legalHoldsLifted     LegalHold[]    @relation("LegalHoldLifter")
+  dispositionsRequested DispositionRequest[] @relation("DispositionRequester")
+  dispositionsExecuted  DispositionRequest[] @relation("DispositionExecutor")
+  dispositionsCancelled DispositionRequest[] @relation("DispositionCanceller")
   notifications        Notification[]
 }
 
@@ -136,12 +142,26 @@ enum UnionStatus {
   DEREGISTERED
 }
 
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DispositionStatus {
+  SCHEDULED
+  CANCELLED
+  EXECUTED
+  BLOCKED
+}
+
 model ComplianceRule {
   id            String   @id @default(cuid())
-  documentType  String   @unique // e.g., "Constitution", "Annual Return"
+  documentType  String   @unique
   required      Boolean  @default(true)
   renewalYears  Int      @default(1)
   retentionYrs  Int      @default(7)
+  sensitive     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -166,14 +186,23 @@ model Union {
 model Document {
   id               String            @id @default(cuid())
   unionId          String
-  documentType     String            // e.g., "Constitution", "Bylaws"
+  documentType     String
   currentVersionId String?
   disposedAt       DateTime?
   snoozedUntil     DateTime?
+  reviewStatus     ReviewStatus      @default(PENDING)
+  reviewedById     String?
+  reviewedAt       DateTime?
+  rejectionReason  String?
+  archivedAt       DateTime?
+  archivedReason   String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   union            Union             @relation(fields: [unionId], references: [id], onDelete: Cascade)
   versions         DocumentVersion[]
+  reviewedBy       User?             @relation("DocumentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  legalHolds         LegalHold[]
+  dispositionRequests DispositionRequest[]
 
   @@unique([unionId, documentType])
 }
@@ -183,14 +212,18 @@ model DocumentVersion {
   documentId     String
   versionNumber  Int
   fileName       String
-  filePath       String   // Relative path to the .bin file
+  filePath       String
   fileSize       Int
-  checksum       String   // SHA-256 hash
+  checksum       String
   fileExtension  String?
-  textContent    String?  // Extracted text for full-text search (null if not extracted)
+  textContent    String?
   uploadedById   String?
   uploadedAt     DateTime @default(now())
+  effectiveDate  DateTime?
+  supersedesVersionId String?
   document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  supersedes     DocumentVersion? @relation("DocumentVersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersededBy   DocumentVersion[] @relation("DocumentVersionSupersedes")
 }
 
 // -----------------------------------------------------------------------------
@@ -261,4 +294,41 @@ model Notification {
   // their notifications are deleted too (notifications are personal —
   // they have no value once the user is gone).
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LegalHold {
+  id            String    @id @default(cuid())
+  documentId    String
+  reason        String
+  placedById    String
+  placedAt      DateTime  @default(now())
+  liftedAt      DateTime?
+  liftedById    String?
+  createdAt     DateTime  @default(now())
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  placedBy      User      @relation("LegalHoldPlacer", fields: [placedById], references: [id], onDelete: Restrict)
+  liftedBy      User?     @relation("LegalHoldLifter", fields: [liftedById], references: [id], onDelete: SetNull)
+  @@index([documentId, liftedAt])
+}
+
+model DispositionRequest {
+  id              String             @id @default(cuid())
+  documentId      String
+  status          DispositionStatus  @default(SCHEDULED)
+  requestedById   String
+  requestedAt     DateTime           @default(now())
+  cooldownEndsAt  DateTime
+  executedAt      DateTime?
+  executedById    String?
+  cancelledAt     DateTime?
+  cancelledById   String?
+  cancelReason    String?
+  certificateJson String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  document        Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  requestedBy     User               @relation("DispositionRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  executedBy      User?              @relation("DispositionExecutor", fields: [executedById], references: [id], onDelete: SetNull)
+  cancelledBy     User?              @relation("DispositionCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+  @@index([documentId, status])
 }

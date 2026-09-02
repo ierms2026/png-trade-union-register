@@ -58,12 +58,10 @@ export async function POST(
   const existing = await db.document.findUnique({
     where: { id: documentId },
     select: {
-      id: true,
-      documentType: true,
-      unionId: true,
-      disposedAt: true,
-      snoozedUntil: true,
+      id: true, documentType: true, unionId: true,
+      disposedAt: true, snoozedUntil: true,
       union: { select: { unionName: true, registrationNo: true } },
+      versions: { orderBy: { versionNumber: "desc" }, take: 1, select: { uploadedAt: true } },
     },
   });
 
@@ -74,51 +72,89 @@ export async function POST(
     );
   }
 
-  // --- 2. Race-safe disposal via updateMany ------------------------------
-  // The `where` clause includes `disposedAt: null` — if the document
-  // was already disposed by a concurrent request, this affects 0 rows.
-  const now = new Date();
-  const result = await db.document.updateMany({
-    where: { id: documentId, disposedAt: null },
-    data: { disposedAt: now },
-  });
+  // --- 1b. Enforce retention window — block early disposal --------------
+  const latestVersion = existing.versions[0];
+  if (latestVersion) {
+    const rule = await db.complianceRule.findUnique({
+      where: { documentType: existing.documentType },
+      select: { retentionYrs: true },
+    });
+    if (rule) {
+      const disposalDueDate = new Date(latestVersion.uploadedAt);
+      disposalDueDate.setFullYear(disposalDueDate.getFullYear() + rule.retentionYrs);
+      if (disposalDueDate.getTime() > Date.now()) {
+        return NextResponse.json(
+          { error: `Cannot dispose: this document's ${rule.retentionYrs}-year retention window has not elapsed (filed ${new Date(latestVersion.uploadedAt).toLocaleDateString()}, eligible for disposal on ${disposalDueDate.toLocaleDateString()}). Use snooze to defer, or wait until the retention period expires.` },
+          { status: 400 },
+        );
+      }
+    }
+  }
 
-  if (result.count === 0) {
-    // Either the document was already disposed, or it doesn't exist.
-    // We already checked existence above, so this means it was disposed
-    // between our fetch and our update — a TOCTOU race that we caught.
-    return NextResponse.json(
-      {
-        error:
-          "This document was already disposed by another request. Please refresh the retention queue.",
+  // --- 2. Legal Hold check -----------------------------------------------
+  const activeHold = await db.legalHold.findFirst({
+    where: { documentId, liftedAt: null },
+  });
+  if (activeHold) {
+    await db.auditLog.create({
+      data: {
+        actorId: user.id, actorName: user.email,
+        action: "disposition_blocked_legal_hold",
+        entityType: "Document", entityId: documentId,
+        afterJson: JSON.stringify({
+          documentType: existing.documentType, unionId: existing.unionId,
+          holdId: activeHold.id, holdReason: activeHold.reason,
+          holdPlacedAt: activeHold.placedAt.toISOString(),
+        }),
+        severity: Severity.WARNING,
       },
+    });
+    return NextResponse.json(
+      { error: `Disposition BLOCKED: this document is under an active legal hold ("${activeHold.reason}", placed ${new Date(activeHold.placedAt).toLocaleDateString()}). The hold must be explicitly lifted before disposal can proceed.` },
+      { status: 423 },
+    );
+  }
+
+  // --- 3. Check for existing pending disposition request ------------------
+  const existingRequest = await db.dispositionRequest.findFirst({
+    where: { documentId, status: "SCHEDULED" },
+  });
+  if (existingRequest) {
+    return NextResponse.json(
+      { error: `A disposition request is already scheduled for this document (cooldown ends ${new Date(existingRequest.cooldownEndsAt).toLocaleDateString()}). Wait for the cooldown to elapse or cancel the existing request first.`, existingRequestId: existingRequest.id },
       { status: 409 },
     );
   }
 
-  // --- 3. Audit log entry (CRITICAL severity) ----------------------------
+  // --- 4. Create DispositionRequest with 14-day cooldown ------------------
+  const COOLDOWN_DAYS = 14;
+  const now = new Date();
+  const cooldownEndsAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+
+  const request = await db.dispositionRequest.create({
+    data: {
+      documentId, status: "SCHEDULED",
+      requestedById: user.id, cooldownEndsAt,
+    },
+  });
+
+  // --- 5. Audit log entry (CRITICAL — disposition scheduled) --------------
   await db.auditLog.create({
     data: {
-      actorId: user.id,
-      actorName: user.email,
-      action: "retention_dispose",
-      entityType: "Document",
-      entityId: documentId,
+      actorId: user.id, actorName: user.email,
+      action: "disposition_scheduled",
+      entityType: "Document", entityId: documentId,
       beforeJson: JSON.stringify({
-        documentType: existing.documentType,
-        unionId: existing.unionId,
-        unionName: existing.union.unionName,
-        registrationNo: existing.union.registrationNo,
-        disposedAt: existing.disposedAt, // null before
-        snoozedUntil: existing.snoozedUntil,
+        documentType: existing.documentType, unionId: existing.unionId,
+        unionName: existing.union.unionName, registrationNo: existing.union.registrationNo,
+        disposedAt: existing.disposedAt,
       }),
       afterJson: JSON.stringify({
-        documentType: existing.documentType,
-        unionId: existing.unionId,
-        unionName: existing.union.unionName,
-        registrationNo: existing.union.registrationNo,
-        disposedAt: now.toISOString(),
-        snoozedUntil: existing.snoozedUntil,
+        documentType: existing.documentType, unionId: existing.unionId,
+        unionName: existing.union.unionName, registrationNo: existing.union.registrationNo,
+        dispositionRequestId: request.id,
+        cooldownEndsAt: cooldownEndsAt.toISOString(),
+        note: `Disposal scheduled with ${COOLDOWN_DAYS}-day cooldown. Execute after ${cooldownEndsAt.toLocaleDateString()} or cancel before then.`,
       }),
       severity: Severity.CRITICAL,
     },
@@ -127,6 +163,10 @@ export async function POST(
   return NextResponse.json({
     success: true,
     documentId,
-    disposedAt: now.toISOString(),
+    dispositionRequestId: request.id,
+    status: "SCHEDULED",
+    cooldownEndsAt: cooldownEndsAt.toISOString(),
+    cooldownDays: COOLDOWN_DAYS,
+    message: `Disposition scheduled. A ${COOLDOWN_DAYS}-day cooldown is now active. After ${cooldownEndsAt.toLocaleDateString()}, execute the disposal via POST /api/dispositions/${documentId}/execute. Any Registrar can cancel before then via POST /api/dispositions/${documentId}/cancel.`,
   });
 }
