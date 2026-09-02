@@ -139,3 +139,96 @@ All four "Compliance Status Distribution" tiles read from the same `/api/dashboa
 - Relabeling the dashboard cards
 - Adjusting any compliance numbers
 - Building any canonical `DashboardMetrics` type or status config (that's a later Phase 0 chunk if the plan calls for one)
+
+---
+
+## Appendix — Chunk 0.2 Handoff (canonical metrics + status config)
+
+### New modules created
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| Status config | `src/lib/dashboard/status-config.ts` | Single source of truth for status labels, color tokens (CSS vars), icons, definitions, and thresholds (EXPIRING_WINDOW_DAYS = 90) |
+| Metrics type + selectors | `src/lib/dashboard/metrics.ts` | `DashboardMetrics` type + `buildDashboardMetrics()` constructor + selector helpers |
+| Guard test | `src/lib/__tests__/dashboard-status-guard.test.ts` | Fails if hardcoded hex colors or status Tailwind classes appear in dashboard component files |
+
+### Public API for chunk 1.1
+
+#### From `src/lib/dashboard/status-config.ts`
+
+```ts
+// Types
+type ComplianceStatus = "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
+
+// Constants
+const EXPIRING_WINDOW_DAYS = 90;
+const NEVER_RENEW_YEARS = 99;
+const COMPLIANCE_STATUSES: ComplianceStatus[]; // all 5
+const APPLICABLE_STATUSES: ComplianceStatus[]; // 4, excludes N/A
+const STATUS_CONFIG: Record<ComplianceStatus, { label, colorToken, icon, definition }>;
+
+// Selectors
+getStatusConfig(status) → { label, colorToken, icon, definition }
+getStatusLabel(status) → string
+getStatusColorToken(status) → string // "var(--status-compliant)"
+getStatusIcon(status) → LucideIcon
+getStatusDefinition(status) → string
+isApplicableStatus(status) → boolean
+getTileStatuses() → ComplianceStatus[] // the 4 applicable statuses for KPI tiles
+```
+
+#### From `src/lib/dashboard/metrics.ts`
+
+```ts
+// Types
+interface DashboardMetrics {
+  unions: { count: number; list: UnionSummary[] };
+  documents: { activeCount: number; byType: DocumentTypeCount[] };
+  compliance: { cells: ComplianceCell[]; counts: ComplianceCounts; rate: ComplianceRate };
+}
+interface ComplianceRate { numerator: number; denominator: number; percentage: number; }
+interface ComplianceCell { unionId, documentType, status, filedAt, expiryDate }
+
+// Constructor (use this in API routes to build the response)
+buildDashboardMetrics({ unions, activeDocumentCount, documentsByType, complianceCells }) → DashboardMetrics
+
+// Selectors
+getComplianceCounts(metrics) → ComplianceCounts
+getComplianceRate(metrics) → ComplianceRate
+getActiveDocumentCount(metrics) → number // 21 (non-disposed, per audit)
+getDocumentsByType(metrics) → DocumentTypeCount[]
+getUnionList(metrics) → UnionSummary[]
+getExpiringWithin(cells, days) → ComplianceCell[]
+getOverdueCells(cells) → ComplianceCell[]
+getMissingCells(cells) → ComplianceCell[]
+getUnionsWithNonCompliance(metrics) → UnionSummary[]
+computeComplianceRate(cells) → ComplianceRate
+tallyComplianceCounts(cells) → ComplianceCounts
+```
+
+### What chunk 1.1 should do
+
+1. **Replace `stats.totalDocuments` (23) with `documents.activeCount` (21)** in the stats API route. The type already uses `activeCount` — the route just needs to filter `disposedAt: null` in its `db.document.count()` call.
+2. **Replace hardcoded status labels/colors in `dashboard.tsx`** with `STATUS_CONFIG[status].label` and `STATUS_CONFIG[status].colorToken`. The guard test will catch any remaining hardcoded hex/Tailwind classes.
+3. **Replace the inline `complianceChartData` array** in dashboard.tsx with `getTileStatuses()` + `STATUS_CONFIG` lookups.
+4. **Use `buildDashboardMetrics()`** in the stats API route to assemble the response, ensuring the shape matches the canonical type.
+5. **Use `computeComplianceRate()`** instead of inline math — eliminates the possibility of drift between numerator/denominator and the displayed percentage.
+
+### TODOs / open questions from 0.1 audit (resolved or logged)
+
+| Question | Resolution |
+|----------|------------|
+| "Documents" KPI = 23 (all) vs "Documents by Type" = 21 (non-disposed) — which is correct? | **Resolved in type design:** `DashboardMetrics.documents.activeCount` encodes "non-disposed" (21) as the canonical count. Chunk 1.1 should change the stats route to match. |
+| Compliance tiles sum to 78 — is this a bug? | **Resolved:** 78 = 6 unions × 13 required rules. Not a bug. The type's `compliance.cells` array has one entry per (union × rule) pair. |
+| "Compliant = 14" in the chunk prompt vs "17" in live DB | **Logged as TODO in metrics.ts:** The live data (17) is authoritative. Chunk 1.1 should NOT "fix" 17 → 14. |
+| Should NOT_APPLICABLE be shown in tiles? | **Resolved in type design:** `getTileStatuses()` returns only the 4 applicable statuses. NOT_APPLICABLE is excluded from tiles and from the rate denominator. |
+
+### Guard test enforcement
+
+The guard test (`dashboard-status-guard.test.ts`) scans `src/components/app/views/dashboard.tsx` and `src/components/app/views/compliance.tsx` for:
+- Hardcoded hex color codes (`#22c55e`, `#ef4444`, etc.) — **must not appear**
+- Hardcoded status-color Tailwind classes (`bg-green-*`, `text-red-*`, `bg-amber-*`, etc.) — **must not appear**
+
+The test passes today because the existing components use CSS variables (`var(--status-compliant)`) and semantic tokens (`chart-3`, `accent`, `destructive`, `muted`).
+
+**TODO for chunk 1.1:** After rewiring components to use `STATUS_CONFIG[status].label`, add a label-enforcement scan that fails if hardcoded status label strings ("Compliant", "Expiring", "Overdue", "Missing") appear in component files. This is not enabled yet because the existing code still has them.
