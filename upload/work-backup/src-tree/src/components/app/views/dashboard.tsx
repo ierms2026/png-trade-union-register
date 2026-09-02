@@ -9,6 +9,8 @@ import { StatsSkeleton, ActivitySkeleton, CardListSkeleton } from "@/components/
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
+import { STATUS_CONFIG, getTileStatuses, type ComplianceStatus } from "@/lib/dashboard/status-config";
+import { type ComplianceCounts } from "@/lib/dashboard/metrics";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -25,7 +27,7 @@ import { type LucideIcon } from "lucide-react";
 
 interface StatsResponse {
   totalUnions: number;
-  totalDocuments: number;
+  activeCount: number;
   compliance: {
     compliant: number;
     expiring: number;
@@ -174,22 +176,21 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
     refetch: refetchDocTypes,
   } = useFetch<{ documentTypes: Array<{ documentType: string; count: number }>; total: number }>("/api/dashboard/document-types");
 
-  // --- Chart data: compliance status distribution ---
-  // Uses CSS variables for semantic status colors (defined in globals.css).
-  const complianceChartData = stats
-    ? [
-        { status: "Compliant", count: stats.compliance.compliant, fill: "var(--status-compliant)" },
-        { status: "Expiring", count: stats.compliance.expiring, fill: "var(--status-expiring)" },
-        { status: "Overdue", count: stats.compliance.overdue, fill: "var(--status-overdue)" },
-        { status: "Missing", count: stats.compliance.missing, fill: "var(--status-missing)" },
-      ]
-    : [];
+  // --- Canonical compliance counts from the stats response ---
+  // Maps the API's lowercase keys to the canonical ComplianceCounts shape
+  // (uppercase, matching STATUS_CONFIG). This is a field mapping, not
+  // an aggregation — the counts come from the API route, not computed here.
+  const counts: ComplianceCounts | null = stats
+    ? {
+        COMPLIANT: stats.compliance.compliant,
+        EXPIRING: stats.compliance.expiring,
+        OVERDUE: stats.compliance.overdue,
+        MISSING: stats.compliance.missing,
+        NOT_APPLICABLE: stats.compliance.notApplicable,
+      }
+    : null;
 
-  const complianceChartConfig: ChartConfig = {
-    count: { label: "Documents" },
-  };
-
-  // --- Chart data: documents by type (donut) ---
+  // --- Chart data: documents by type ---
   // Uses the 5-chart palette from the design system, cycling for >5 types.
   const DONUT_COLORS = [
     "var(--chart-1)", "var(--chart-2)", "var(--chart-3)",
@@ -248,11 +249,21 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
       ) : stats ? (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           <StatCard label="Total Unions" value={stats.totalUnions} icon={Building2} color="bg-primary/10 text-primary" />
-          <StatCard label="Documents" value={stats.totalDocuments} icon={FileText} color="bg-primary/10 text-primary" />
-          <StatCard label="Compliant" value={stats.compliance.compliant} icon={CheckCircle2} color="bg-chart-3/20 text-chart-3" />
-          <StatCard label="Expiring" value={stats.compliance.expiring} icon={AlertTriangle} color="bg-accent/20 text-accent-foreground" />
-          <StatCard label="Overdue" value={stats.compliance.overdue} icon={XCircle} color="bg-destructive/10 text-destructive" />
-          <StatCard label="Missing" value={stats.compliance.missing} icon={FileQuestion} color="bg-muted text-muted-foreground" />
+          <StatCard label="Documents" value={stats.activeCount} icon={FileText} color="bg-primary/10 text-primary" />
+          {getTileStatuses().map((status) => (
+            <StatCard
+              key={status}
+              label={STATUS_CONFIG[status].label}
+              value={counts![status]}
+              icon={STATUS_CONFIG[status].icon}
+              color={
+                status === "COMPLIANT" ? "bg-chart-3/20 text-chart-3" :
+                status === "EXPIRING" ? "bg-accent/20 text-accent-foreground" :
+                status === "OVERDUE" ? "bg-destructive/10 text-destructive" :
+                "bg-muted text-muted-foreground"
+              }
+            />
+          ))}
         </div>
       ) : null}
 
@@ -267,30 +278,27 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  { status: "COMPLIANT", label: "Compliant", count: stats.compliance.compliant, fill: "var(--status-compliant)", icon: CheckCircle2 },
-                  { status: "EXPIRING", label: "Expiring", count: stats.compliance.expiring, fill: "var(--status-expiring)", icon: AlertTriangle },
-                  { status: "OVERDUE", label: "Overdue", count: stats.compliance.overdue, fill: "var(--status-overdue)", icon: XCircle },
-                  { status: "MISSING", label: "Missing", count: stats.compliance.missing, fill: "var(--status-missing)", icon: FileQuestion },
-                ].map((tile) => {
-                  const Icon = tile.icon;
+                {getTileStatuses().map((status) => {
+                  const config = STATUS_CONFIG[status];
+                  const Icon = config.icon;
+                  const tileCount = counts![status];
                   const clickable = !!onFilterCompliance;
                   return (
                     <button
-                      key={tile.status}
+                      key={status}
                       type="button"
-                      onClick={() => onFilterCompliance?.(tile.status)}
+                      onClick={() => onFilterCompliance?.(status)}
                       disabled={!clickable}
-                      title={clickable ? `Filter document list by ${tile.label} status` : undefined}
+                      title={clickable ? `Filter document list by ${config.label} status` : undefined}
                       className="group relative overflow-hidden rounded-lg border p-3 text-left transition-all hover:shadow-sm disabled:cursor-default"
-                      style={{ borderTop: `3px solid ${tile.fill}`, background: `color-mix(in srgb, ${tile.fill} 6%, white)` }}
+                      style={{ borderTop: `3px solid ${config.colorToken}`, background: `color-mix(in srgb, ${config.colorToken} 6%, white)` }}
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-2xl font-bold leading-none tracking-tight" style={{ color: tile.fill }}>{tile.count}</p>
-                          <p className="mt-1.5 text-xs font-medium text-muted-foreground">{tile.label}</p>
+                          <p className="text-2xl font-bold leading-none tracking-tight" style={{ color: config.colorToken }}>{tileCount}</p>
+                          <p className="mt-1.5 text-xs font-medium text-muted-foreground">{config.label}</p>
                         </div>
-                        <Icon className="h-4 w-4 shrink-0 opacity-60" style={{ color: tile.fill }} />
+                        <Icon className="h-4 w-4 shrink-0 opacity-60" style={{ color: config.colorToken }} />
                       </div>
                     </button>
                   );
@@ -362,26 +370,13 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-compliant)" }} />
-                  <span className="text-muted-foreground">Compliant:</span>
-                  <span className="font-medium">{stats.compliance.compliant}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-expiring)" }} />
-                  <span className="text-muted-foreground">Expiring:</span>
-                  <span className="font-medium">{stats.compliance.expiring}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-overdue)" }} />
-                  <span className="text-muted-foreground">Overdue:</span>
-                  <span className="font-medium">{stats.compliance.overdue}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--status-missing)" }} />
-                  <span className="text-muted-foreground">Missing:</span>
-                  <span className="font-medium">{stats.compliance.missing}</span>
-                </div>
+                {getTileStatuses().map((status) => (
+                  <div key={status} className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_CONFIG[status].colorToken }} />
+                    <span className="text-muted-foreground">{STATUS_CONFIG[status].label}:</span>
+                    <span className="font-medium">{counts![status]}</span>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

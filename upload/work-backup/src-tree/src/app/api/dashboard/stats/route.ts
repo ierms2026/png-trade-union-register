@@ -14,7 +14,7 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 // RESPONSE SHAPE:
 //   {
 //     totalUnions: number,
-//     totalDocuments: number,
+//     activeCount: number,  // non-disposed documents only (per chunk 0.1 audit)
 //     compliance: {
 //       compliant: number, expiring: number, overdue: number,
 //       missing: number, notApplicable: number,
@@ -39,13 +39,16 @@ export async function GET() {
       ? { id: user.assignedUnionId }
       : {};
 
-  const [totalUnions, totalDocuments] = await Promise.all([
+  // Per chunk 0.1 audit: "Documents" = active (non-disposed) docs only.
+  // disposedAt: null excludes the 2 disposed docs, giving 21 (matching
+  // the /api/dashboard/document-types endpoint).
+  const [totalUnions, activeCount] = await Promise.all([
     db.union.count({ where: unionWhere }),
     db.document.count({
       where:
         user.role === "OFFICER" && user.assignedUnionId
-          ? { unionId: user.assignedUnionId }
-          : {},
+          ? { unionId: user.assignedUnionId, disposedAt: null }
+          : { disposedAt: null },
     }),
   ]);
 
@@ -85,7 +88,7 @@ export async function GET() {
 
   return NextResponse.json({
     totalUnions,
-    totalDocuments,
+    activeCount,
     compliance: {
       compliant,
       expiring,
