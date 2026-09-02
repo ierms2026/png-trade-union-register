@@ -1,0 +1,1 @@
+../upload/work-backup/scripts/restore-work.ts
