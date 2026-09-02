@@ -1,8 +1,8 @@
 {
-  "backedUpAt": "2026-09-02T06:59:58.014Z",
+  "backedUpAt": "2026-09-02T07:27:19.656Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.19.0",
-  "fileCount": 170,
+  "fileCount": 176,
   "files": [
     {
       "path": "src/app/api/api-keys/[id]/route.ts",
@@ -35,12 +35,6 @@
       "mtime": "2026-08-19T03:50:54.000Z"
     },
     {
-      "path": "src/app/api/auth/2fa/verify/route.ts",
-      "checksum": "9c52d6e5229926b1cad957e29020a75eeea889b14a1066d78813d7cf4c3153e8",
-      "size": 3501,
-      "mtime": "2026-08-19T03:50:55.000Z"
-    },
-    {
       "path": "src/app/api/auth/login/2fa/route.ts",
       "checksum": "06fd6d90b59ae74828b7f193c51e09c751d18b2d9986846bf5c6bba78f64e38e",
       "size": 7784,
@@ -53,6 +47,12 @@
       "mtime": "2026-08-27T05:21:28.000Z"
     },
     {
+      "path": "src/app/api/auth/logout/route.ts",
+      "checksum": "f95db23377cd96bb6b4ea3138dec24aef72dd3f6551605544f3597cda2a09cc4",
+      "size": 3482,
+      "mtime": "2026-08-19T03:49:52.000Z"
+    },
+    {
       "path": "src/app/api/auth/sessions/[jti]/route.ts",
       "checksum": "9e262b174f1a91abf861a7474572700c11c7a7e0f172450f541b7d9582b0d1d4",
       "size": 3561,
@@ -63,6 +63,12 @@
       "checksum": "6b83fd98be8a98f6e202349c51e8d14f0547ad1281a17a4a343c65f9d40fadc0",
       "size": 2800,
       "mtime": "2026-08-19T03:50:55.000Z"
+    },
+    {
+      "path": "src/app/api/auth/set-password/route.ts",
+      "checksum": "3f11b2c8b1b45f3510d9d06919ce6ee4f1a534fcb04b4c77934d91f80bc97900",
+      "size": 3437,
+      "mtime": "2026-08-21T01:56:51.000Z"
     },
     {
       "path": "src/app/api/calendar/route.ts",
@@ -149,6 +155,12 @@
       "mtime": "2026-09-01T03:36:56.643Z"
     },
     {
+      "path": "src/app/api/legislation/route.ts",
+      "checksum": "838555ecb62975b8db9d9c8bd0b34189781410c99f9beaf389f89897a0f4339a",
+      "size": 2307,
+      "mtime": "2026-08-19T03:56:05.000Z"
+    },
+    {
       "path": "src/app/api/notifications/[id]/read/route.ts",
       "checksum": "7c564ce54ccb01edbdb19f491bd8638daa17dde08217dd3f16199e9493b91545",
       "size": 2067,
@@ -189,12 +201,6 @@
       "checksum": "a58d9c11ab20885fba5f5b253b98230635cc5ab20d375b87c0e028977acced75",
       "size": 7271,
       "mtime": "2026-09-02T01:53:28.925Z"
-    },
-    {
-      "path": "src/app/api/retention/[documentId]/reject/route.ts",
-      "checksum": "41345739fe8943b7fb6864dec1ba9f472ad179e957562ae9e58d33715ebef1fa",
-      "size": 3735,
-      "mtime": "2026-08-19T03:52:50.000Z"
     },
     {
       "path": "src/app/api/retention/route.ts",
@@ -251,10 +257,10 @@
       "mtime": "2026-08-19T03:57:09.000Z"
     },
     {
-      "path": "src/app/api/tasks/assignees/route.ts",
-      "checksum": "4ef07799259a6d809625f8bdf6f57fb15725b647ca1cbe8bbc8539d0f132a53d",
-      "size": 1537,
-      "mtime": "2026-08-19T03:53:58.000Z"
+      "path": "src/app/api/tasks/[id]/route.ts",
+      "checksum": "013dbeee4a5b18be145f9fa4b876fed63fbc7f515462ea17fe4ec498ef1b59d8",
+      "size": 8997,
+      "mtime": "2026-08-19T04:13:55.000Z"
     },
     {
       "path": "src/app/api/tasks/route.ts",
@@ -851,6 +857,24 @@
       "mtime": "2026-08-25T05:07:15.000Z"
     },
     {
+      "path": "src/lib/__tests__/dashboard-metrics.test.ts",
+      "checksum": "1a53b4c714a03dcbb21c8ce7d3bad7af072334e05ca1ff4669199106c5cf9dbe",
+      "size": 8959,
+      "mtime": "2026-09-02T07:25:18.177Z"
+    },
+    {
+      "path": "src/lib/__tests__/dashboard-status-config.test.ts",
+      "checksum": "173ca343b3a24da42172372fab72b622a4e17e4e2df046f07ef2173f0b51aa9d",
+      "size": 5096,
+      "mtime": "2026-09-02T07:24:59.960Z"
+    },
+    {
+      "path": "src/lib/__tests__/dashboard-status-guard.test.ts",
+      "checksum": "8e92d57d04f6fe88c94b202b0af234ddc6a982d8710772f827dcac12b2a2c3de",
+      "size": 4609,
+      "mtime": "2026-09-02T07:22:32.962Z"
+    },
+    {
       "path": "src/lib/__tests__/last-registrar.test.ts",
       "checksum": "06bdc8c3e9516cec5c58f2d8e49ecbb0db0cd13af9343421a21dda98457a6ec9",
       "size": 4224,
@@ -951,6 +975,18 @@
       "checksum": "857d587c10b54221a24eb6b3867697d06ff7b285516e6f4d62c357ebaf57868b",
       "size": 6550,
       "mtime": "2026-09-02T01:52:48.406Z"
+    },
+    {
+      "path": "src/lib/dashboard/metrics.ts",
+      "checksum": "8bdbe0932905ad84c9932b90ce294decc7d82f2477ea12259aac8ed09c9ac8ac",
+      "size": 7892,
+      "mtime": "2026-09-02T07:20:51.402Z"
+    },
+    {
+      "path": "src/lib/dashboard/status-config.ts",
+      "checksum": "082373bbe0a5ae20cc62233c5e6343dd713458262f4780433c24aee8ca99b9c2",
+      "size": 5163,
+      "mtime": "2026-09-02T07:20:09.142Z"
     },
     {
       "path": "src/lib/db.ts",
