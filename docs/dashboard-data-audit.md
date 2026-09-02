@@ -232,3 +232,56 @@ The guard test (`dashboard-status-guard.test.ts`) scans `src/components/app/view
 The test passes today because the existing components use CSS variables (`var(--status-compliant)`) and semantic tokens (`chart-3`, `accent`, `destructive`, `muted`).
 
 **TODO for chunk 1.1:** After rewiring components to use `STATUS_CONFIG[status].label`, add a label-enforcement scan that fails if hardcoded status label strings ("Compliant", "Expiring", "Overdue", "Missing") appear in component files. This is not enabled yet because the existing code still has them.
+
+---
+
+## Appendix — Chunk 1.1 Handoff (wired to canonical DashboardMetrics)
+
+### Definition of "Documents" now in force
+
+**DECISION (from 0.1 audit, applied in 1.1):** "Documents" = active (non-disposed) docs only. Disposed docs (2) are excluded from the KPI and shown nowhere on the dashboard. Both the stats API route and the document-types API route now filter `disposedAt: null`, giving 21 — not 23.
+
+### Components wired
+
+| Component | Before (chunk 0.2) | After (chunk 1.1) |
+|-----------|-------------------|-------------------|
+| Documents KPI stat card | `stats.totalDocuments` (23, all docs) | `stats.activeCount` (21, non-disposed) |
+| Compliance Status Distribution tiles | Hardcoded array with inline labels/colors/icons | `getTileStatuses().map(status => STATUS_CONFIG[status])` |
+| Stat cards (Compliant/Expiring/Overdue/Missing) | Hardcoded labels + icons from lucide-react | `STATUS_CONFIG[status].label` + `STATUS_CONFIG[status].icon` |
+| Compliance Summary (rate + breakdown) | Hardcoded labels + inline `var(--status-*)` | `STATUS_CONFIG[status].label` + `STATUS_CONFIG[status].colorToken` |
+| Documents by Type subtitle | `docTypesData?.total` (21) — already correct | Unchanged (still 21, now matches KPI) |
+
+### API route changes
+
+**`src/app/api/dashboard/stats/route.ts`:**
+- `db.document.count` `where` clause now includes `disposedAt: null` (was `{}`)
+- Response field `totalDocuments` renamed → `activeCount`
+- This makes the stats route's document count (21) match the document-types route's count (21)
+
+### Dead code removed
+
+- `complianceChartData` array (was 8 lines mapping stats → chart data with hardcoded labels)
+- `complianceChartConfig` (was unused ChartConfig object)
+
+### Mutation test
+
+`src/lib/__tests__/dashboard-mutation.test.ts` (5 tests):
+- Baseline assertion: 17/2/2/57 → 78 total
+- COMPLIANT → OVERDUE flip: decrements Compliant in ALL widgets, increments Overdue in ALL widgets, rate drops
+- MISSING → COMPLIANT flip: increments Compliant in ALL widgets, decrements Missing in ALL widgets, rate rises
+- Tile-count consistency: every tile's count matches the corresponding `counts` field
+- Tile count = 4 (only applicable statuses, NOT_APPLICABLE excluded)
+
+### What chunk 1.2 must know
+
+- The compliance rate is displayed as `stats.compliance.overallRate` (e.g., "22%") — a single number from the API route. Chunk 1.2 should change this to show "17 of 78" (numerator / denominator) using `getComplianceRate(metrics).numerator` and `.denominator`. The canonical `ComplianceRate` type already carries these fields.
+- The rate currently comes from the API route's inline computation (lines 83-84 of stats route). If 1.2 wants to use `computeComplianceRate()` from the metrics module, it would need to build `ComplianceCell[]` in the route — the route already has the matrix cells but in a different shape. This is feasible but out of scope for 1.1.
+
+### What chunk 1.3 must know
+
+- The 4 Compliance Status Distribution tiles are wired to `getTileStatuses()` + `STATUS_CONFIG`. They render 4 tiles in a `grid grid-cols-2 sm:grid-cols-4` layout. Chunk 1.3 (which "deletes them") can simply remove the entire `{stats && (<Card>...tiles...</Card>)}` block.
+- The stat cards row (6 cards: Total Unions, Documents, Compliant, Expiring, Overdue, Missing) also has the 4 compliance statuses wired via `getTileStatuses()`. If 1.3 merges or removes tiles, the stat cards may also need updating — but 1.3's scope is the tiles card, not the stat cards row.
+
+### Guard test status
+
+The guard test (`dashboard-status-guard.test.ts`) still passes — no hardcoded hex codes or status Tailwind classes were introduced. The label-enforcement scan (checking for hardcoded "Compliant"/"Expiring"/"Overdue"/"Missing" strings) is still a TODO — the component now reads labels from `STATUS_CONFIG[status].label`, so the hardcoded strings are gone, but enabling the scan is chunk 1.2 or 1.3's call (to avoid false positives during transition).
