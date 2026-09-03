@@ -114,6 +114,170 @@ function LollipopChart({ data }: { data: LollipopDatum[] }) {
   );
 }
 
+// =============================================================================
+// ComplianceCompositionBar — 100% stacked horizontal bar showing the
+// proportional composition of compliance statuses (Compliant / Expiring /
+// Overdue / Missing). Replaces the deleted Compliance Status Distribution
+// tiles card (chunk 1.3). Uses canonical counts from DashboardMetrics.
+//
+// Per 1.3 handoff: counts inside this bar's segments are an ACCEPTED
+// second appearance of the quartet — they add context. Do not remove KPI
+// band counts.
+//
+// Segment + legend entries are clickable → onFilterCompliance (which
+// routes through navigateToComplianceFilter from the 1.3 helper).
+// Keyboard: each element is a <button> (focusable, Enter/Space activates).
+// Screen readers: visually-hidden list provides full text reading.
+// =============================================================================
+
+interface ComplianceCompositionBarProps {
+  counts: ComplianceCounts;
+  denominator: number;
+  totalUnions: number;
+  onFilter?: (status: string) => void;
+}
+
+function ComplianceCompositionBar({ counts, denominator, totalUnions, onFilter }: ComplianceCompositionBarProps) {
+  const tiles = getTileStatuses();
+
+  // Edge: zero denominator → "No requirements configured"
+  if (denominator === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Document Compliance Composition</CardTitle>
+          <CardDescription>Compliance status breakdown across all unions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No requirements configured.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Denominator mismatch guard: sum of applicable counts must equal denominator
+  const sum = counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.MISSING;
+  if (sum !== denominator) {
+    console.error(
+      `[ComplianceCompositionBar] Denominator mismatch: sum of counts (${sum}) != denominator (${denominator}). Not rendering.`,
+    );
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Document Compliance Composition</CardTitle>
+          <CardDescription>Compliance status breakdown across all unions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-destructive">Data inconsistency detected. Please refresh.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Segments: only non-zero counts render as visible bar segments.
+  // Zero-count statuses are omitted from the bar but still appear in the legend.
+  const segments = tiles
+    .map((status) => ({
+      status,
+      config: STATUS_CONFIG[status],
+      count: counts[status],
+      widthPct: (counts[status] / denominator) * 100,
+    }))
+    .filter((s) => s.count > 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Document Compliance Composition</CardTitle>
+        <CardDescription>
+          {denominator} required documents across {totalUnions} unions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Visually-hidden screen reader list — full text reading in one pass */}
+        <ul className="sr-only">
+          {tiles.map((status) => (
+            <li key={status}>
+              {counts[status]} of {denominator} {STATUS_CONFIG[status].label}
+            </li>
+          ))}
+        </ul>
+
+        {/* Stacked bar: flex row of proportional segments */}
+        <TooltipProvider delayDuration={0}>
+          <div className="flex h-8 w-full overflow-hidden rounded-lg" role="group" aria-label="Compliance status composition">
+            {segments.map((seg) => (
+              <Tooltip key={seg.status}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`${seg.config.label}: ${seg.count}`}
+                    onClick={() => onFilter?.(seg.status)}
+                    disabled={!onFilter}
+                    className="flex h-full items-center justify-center transition-all hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-default"
+                    style={{
+                      flexBasis: `${seg.widthPct}%`,
+                      backgroundColor: seg.config.colorToken,
+                    }}
+                  >
+                    {/* Count inside segment: show only if the segment is wide enough
+                        (roughly > 8% of the bar — enough for a 2-digit number) */}
+                    {seg.widthPct > 8 && (
+                      <span className="text-xs font-semibold text-white mix-blend-difference">
+                        {seg.count}
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="max-w-xs text-xs">
+                    <span className="font-medium">{seg.config.label}: {seg.count}</span>
+                    <br />
+                    {seg.config.definition}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        </TooltipProvider>
+
+        {/* Legend row: all 4 statuses including zero-count, clickable */}
+        <div className="flex flex-wrap gap-3">
+          {tiles.map((status) => {
+            const config = STATUS_CONFIG[status];
+            const count = counts[status];
+            return (
+              <TooltipProvider key={status} delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={`${config.label}: ${count}`}
+                      onClick={() => onFilter?.(status)}
+                      disabled={!onFilter}
+                      className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-all hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: config.colorToken }}
+                      />
+                      <span className="text-muted-foreground">{config.label}</span>
+                      <span className="font-medium">{count}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="max-w-xs text-xs">{config.definition}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: "bg-primary/10 text-primary",
   WARNING: "bg-accent/20 text-accent-foreground",
@@ -275,9 +439,16 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
 
       {/* Charts row */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Slot formerly occupied by Compliance Status Distribution tiles —
-            deleted in chunk 1.3. The quartet now appears only in the KPI
-            band above. This slot is intentionally empty; chunk 2.1 fills it. */}
+        {/* Compliance composition bar — fills the slot vacated by the deleted
+            Compliance Status Distribution tiles (chunk 1.3). */}
+        {stats && counts && (
+          <ComplianceCompositionBar
+            counts={counts}
+            denominator={stats.compliance.rate.denominator}
+            totalUnions={stats.totalUnions}
+            onFilter={onFilterCompliance}
+          />
+        )}
 
         {/* Documents by type — horizontal lollipop chart */}
         {docTypesLoading ? (
