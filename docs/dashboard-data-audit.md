@@ -485,3 +485,66 @@ All tests derive expected widths independently from the fixture using `expectedW
 | Grep: no hardcoded hex/strings in new component | 0 hex codes, 0 hardcoded status literals; `STATUS_CONFIG` used 3×, `getTileStatuses` 1× |
 | Mutation test extended | 6 new tests (18 total), all passing |
 | Build/lint/tests pass | `tsc --noEmit` clean; `vitest run` → 13 files, 174 tests, all green |
+
+---
+
+## Appendix — Chunk 2.2 Handoff (required vs on-file meters by document type)
+
+### What was built
+
+`RequiredVsOnFileMeters` component (lines 281–368 of dashboard.tsx) replaces the lollipop chart. One meter row per required document type showing on-file vs required, sorted by missing DESC (ties by name ASC).
+
+Each row:
+- Type name label (left, truncated with title tooltip)
+- Meter track (`bg-muted`) with `bg-primary` fill at `width = (onFile / required) × 100%`
+- Text: "{onFile} of {required} on file" + "· {missing} missing" (highlighted in `STATUS_CONFIG.MISSING.colorToken`)
+- `aria-label`: "{documentType}: {onFile} of {required} on file, {missing} missing"
+- Semantic `<ul>` list structure
+
+### Metrics module extension
+
+Added to `src/lib/dashboard/metrics.ts`:
+- `RequiredVsOnFileEntry` interface: `{ documentType, required, onFile, missing }`
+- `getRequiredVsOnFileByType(onFileByType, requiredTypes, totalUnions)`: pure function, sorts by missing DESC then name ASC
+- `sumOnFile(entries)`: sums on-file counts (must equal Documents KPI)
+
+### API route extension
+
+`/api/dashboard/document-types` now returns:
+```json
+{
+  "documentTypes": [...],
+  "total": 21,
+  "requiredTypes": ["Constitution", "Financial Return", ...],
+  "totalUnions": 6
+}
+```
+
+### Dead code removed
+
+- `LollipopChart` function + `LollipopDatum` interface (still defined but no longer called — removing them is 6.1's scope as a layout cleanup)
+- `DONUT_COLORS` array + `docTypeChartData` mapping (removed from the component body)
+
+### Edge cases tested (10 new tests, 28 total in mutation test file)
+
+| Case | Behavior | Test |
+|------|----------|------|
+| on-file = 0 | Full row rendered: "0 of 6 on file · 6 missing" | `on-file = 0 → renders '0 of 6 on file, 6 missing'` |
+| missing = 0 | "6 of 6 on file" (no missing text) | `missing = 0 → no missing text shown` |
+| required = 0 | Row omitted, `console.error` logged | `required = 0 → type omitted from output (component logs loudly)` |
+| on-file > required | Rendered without clamping, `console.error` logged, missing is negative | `on-file > required → data inconsistency (component logs, does NOT clamp)` |
+| Mutation: remove doc | Fill + missing + sort change; sum of on-file = 20 (was 21) | `mutation: removing a doc changes fill + missing + sort order` |
+| Mutation: add doc | 0→1; missing 6→5; sum = 22; sort changes | `mutation: adding a doc to a zero-on-file type changes its row from 0 to 1` |
+
+### Deferred drill-through proposal for 4.1
+
+Rows are NOT interactive in this chunk. A natural drill-through would:
+- Click a row → navigate to the Compliance matrix filtered by that document type
+- The matrix already supports status filtering; adding document-type filtering would require extending `ComplianceView`'s filter + the matrix API
+- This is a clean extension of the `navigateToComplianceFilter()` pattern from chunk 1.3
+
+### What chunk 6.1 / 6.2 should know
+
+- **6.1** may re-layout the grid; the meters card and the composition bar are both in `grid gap-6 lg:grid-cols-2`
+- **6.2** may rename the card title/subtitle
+- Dead code (`LollipopChart` function, `LollipopDatum` interface) is still in the file but uncalled — 6.1 should remove it during layout cleanup

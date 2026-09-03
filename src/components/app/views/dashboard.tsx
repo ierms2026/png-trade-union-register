@@ -10,7 +10,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
 import { STATUS_CONFIG, getTileStatuses, type ComplianceStatus } from "@/lib/dashboard/status-config";
-import { type ComplianceCounts } from "@/lib/dashboard/metrics";
+import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry } from "@/lib/dashboard/metrics";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // =============================================================================
@@ -278,6 +278,95 @@ function ComplianceCompositionBar({ counts, denominator, totalUnions, onFilter }
   );
 }
 
+// =============================================================================
+// RequiredVsOnFileMeters — one meter row per required document type showing
+// on-file vs required. Replaces the lollipop chart (chunk 2.2).
+//
+// Each row: type label + meter track (fill = onFile/required) + text
+// "X of Y on file" + "· Z missing" (highlighted using Missing color token).
+// Sorted by missing DESC, ties by type name ASC (from the metrics selector).
+//
+// NOT interactive in this chunk — drill-through deferred to 4.1.
+// =============================================================================
+
+function RequiredVsOnFileMeters({
+  onFileByType,
+  requiredTypes,
+  totalUnions,
+}: {
+  onFileByType: Array<{ documentType: string; count: number }>;
+  requiredTypes: string[];
+  totalUnions: number;
+}) {
+  const entries = getRequiredVsOnFileByType(onFileByType, requiredTypes, totalUnions);
+  const totalOnFile = sumOnFile(entries);
+  const missingColor = STATUS_CONFIG.MISSING.colorToken;
+
+  // Guard: required = 0 for a configured type → omit row + log loudly
+  const validEntries = entries.filter((e) => {
+    if (e.required === 0) {
+      console.error(
+        `[RequiredVsOnFileMeters] Type "${e.documentType}" has required=0. Omitting row.`,
+      );
+      return false;
+    }
+    if (e.onFile > e.required) {
+      console.error(
+        `[RequiredVsOnFileMeters] Type "${e.documentType}" has onFile (${e.onFile}) > required (${e.required}). Data inconsistency — rendering without clamping.`,
+      );
+    }
+    return true;
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Required vs On-File by Type</CardTitle>
+        <CardDescription>
+          On file vs required across {requiredTypes.length} document types.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2.5" aria-label="Required vs on-file by document type">
+          {validEntries.map((entry) => {
+            const fillPct = entry.required > 0 ? (entry.onFile / entry.required) * 100 : 0;
+            return (
+              <li
+                key={entry.documentType}
+                aria-label={`${entry.documentType}: ${entry.onFile} of ${entry.required} on file${entry.missing > 0 ? `, ${entry.missing} missing` : ""}`}
+                className="space-y-1"
+              >
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="truncate font-medium" title={entry.documentType}>
+                    {entry.documentType}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {entry.onFile} of {entry.required} on file
+                    {entry.missing > 0 && (
+                      <span style={{ color: missingColor }} className="ml-1 font-medium">
+                        · {entry.missing} missing
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-2 rounded-full bg-primary transition-all"
+                    style={{ width: `${Math.min(fillPct, 100)}%` }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {totalOnFile} on file across {requiredTypes.length} types.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: "bg-primary/10 text-primary",
   WARNING: "bg-accent/20 text-accent-foreground",
@@ -344,7 +433,12 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
     loading: docTypesLoading,
     error: docTypesError,
     refetch: refetchDocTypes,
-  } = useFetch<{ documentTypes: Array<{ documentType: string; count: number }>; total: number }>("/api/dashboard/document-types");
+  } = useFetch<{
+    documentTypes: Array<{ documentType: string; count: number }>;
+    total: number;
+    requiredTypes: string[];
+    totalUnions: number;
+  }>("/api/dashboard/document-types");
 
   // --- Canonical compliance counts from the stats response ---
   // Maps the API's lowercase keys to the canonical ComplianceCounts shape
@@ -359,18 +453,6 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
         NOT_APPLICABLE: stats.compliance.notApplicable,
       }
     : null;
-
-  // --- Chart data: documents by type ---
-  // Uses the 5-chart palette from the design system, cycling for >5 types.
-  const DONUT_COLORS = [
-    "var(--chart-1)", "var(--chart-2)", "var(--chart-3)",
-    "var(--chart-4)", "var(--chart-5)",
-  ];
-  const docTypeChartData = (docTypesData?.documentTypes || []).map((d, i) => ({
-    name: d.documentType,
-    value: d.count,
-    fill: DONUT_COLORS[i % DONUT_COLORS.length],
-  }));
 
   return (
     <div className="space-y-6">
@@ -450,11 +532,11 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           />
         )}
 
-        {/* Documents by type — horizontal lollipop chart */}
+        {/* Required vs On-File meters — replaces the lollipop chart (chunk 2.2) */}
         {docTypesLoading ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Documents by Type</CardTitle>
+              <CardTitle className="text-lg">Required vs On-File by Type</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[240px] animate-pulse rounded-md bg-muted" />
@@ -462,18 +544,12 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           </Card>
         ) : docTypesError ? (
           <ErrorState description={docTypesError} onRetry={refetchDocTypes} />
-        ) : docTypeChartData.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Documents by Type</CardTitle>
-              <CardDescription>
-                {docTypesData?.total || 0} documents across {docTypeChartData.length} types.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LollipopChart data={[...docTypeChartData].sort((a, b) => b.value - a.value)} />
-            </CardContent>
-          </Card>
+        ) : docTypesData && docTypesData.requiredTypes && docTypesData.requiredTypes.length > 0 ? (
+          <RequiredVsOnFileMeters
+            onFileByType={docTypesData.documentTypes}
+            requiredTypes={docTypesData.requiredTypes}
+            totalUnions={docTypesData.totalUnions}
+          />
         ) : null}
       </div>
 

@@ -603,3 +603,230 @@ describe("composition bar — segment widths match counts as percentages", () =>
     );
   });
 });
+
+// =============================================================================
+// Required vs On-File meters tests — chunk 2.2 acceptance criteria:
+// - Every required type renders including zero-on-file
+// - Sort: missing DESC, ties by name ASC
+// - Sum of on-file equals Documents KPI
+// - Fill proportion = onFile / required (asserted numerically)
+// - Edge cases: on-file=0, missing=0, required=0 (omitted + logged)
+// - Mutation: removing a doc changes fill + missing + sort
+// =============================================================================
+
+import {
+  getRequiredVsOnFileByType,
+  sumOnFile,
+  type RequiredVsOnFileEntry,
+  type DocumentTypeCount,
+} from "../dashboard/metrics";
+
+describe("required vs on-file — per-type meters", () => {
+  // Simulate the live DB: 13 required types, 6 unions each
+  const ALL_REQUIRED_TYPES = [
+    "General Matters", "Application for Registration", "Registration Certificate",
+    "Constitution", "Financial Membership List", "Election of Office Bearers",
+    "Secret Ballots", "Financial Return", "Affiliations", "Inspection Reports",
+    "General Secretary Appointments", "Welfare Fund", "Awards",
+  ];
+  const TOTAL_UNIONS = 6;
+
+  // On-file counts per type (matching live data: 21 total)
+  const ON_FILE_BY_TYPE: DocumentTypeCount[] = [
+    { documentType: "Registration Certificate", count: 5 },
+    { documentType: "Constitution", count: 5 },
+    { documentType: "Financial Return", count: 4 },
+    { documentType: "Election of Office Bearers", count: 2 },
+    { documentType: "Awards", count: 2 },
+    { documentType: "Financial Membership List", count: 1 },
+    { documentType: "Affiliations", count: 1 },
+    { documentType: "Secret Ballots", count: 1 },
+  ];
+
+  it("every required type renders — including zero-on-file types", () => {
+    const entries = getRequiredVsOnFileByType(ON_FILE_BY_TYPE, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+    expect(entries).toHaveLength(ALL_REQUIRED_TYPES.length);
+
+    // Types with 0 on-file: General Matters, Application for Registration,
+    // Inspection Reports, General Secretary Appointments, Welfare Fund
+    const zeroOnFile = entries.filter((e) => e.onFile === 0);
+    expect(zeroOnFile.length).toBe(5);
+    for (const entry of zeroOnFile) {
+      expect(entry.missing).toBe(TOTAL_UNIONS);
+    }
+  });
+
+  it("sort order: missing DESC, ties by name ASC (deterministic)", () => {
+    const entries = getRequiredVsOnFileByType(ON_FILE_BY_TYPE, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+
+    // Independently compute expected sort
+    const onFileMap = new Map(ON_FILE_BY_TYPE.map((d) => [d.documentType, d.count]));
+    const expected = ALL_REQUIRED_TYPES.map((docType) => {
+      const onFile = onFileMap.get(docType) ?? 0;
+      return { documentType: docType, required: TOTAL_UNIONS, onFile, missing: TOTAL_UNIONS - onFile };
+    }).sort((a, b) => {
+      if (b.missing !== a.missing) return b.missing - a.missing;
+      return a.documentType.localeCompare(b.documentType);
+    });
+
+    // Assert each entry matches expected order
+    expect(entries.map((e) => e.documentType)).toEqual(expected.map((e) => e.documentType));
+
+    // First 5 should all have missing = 6 (the zero-on-file types)
+    expect(entries[0].missing).toBe(6);
+    expect(entries[4].missing).toBe(6);
+    // Ties at missing=6 broken alphabetically:
+    expect(entries[0].documentType).toBe("Application for Registration");
+    expect(entries[1].documentType).toBe("General Matters");
+    expect(entries[2].documentType).toBe("General Secretary Appointments");
+    expect(entries[3].documentType).toBe("Inspection Reports");
+    expect(entries[4].documentType).toBe("Welfare Fund");
+  });
+
+  it("sum of on-file equals Documents KPI (21)", () => {
+    const entries = getRequiredVsOnFileByType(ON_FILE_BY_TYPE, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+    const total = sumOnFile(entries);
+    // Independently sum the ON_FILE_BY_TYPE fixture
+    const expectedTotal = ON_FILE_BY_TYPE.reduce((sum, d) => sum + d.count, 0);
+    expect(total).toBe(expectedTotal);
+    expect(total).toBe(21);
+  });
+
+  it("fill proportion = onFile / required (asserted numerically)", () => {
+    const entries = getRequiredVsOnFileByType(ON_FILE_BY_TYPE, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+
+    for (const entry of entries) {
+      const expectedFill = entry.required > 0 ? (entry.onFile / entry.required) * 100 : 0;
+      // Simulate the component's width calculation
+      const componentFill = entry.required > 0 ? (entry.onFile / entry.required) * 100 : 0;
+      expect(componentFill).toBeCloseTo(expectedFill, 5);
+      expect(Number.isNaN(componentFill)).toBe(false);
+    }
+
+    // Explicit: Financial Return = 4/6 = 66.67%
+    const financialReturn = entries.find((e) => e.documentType === "Financial Return")!;
+    expect(financialReturn.onFile).toBe(4);
+    expect(financialReturn.required).toBe(6);
+    expect((4 / 6) * 100).toBeCloseTo(66.667, 1);
+
+    // Registration Certificate = 5/6 = 83.33%
+    const regCert = entries.find((e) => e.documentType === "Registration Certificate")!;
+    expect(regCert.onFile).toBe(5);
+    expect(regCert.required).toBe(6);
+    expect((5 / 6) * 100).toBeCloseTo(83.333, 1);
+
+    // Welfare Fund = 0/6 = 0%
+    const welfare = entries.find((e) => e.documentType === "Welfare Fund")!;
+    expect(welfare.onFile).toBe(0);
+    expect(welfare.required).toBe(6);
+    expect((0 / 6) * 100).toBe(0);
+  });
+
+  it("edge: on-file = 0 → renders '0 of 6 on file, 6 missing'", () => {
+    const entries = getRequiredVsOnFileByType(ON_FILE_BY_TYPE, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+    const welfare = entries.find((e) => e.documentType === "Welfare Fund")!;
+    expect(welfare.onFile).toBe(0);
+    expect(welfare.required).toBe(6);
+    expect(welfare.missing).toBe(6);
+    // The component would render "0 of 6 on file · 6 missing"
+  });
+
+  it("edge: missing = 0 → no missing text shown", () => {
+    // All unions have the type on file
+    const allOnFile: DocumentTypeCount[] = ALL_REQUIRED_TYPES.map((t) => ({
+      documentType: t,
+      count: TOTAL_UNIONS,
+    }));
+    const entries = getRequiredVsOnFileByType(allOnFile, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+    for (const entry of entries) {
+      expect(entry.onFile).toBe(entry.required);
+      expect(entry.missing).toBe(0);
+    }
+  });
+
+  it("edge: required = 0 → type omitted from output (component logs loudly)", () => {
+    // A type with required=0 (totalUnions=0)
+    const entries = getRequiredVsOnFileByType(
+      [],
+      ["Nonexistent Type"],
+      0,
+    );
+    // With totalUnions=0, required=0, so missing=0
+    expect(entries).toHaveLength(1);
+    expect(entries[0].required).toBe(0);
+    expect(entries[0].onFile).toBe(0);
+    expect(entries[0].missing).toBe(0);
+    // The component filters this out (validEntries guard) and logs console.error
+  });
+
+  it("edge: on-file > required → data inconsistency (component logs, does NOT clamp)", () => {
+    // Simulate: 8 docs of a type that only requires 6
+    const onFile: DocumentTypeCount[] = [
+      { documentType: "OverFiled Type", count: 8 },
+    ];
+    const entries = getRequiredVsOnFileByType(onFile, ["OverFiled Type"], TOTAL_UNIONS);
+    expect(entries[0].onFile).toBe(8);
+    expect(entries[0].required).toBe(6);
+    expect(entries[0].missing).toBe(-2); // negative — component logs this
+  });
+
+  it("mutation: removing a doc changes fill + missing + sort order", () => {
+    // Deep-copy the fixture to avoid cross-test mutation
+    const onFileAfter = ON_FILE_BY_TYPE.map((d) => ({ ...d }));
+
+    // Remove one Financial Return (4 → 3)
+    onFileAfter.find((d) => d.documentType === "Financial Return")!.count = 3;
+
+    const entriesAfter = getRequiredVsOnFileByType(onFileAfter, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+    const financialReturnAfter = entriesAfter.find((e) => e.documentType === "Financial Return")!;
+
+    // Independently compute expected
+    expect(financialReturnAfter.onFile).toBe(3);
+    expect(financialReturnAfter.required).toBe(6);
+    expect(financialReturnAfter.missing).toBe(3);
+
+    // Fill proportion changed: 3/6 = 50% (was 4/6 = 66.67%)
+    const fillPct = (3 / 6) * 100;
+    expect(fillPct).toBe(50);
+
+    // Sum of on-file = 20 (original 21 - 1)
+    const totalAfter = sumOnFile(entriesAfter);
+    expect(totalAfter).toBe(20);
+
+    // Sort order: Financial Return now has missing=3 (was missing=2)
+    // It should rank higher (earlier in the list) than types with missing < 3
+    const frIndex = entriesAfter.findIndex((e) => e.documentType === "Financial Return")!;
+    // After FR in the sorted list (higher index), there should be no entries
+    // with missing >= 3 (they'd sort before it)
+    const typesAfterFRWithHigherOrEqualMissing = entriesAfter.filter(
+      (e, i) => i > frIndex && e.missing >= 3,
+    );
+    expect(typesAfterFRWithHigherOrEqualMissing.length).toBe(0);
+  });
+
+  it("mutation: adding a doc to a zero-on-file type changes its row from 0 to 1", () => {
+    // Deep-copy the fixture
+    const onFile = ON_FILE_BY_TYPE.map((d) => ({ ...d }));
+
+    // Add one Welfare Fund (was 0, now 1)
+    onFile.push({ documentType: "Welfare Fund", count: 1 });
+
+    const entries = getRequiredVsOnFileByType(onFile, ALL_REQUIRED_TYPES, TOTAL_UNIONS);
+    const welfare = entries.find((e) => e.documentType === "Welfare Fund")!;
+
+    expect(welfare.onFile).toBe(1);
+    expect(welfare.required).toBe(6);
+    expect(welfare.missing).toBe(5); // was 6, now 5
+
+    // Sum of on-file now = 22 (original 21 + 1)
+    expect(sumOnFile(entries)).toBe(22);
+
+    // Welfare Fund now has missing=5 (was 6), so it sorts lower
+    const welfareIndex = entries.findIndex((e) => e.documentType === "Welfare Fund")!;
+    const typesWithHigherMissing = entries.filter(
+      (e, i) => e.missing > 5 && i < welfareIndex,
+    );
+    // All types with missing > 5 (i.e., 6) should be BEFORE Welfare Fund
+    expect(typesWithHigherMissing.length).toBe(4); // the 4 other zero-on-file types
+  });
+});

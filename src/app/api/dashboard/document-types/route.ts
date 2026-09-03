@@ -5,10 +5,17 @@ import { getAuthUser } from "@/lib/auth/auth-guard";
 // =============================================================================
 // GET /api/dashboard/document-types
 // -----------------------------------------------------------------------------
-// Returns the count of documents grouped by documentType — powers the
-// "Documents by Type" donut chart on the Dashboard.
+// Returns the count of documents grouped by documentType + the list of
+// required document types and totalUnions — powers the "Required vs On-File"
+// meters on the Dashboard (chunk 2.2).
 //
-// Returns: [{ documentType: "Constitution", count: 4 }, ...]
+// Returns:
+//   {
+//     documentTypes: [{ documentType: "Constitution", count: 4 }, ...],
+//     total: 21,
+//     requiredTypes: ["Constitution", "Financial Return", ...],  // from ComplianceRule
+//     totalUnions: 6,
+//   }
 // =============================================================================
 
 export async function GET(req: NextRequest) {
@@ -17,31 +24,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Count documents per type, excluding disposed docs.
-  // Officer scoping: only count documents from their assigned union.
-  const where: { disposedAt: null; unionId?: string } = { disposedAt: null };
-  if (user.role === "OFFICER" && user.assignedUnionId) {
-    where.unionId = user.assignedUnionId;
-  }
+  // Officer scoping
+  const officerScoped = user.role === "OFFICER" && user.assignedUnionId;
+  const unionWhere = officerScoped ? { id: user.assignedUnionId } : {};
+  const docWhere: { disposedAt: null; unionId?: string } = { disposedAt: null };
+  if (officerScoped) docWhere.unionId = user.assignedUnionId!;
 
-  const documents = await db.document.findMany({
-    where,
-    select: { documentType: true },
-  });
+  // Fetch on-file doc counts + required rules + totalUnions in parallel
+  const [documents, rules, totalUnions] = await Promise.all([
+    db.document.findMany({ where: docWhere, select: { documentType: true } }),
+    db.complianceRule.findMany({ where: { required: true }, select: { documentType: true } }),
+    db.union.count({ where: unionWhere }),
+  ]);
 
-  // Aggregate counts in JS (simpler than raw SQL groupBy for SQLite)
+  // Aggregate on-file counts per type
   const counts = new Map<string, number>();
   for (const doc of documents) {
     counts.set(doc.documentType, (counts.get(doc.documentType) || 0) + 1);
   }
 
-  // Convert to array sorted by count descending
   const result = Array.from(counts.entries())
     .map(([documentType, count]) => ({ documentType, count }))
     .sort((a, b) => b.count - a.count);
 
+  // Required types list (for the required-vs-on-file comparison)
+  const requiredTypes = rules.map((r) => r.documentType);
+
   return NextResponse.json({
     documentTypes: result,
     total: documents.length,
+    requiredTypes,
+    totalUnions,
   });
 }
