@@ -96,6 +96,11 @@ export async function GET() {
       missing,
       notApplicable,
       overallRate,
+      rate: {
+        numerator: compliant,
+        denominator: applicable,
+        percentage: overallRate,
+      },
     },
   });
 }
