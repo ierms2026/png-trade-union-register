@@ -44,6 +44,21 @@ export interface DocumentTypeCount {
   count: number;
 }
 
+/**
+ * Per-type required vs on-file comparison. Each required document type
+ * gets one entry showing how many unions have that type on file vs
+ * how many are required (totalUnions).
+ */
+export interface RequiredVsOnFileEntry {
+  documentType: string;
+  /** How many unions require this type (= totalUnions for a required rule). */
+  required: number;
+  /** How many non-disposed documents of this type exist on file. */
+  onFile: number;
+  /** required - onFile. Always >= 0 if data is consistent. */
+  missing: number;
+}
+
 export interface ComplianceCell {
   unionId: string;
   documentType: string;
@@ -229,4 +244,54 @@ export function buildDashboardMetrics(params: {
       rate,
     },
   };
+}
+
+/**
+ * Compute required-vs-on-file per document type.
+ *
+ * Each required rule type requires 1 document per union (= totalUnions).
+ * The on-file count comes from the document-types aggregation (non-disposed).
+ * Types with 0 on-file are INCLUDED (they show the full gap).
+ *
+ * Sort order: missing DESC, ties broken by documentType ASC (deterministic).
+ *
+ * @param onFileByType  Array of { documentType, count } from the document-types API
+ * @param requiredTypes Array of document type names that are required (from ComplianceRule)
+ * @param totalUnions   Number of unions (required per type = totalUnions × 1)
+ * @returns Sorted array of RequiredVsOnFileEntry
+ */
+export function getRequiredVsOnFileByType(
+  onFileByType: DocumentTypeCount[],
+  requiredTypes: string[],
+  totalUnions: number,
+): RequiredVsOnFileEntry[] {
+  // Build a map of on-file counts for quick lookup
+  const onFileMap = new Map<string, number>();
+  for (const entry of onFileByType) {
+    onFileMap.set(entry.documentType, entry.count);
+  }
+
+  const result: RequiredVsOnFileEntry[] = [];
+  for (const docType of requiredTypes) {
+    const required = totalUnions; // each required rule × 1 per union
+    const onFile = onFileMap.get(docType) ?? 0;
+    const missing = required - onFile;
+    result.push({ documentType: docType, required, onFile, missing });
+  }
+
+  // Sort by missing DESC, ties by documentType ASC
+  result.sort((a, b) => {
+    if (b.missing !== a.missing) return b.missing - a.missing;
+    return a.documentType.localeCompare(b.documentType);
+  });
+
+  return result;
+}
+
+/**
+ * Sum the on-file counts across all RequiredVsOnFileEntry.
+ * Must equal the Documents KPI (activeCount) if data is consistent.
+ */
+export function sumOnFile(entries: RequiredVsOnFileEntry[]): number {
+  return entries.reduce((sum, e) => sum + e.onFile, 0);
 }
