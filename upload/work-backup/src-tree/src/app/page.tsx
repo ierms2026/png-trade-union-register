@@ -19,6 +19,7 @@ import { UsersView } from "@/components/app/views/users";
 import { SecurityView } from "@/components/app/views/security";
 import { ApiKeysView } from "@/components/app/views/api-keys";
 import { AccountSecurityView } from "@/components/app/views/account-security";
+import { navigateToComplianceFilter } from "@/lib/dashboard/status-filter";
 
 interface AuthUser {
   id: string;
@@ -108,16 +109,19 @@ export default function Home() {
   if (!user) return null;
   const currentUser = user;
 
+  function handleFilterCompliance(status: string) {
+    const nav = navigateToComplianceFilter(status as Parameters<typeof navigateToComplianceFilter>[0]);
+    setInitialStatusFilter(nav.filter);
+    setActiveView(nav.view);
+  }
+
   function renderView() {
     switch (activeView) {
       case "dashboard": return (
         <DashboardView
           user={currentUser}
           onNavigate={setActiveView}
-          onFilterCompliance={(status) => {
-            setInitialStatusFilter(status);
-            setActiveView("compliance");
-          }}
+          onFilterCompliance={handleFilterCompliance}
         />
       );
       case "unions":
@@ -137,10 +141,7 @@ export default function Home() {
         <DashboardView
           user={currentUser}
           onNavigate={setActiveView}
-          onFilterCompliance={(status) => {
-            setInitialStatusFilter(status);
-            setActiveView("compliance");
-          }}
+          onFilterCompliance={handleFilterCompliance}
         />
       );
     }
