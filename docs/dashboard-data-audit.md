@@ -410,3 +410,78 @@ function handleFilterCompliance(status: string) {
 | Zero orphaned references | "Compliance Status Distribution" only in comment (line 278); "Click a tile" = 0; "grid grid-cols-2 gap-2 text-sm" = 0; no test references to deleted elements |
 | Suite green | 13 files, 168 tests, all passed. No tests deleted or skipped. |
 | Build/lint/tests pass | `tsc --noEmit` clean; `vitest run` all green |
+
+---
+
+## Appendix — Chunk 2.1 Handoff (stacked compliance composition bar)
+
+### What was built
+
+A `ComplianceCompositionBar` component (defined in `dashboard.tsx` lines 117–279) fills the empty grid slot left by chunk 1.3. It renders as a `<Card>` with:
+- Title: "Document Compliance Composition"
+- Subtitle: "{denominator} required documents across {totalUnions} unions." (e.g. "78 required documents across 6 unions.")
+- A 100% stacked horizontal bar with 4 proportional segments (Compliant → Expiring → Overdue → Missing)
+- A legend row beneath with clickable entries for all 4 statuses (including zero-count)
+- Visually-hidden screen reader list (`sr-only`) with full text reading
+- Per-segment tooltips from `STATUS_CONFIG[status].definition`
+
+### Segment-click contract
+
+Both bar segments and legend entries are `<button type="button">` elements:
+- `onClick={() => onFilter?.(status)}` — routes through the `onFilterCompliance` prop, which calls `navigateToComplianceFilter()` from the 1.3 helper
+- `disabled={!onFilter}` — when no filter callback is provided (e.g. Officer role), buttons are disabled but still focusable for screen readers
+- `aria-label="${config.label}: ${count}"` — accessible name includes status + count
+- `focus-visible:ring-2 focus-visible:ring-ring` — visible keyboard focus indicator
+- Tooltips via shadcn `Tooltip` / `TooltipProvider` with `delayDuration={0}` (shows on focus, not hover-only)
+
+### Data flow
+
+```
+stats (from /api/dashboard/stats)
+  → counts: ComplianceCounts (mapped in DashboardView)
+  → stats.compliance.rate.denominator
+  → stats.totalUnions
+  → <ComplianceCompositionBar counts={counts} denominator={...} totalUnions={...} onFilter={onFilterCompliance} />
+```
+
+No independent aggregation in the component — all values come from the `counts` and `denominator` props. The width computation `(counts[status] / denominator) * 100` is a CSS layout concern (converting a count to a proportional flex-basis), not a compliance-rate metric — the rate percentage lives exclusively in `computeComplianceRate()` in the metrics module.
+
+### Edge cases tested
+
+| Case | Behavior | Test |
+|------|----------|------|
+| Zero denominator (`denominator === 0`) | "No requirements configured" text, no bar | `all counts zero → denominator = 0 → no NaN in widths` |
+| Denominator mismatch (sum ≠ denominator) | "Data inconsistency detected" text, console.error logged, no bar | `denominator mismatch: sum of counts != denominator → guard fires` |
+| Zero-count segment | Segment omitted from bar (width = 0%, filtered out), legend entry still shown at count 0 | `zero-count segment omitted from bar but legend entry shown` |
+| All counts zero | Same as zero denominator — "No requirements configured" | Same test as above |
+| Small segments | Count label shown only if segment width > 8% (enough for a 2-digit number); small segments' count accessible via legend + tooltip | Not separately tested (visual threshold) |
+
+### Mutation test extension
+
+`dashboard-mutation.test.ts` grew from 12 → 18 tests (6 new):
+- Baseline: segment widths independently computed match selector output (17/78, 2/78, 2/78, 57/78)
+- Mutation: flipping COMPLIANT → OVERDUE changes segment widths proportionally (17/78 → 16/78, 2/78 → 3/78)
+- Zero-count segment omitted from bar but legend entry shown
+- Denominator mismatch guard fires
+- All counts zero → denominator = 0, no NaN
+- Segment ordering: Compliant → Expiring → Overdue → Missing
+
+All tests derive expected widths independently from the fixture using `expectedWidths()` + `countByStatus()`, not by calling the selector under test.
+
+### What remains in the slot for future chunks
+
+- **6.2** may rename the card title/subtitle and add richer tooltips
+- **6.1** may re-layout the grid (currently `grid gap-6 lg:grid-cols-2` with the bar on the left, lollipop on the right)
+- **4.1** may wire KPI band stat cards' click behavior to the same `onFilterCompliance` callback (currently they display counts but don't filter)
+
+### Acceptance criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| Widths match counts as percentages | 6 width tests asserting `(count / denominator) * 100` to 5 decimal places; sum of widths = 100 |
+| Every status reachable via legend; clicks through 1.3 helper | Legend has all 4 `getTileStatuses()` entries as `<button onClick={onFilter?.(status)}>`; `onFilter` is `onFilterCompliance` which calls `navigateToComplianceFilter()` |
+| Keyboard: tab reaches segments + legend, focus visible | All segments + legend entries are `<button type="button">` with `focus-visible:ring-2` |
+| All 3 edge cases tested; no NaN | 3 edge case tests: zero denominator, denominator mismatch, all-zero counts — all assert no NaN |
+| Grep: no hardcoded hex/strings in new component | 0 hex codes, 0 hardcoded status literals; `STATUS_CONFIG` used 3×, `getTileStatuses` 1× |
+| Mutation test extended | 6 new tests (18 total), all passing |
+| Build/lint/tests pass | `tsc --noEmit` clean; `vitest run` → 13 files, 174 tests, all green |
