@@ -275,47 +275,9 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
 
       {/* Charts row */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Compliance status distribution — 4 KPI stat tiles (clickable) */}
-        {stats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Compliance Status Distribution</CardTitle>
-              <CardDescription>Document compliance status across all unions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {getTileStatuses().map((status) => {
-                  const config = STATUS_CONFIG[status];
-                  const Icon = config.icon;
-                  const tileCount = counts![status];
-                  const clickable = !!onFilterCompliance;
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => onFilterCompliance?.(status)}
-                      disabled={!clickable}
-                      title={clickable ? `Filter document list by ${config.label} status` : undefined}
-                      className="group relative overflow-hidden rounded-lg border p-3 text-left transition-all hover:shadow-sm disabled:cursor-default"
-                      style={{ borderTop: `3px solid ${config.colorToken}`, background: `color-mix(in srgb, ${config.colorToken} 6%, white)` }}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-2xl font-bold leading-none tracking-tight" style={{ color: config.colorToken }}>{tileCount}</p>
-                          <p className="mt-1.5 text-xs font-medium text-muted-foreground">{config.label}</p>
-                        </div>
-                        <Icon className="h-4 w-4 shrink-0 opacity-60" style={{ color: config.colorToken }} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              {onFilterCompliance && (
-                <p className="mt-2 text-xs text-muted-foreground">Click a tile to filter the Compliance matrix.</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Slot formerly occupied by Compliance Status Distribution tiles —
+            deleted in chunk 1.3. The quartet now appears only in the KPI
+            band above. This slot is intentionally empty; chunk 2.1 fills it. */}
 
         {/* Documents by type — horizontal lollipop chart */}
         {docTypesLoading ? (
@@ -388,15 +350,6 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
                     </div>
                   </>
                 )}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                {getTileStatuses().map((status) => (
-                  <div key={status} className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_CONFIG[status].colorToken }} />
-                    <span className="text-muted-foreground">{STATUS_CONFIG[status].label}:</span>
-                    <span className="font-medium">{counts![status]}</span>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>

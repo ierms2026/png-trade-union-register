@@ -348,3 +348,65 @@ Chunk 1.3 ("deletes the 4 tiles card" — the Compliance Status Distribution) ma
 
 - The Compliance Status Distribution tiles card (lines 270–310 of dashboard.tsx) is the one to delete — it's the 4-tile clickable grid, NOT the Compliance Summary card.
 - The Compliance Summary card's legend list (lines 392–400) is a separate concern. If 1.3 only deletes the tiles card, the legend list can stay. If 1.3 also removes the legend, the rate display (lines 357–391) must stay — it's the primary compliance indicator.
+
+---
+
+## Appendix — Chunk 1.3 Handoff (de-duplicate compliance counts)
+
+### What was deleted
+
+1. **Compliance Status Distribution tiles card** — the entire `<Card>` with the 4 clickable tiles (status + count + icon + top-border color) and the "Click a tile to filter" hint text. Was at lines 278–318 of dashboard.tsx.
+2. **Legend list from Compliance Summary card** — the `grid grid-cols-2 gap-2 text-sm` block with 4 rows of colored dots + labels + counts. Was at lines 392–400 of dashboard.tsx.
+
+### What remains
+
+- **KPI band** (lines ~249–273) — 6 StatCards: Total Unions, Documents, Compliant, Expiring, Overdue, Missing. The quartet (17/2/2/57) appears here and nowhere else. Uses `getTileStatuses()` + `STATUS_CONFIG[status]` + `counts![status]`.
+- **Compliance Summary card** (lines ~346–356) — now contains ONLY the rate display from chunk 1.2 ("17 of 78 required (22%)" + progress bar + tooltip). No legend list.
+
+### The empty grid slot
+
+The "Charts row" (`grid gap-6 lg:grid-cols-2`) now has only the "Documents by Type" lollipop chart on the right. The left slot (where the Distribution tiles were) is intentionally empty — marked with a comment: "Slot formerly occupied by Compliance Status Distribution tiles — deleted in chunk 1.3. This slot is intentionally empty; chunk 2.1 fills it."
+
+**For chunk 2.1:** The empty slot is the first child of `<div className="grid gap-6 lg:grid-cols-2">` in dashboard.tsx (line ~277). The lollipop chart is the second child. When 2.1 fills the slot, it should render inside that grid as a `<Card>` sibling.
+
+### Extracted helper: `navigateToComplianceFilter(status)`
+
+**File:** `src/lib/dashboard/status-filter.ts`
+**Tests:** `src/lib/__tests__/dashboard-status-filter.test.ts` (8 tests, all passing)
+
+**API (public contract for chunk 2.1):**
+
+```ts
+import { navigateToComplianceFilter, FILTERABLE_STATUSES } from "@/lib/dashboard/status-filter";
+import type { ComplianceFilterNavigation } from "@/lib/dashboard/status-filter";
+import type { ComplianceStatus } from "@/lib/dashboard/status-config";
+
+// Returns the navigation target for filtering the Compliance matrix
+const result: ComplianceFilterNavigation = navigateToComplianceFilter("OVERDUE");
+// result = { view: "compliance", filter: "OVERDUE" }
+
+// The caller is responsible for setting the filter state + navigating
+// Example usage (as page.tsx does it):
+function handleFilterCompliance(status: string) {
+  const nav = navigateToComplianceFilter(status as ComplianceStatus);
+  setInitialStatusFilter(nav.filter);
+  setActiveView(nav.view);
+}
+
+// FILTERABLE_STATUSES = ["COMPLIANT", "EXPIRING", "OVERDUE", "MISSING"]
+// (excludes NOT_APPLICABLE — throws if called with it)
+```
+
+**What it navigates to:** The compliance view (`/compliance`) with the `initialFilter` prop set to the status. The `ComplianceView` component accepts `initialFilter?: string | null` and uses it as the initial `useState` value for the matrix status filter.
+
+**Page.tsx integration:** `page.tsx` now imports `navigateToComplianceFilter` and uses it in a shared `handleFilterCompliance(status)` function (replaces the two inline arrow functions that were duplicated in the `case "dashboard"` and `default` branches).
+
+### Acceptance criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| Quartet appears only in KPI band | `getTileStatuses()` at line 259 (KPI band only); `counts![status]` at line 263 (KPI band only); no tiles card, no legend list |
+| Status-filter helper with passing test | `src/lib/dashboard/status-filter.ts` + 8 tests in `dashboard-status-filter.test.ts` |
+| Zero orphaned references | "Compliance Status Distribution" only in comment (line 278); "Click a tile" = 0; "grid grid-cols-2 gap-2 text-sm" = 0; no test references to deleted elements |
+| Suite green | 13 files, 168 tests, all passed. No tests deleted or skipped. |
+| Build/lint/tests pass | `tsc --noEmit` clean; `vitest run` all green |
