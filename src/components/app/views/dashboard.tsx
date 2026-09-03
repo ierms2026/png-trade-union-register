@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
 import { STATUS_CONFIG, getTileStatuses, type ComplianceStatus } from "@/lib/dashboard/status-config";
 import { type ComplianceCounts } from "@/lib/dashboard/metrics";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -35,6 +36,11 @@ interface StatsResponse {
     missing: number;
     notApplicable: number;
     overallRate: number;
+    rate: {
+      numerator: number;
+      denominator: number;
+      percentage: number;
+    };
   };
 }
 
@@ -348,26 +354,40 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
               <CardDescription>Live compliance status across all unions.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-md bg-muted/50 p-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Overall Compliance Rate</p>
-                  <p className="text-3xl font-bold">{stats.compliance.overallRate}%</p>
-                </div>
-                <div className="relative h-16 w-16">
-                  <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
-                    <circle
-                      cx="18" cy="18" r="16"
-                      fill="none" stroke="currentColor" strokeWidth="4"
-                      className="text-muted"
-                    />
-                    <circle
-                      cx="18" cy="18" r="16"
-                      fill="none" stroke="currentColor" strokeWidth="4"
-                      strokeDasharray={`${stats.compliance.overallRate} 100`}
-                      className="text-primary transition-all"
-                    />
-                  </svg>
-                </div>
+              <div className="rounded-md bg-muted/50 p-4">
+                <p className="text-sm text-muted-foreground">Overall Compliance Rate</p>
+                {stats.compliance.rate.denominator === 0 ? (
+                  <p className="mt-1 text-xl font-bold text-muted-foreground">No requirements configured</p>
+                ) : (
+                  <>
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded text-left"
+                            aria-label={`${stats.compliance.rate.numerator} of ${stats.compliance.rate.denominator} required documents compliant. ${stats.compliance.rate.percentage} percent.`}
+                          >
+                            <p className="text-xl font-bold">
+                              {stats.compliance.rate.numerator} of {stats.compliance.rate.denominator} required ({stats.compliance.rate.percentage}%)
+                            </p>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="max-w-xs text-xs">
+                            Percentage of required documents currently compliant. Required = registered unions × required document types.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-2 rounded-full bg-primary transition-all"
+                        style={{ width: `${stats.compliance.rate.percentage}%` }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 {getTileStatuses().map((status) => (

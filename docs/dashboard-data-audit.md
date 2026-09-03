@@ -285,3 +285,66 @@ The test passes today because the existing components use CSS variables (`var(--
 ### Guard test status
 
 The guard test (`dashboard-status-guard.test.ts`) still passes — no hardcoded hex codes or status Tailwind classes were introduced. The label-enforcement scan (checking for hardcoded "Compliant"/"Expiring"/"Overdue"/"Missing" strings) is still a TODO — the component now reads labels from `STATUS_CONFIG[status].label`, so the hardcoded strings are gone, but enabling the scan is chunk 1.2 or 1.3's call (to avoid false positives during transition).
+
+---
+
+## Appendix — Chunk 1.2 Handoff (compliance rate with explicit denominator)
+
+### New rate card content
+
+**Before (chunk 1.1):** `{stats.compliance.overallRate}%` (bare percentage, e.g. "22%") + SVG donut gauge
+
+**After (chunk 1.2):** `{numerator} of {denominator} required ({percentage}%)` (e.g. "17 of 78 required (22%)") + horizontal progress bar
+
+The rate display reads exclusively from `stats.compliance.rate.{numerator,denominator,percentage}` — the canonical `ComplianceRate` shape from the metrics module. No percentage computation in the component (grep confirmed: 0 `Math.round`, 0 division/arithmetic with compliance fields).
+
+### API route change
+
+`src/app/api/dashboard/stats/route.ts` now returns `compliance.rate: { numerator, denominator, percentage }` alongside the existing `overallRate` field. The `overallRate` field is kept for backward compatibility but is NOT used by the dashboard component.
+
+### Progress bar
+
+- Horizontal bar: `h-2 w-full rounded-full bg-muted` (track) + `bg-primary transition-all` (fill)
+- Fill width = `stats.compliance.rate.percentage` (0–100%)
+- Uses `bg-primary` (neutral/primary token), NOT a status color — per the chunk spec: "The rate is a derived mix, and coloring it green overstates health."
+
+### Tooltip
+
+- Uses shadcn `Tooltip` / `TooltipTrigger` / `TooltipContent` / `TooltipProvider` (Radix-based)
+- Trigger is a `<button type="button">` — natively focusable (keyboard-accessible, not hover-only)
+- `TooltipProvider delayDuration={0}` — shows immediately on focus
+- Tooltip content: "Percentage of required documents currently compliant. Required = registered unions × required document types."
+- `aria-label` on the button: "17 of 78 required documents compliant. 22 percent." — screen readers get the full reading in one pass
+
+### Edge cases handled
+
+| Case | Display | Progress bar |
+|------|---------|-------------|
+| Zero denominator (`denominator === 0`) | "No requirements configured" | Not rendered |
+| 0% (`numerator === 0`, `denominator > 0`) | "0 of 78 required (0%)" | Empty bar (width: 0%) |
+| 100% (`numerator === denominator`) | "78 of 78 required (100%)" | Full bar (width: 100%) |
+| Normal (e.g. 17/78) | "17 of 78 required (22%)" | Partial bar (width: 22%) |
+
+No NaN or Infinity in any case — `computeComplianceRate()` handles `denominator === 0` by returning `percentage: 0`.
+
+### Mutation test extension
+
+`src/lib/__tests__/dashboard-mutation.test.ts` grew from 5 → 12 tests:
+- 5 existing 1.1 tests (unchanged)
+- 3 rate-specific tests (baseline 17/78→22%, MISSING→COMPLIANT mutation, progress bar 0–100 bounds)
+- 4 edge case tests (zero denominator, 0%, 100%, explicit NaN/Infinity check)
+
+All tests derive expected values independently from the fixture (using `countByStatus()` + `expectedRate()` helper), not by calling the selector under test.
+
+### What remains in the Compliance Summary card for 1.3 to delete
+
+The Compliance Summary card (lines 344–400 of dashboard.tsx) now contains:
+1. **Rate display** (lines 357–391) — the rate text + progress bar + tooltip — 1.2's work, stays
+2. **Legend list** (lines 392–400) — the 4-row grid with status dots + labels + counts — 1.1 wired it to `STATUS_CONFIG`, 1.3 should delete it
+
+Chunk 1.3 ("deletes the 4 tiles card" — the Compliance Status Distribution) may also want to remove the legend list from this card since the tiles are being removed. The rate display should remain.
+
+### What chunk 1.3 must know
+
+- The Compliance Status Distribution tiles card (lines 270–310 of dashboard.tsx) is the one to delete — it's the 4-tile clickable grid, NOT the Compliance Summary card.
+- The Compliance Summary card's legend list (lines 392–400) is a separate concern. If 1.3 only deletes the tiles card, the legend list can stay. If 1.3 also removes the legend, the rate display (lines 357–391) must stay — it's the primary compliance indicator.
