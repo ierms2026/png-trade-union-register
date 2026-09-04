@@ -12,6 +12,7 @@ import { type LucideIcon } from "lucide-react";
 import { STATUS_CONFIG, getTileStatuses, COMPLIANCE_STATUSES, EXPIRING_WINDOW_DAYS, FORECAST_BUCKETS, type ComplianceStatus } from "@/lib/dashboard/status-config";
 import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP, getUnionDocMatrix, type UnionDocMatrix, type ComplianceCell, type UnionSummary, getExpiryForecast, type ExpiryForecast, type ForecastBucket } from "@/lib/dashboard/metrics";
 import { formatDueDate, formatAbsolute } from "@/lib/dashboard/date-utils";
+import { complianceFilterUrl, complianceUnfilteredUrl, unionsListUrl } from "@/lib/dashboard/dashboard-links";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 
@@ -70,11 +71,15 @@ interface StatCardProps {
   value: number;
   icon: LucideIcon;
   color: string;
+  /** Optional href for drill-through. When provided, the card becomes a clickable link. */
+  href?: string;
+  /** Accessible name for the link, e.g. "Missing: 57 documents — view filtered list". */
+  ariaLabel?: string;
 }
 
-function StatCard({ label, value, icon: Icon, color }: StatCardProps) {
-  return (
-    <Card>
+function StatCard({ label, value, icon: Icon, color, href, ariaLabel }: StatCardProps) {
+  const cardContent = (
+    <Card className={href ? "cursor-pointer transition-all hover:shadow-md hover:border-accent focus-within:ring-2 focus-within:ring-ring" : ""}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardDescription className="text-xs">{label}</CardDescription>
@@ -88,6 +93,19 @@ function StatCard({ label, value, icon: Icon, color }: StatCardProps) {
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        aria-label={ariaLabel}
+        className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {cardContent}
+      </a>
+    );
+  }
+  return cardContent;
 }
 
 interface LollipopDatum {
@@ -853,8 +871,22 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
         <ErrorState description={statsError} onRetry={refetchStats} />
       ) : stats ? (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <StatCard label="Total Unions" value={stats.totalUnions} icon={Building2} color="bg-primary/10 text-primary" />
-          <StatCard label="Documents" value={stats.activeCount} icon={FileText} color="bg-primary/10 text-primary" />
+          <StatCard
+            label="Total Unions"
+            value={stats.totalUnions}
+            icon={Building2}
+            color="bg-primary/10 text-primary"
+            href={unionsListUrl()}
+            ariaLabel={`Total Unions: ${stats.totalUnions} — view unions list`}
+          />
+          <StatCard
+            label="Documents"
+            value={stats.activeCount}
+            icon={FileText}
+            color="bg-primary/10 text-primary"
+            href={complianceUnfilteredUrl()}
+            ariaLabel={`Documents: ${stats.activeCount} — view compliance overview`}
+          />
           {getTileStatuses().map((status) => (
             <StatCard
               key={status}
@@ -867,6 +899,8 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
                 status === "OVERDUE" ? "bg-destructive/10 text-destructive" :
                 "bg-muted text-muted-foreground"
               }
+              href={complianceFilterUrl(status)}
+              ariaLabel={`${STATUS_CONFIG[status].label}: ${counts![status]} documents — view filtered list`}
             />
           ))}
         </div>

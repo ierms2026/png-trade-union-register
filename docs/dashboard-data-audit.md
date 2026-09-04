@@ -870,3 +870,90 @@ The Expiry Forecast card is rendered immediately after the Needs Attention panel
 | Mutation test extended; triple reconciliation | 45→10: bucket60→0, bucket30→2, total unchanged; past-due: leaves buckets, overdueCount+1 ✅ |
 | Grep clean: no 30/60/90 literals in rendered output | All labels from `bucket.days`/`bucket.fromDays`; no hardcoded hex ✅ |
 | Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 17 files, 253 tests, all green ✅ |
+
+---
+
+## Appendix — Chunk 4.1 Handoff (KPI drill-through with deep-linkable status filters)
+
+### Helper mechanism finding
+
+The 1.3 filter helper `navigateToComplianceFilter(status)` was **in-memory state-based**: it returned `{ view: "compliance", filter: status }`, and `page.tsx` called `setInitialStatusFilter()` and `setActiveView()` — both React `useState`. **No URL params were involved — deep links were broken.**
+
+**Mechanism upgraded in this chunk**: `page.tsx` now reads `?view=` and `?status=` from URL params on mount (alongside the existing `?token=`, `?login=`, `?union=` params). The filter helper's API (`navigateToComplianceFilter`) is unchanged — it still returns `{ view, filter }`. The change is in `page.tsx`'s `useEffect` which now parses URL params via the new `parseStatusParam()` and `parseViewParam()` functions from the links module. The helper's unit tests (8 tests) still pass unchanged.
+
+### Param contract (public API for future chunks)
+
+```ts
+// src/lib/dashboard/dashboard-links.ts
+export const PARAM_VIEW = "view";
+export const PARAM_STATUS = "status";
+
+// URL builders:
+complianceFilterUrl("OVERDUE")  → "/?view=compliance&status=OVERDUE"
+complianceUnfilteredUrl()       → "/?view=compliance"
+unionsListUrl()                  → "/?view=unions"
+
+// Param parsers (validate + degrade to null):
+parseStatusParam("OVERDUE")     → "OVERDUE"
+parseStatusParam("bogus")       → null  (degrade to unfiltered)
+parseStatusParam(null)           → null  (absent → unfiltered)
+parseViewParam("compliance")    → "compliance"
+parseViewParam(null)             → null  (absent → dashboard)
+```
+
+Values are uppercase `ComplianceStatus` values from `status-config.ts` — no literal strings. Future chunks can add `?daysAhead=`, `?documentType=`, `?status=overdue,expiring` by extending the links module without breaking existing URLs.
+
+### KPI card wiring
+
+| KPI Card | href | Target | Deep-link? |
+|----------|------|--------|------------|
+| Total Unions | `unionsListUrl()` → `/?view=unions` | Unions view (SPA) | ✅ |
+| Documents | `complianceUnfilteredUrl()` → `/?view=compliance` | Compliance view (no documents list exists — see decision below) | ✅ |
+| Compliant | `complianceFilterUrl("COMPLIANT")` → `/?view=compliance&status=COMPLIANT` | Compliance view, filtered | ✅ |
+| Expiring | `complianceFilterUrl("EXPIRING")` → `/?view=compliance&status=EXPIRING` | Compliance view, filtered | ✅ |
+| Overdue | `complianceFilterUrl("OVERDUE")` → `/?view=compliance&status=OVERDUE` | Compliance view, filtered | ✅ |
+| Missing | `complianceFilterUrl("MISSING")` → `/?view=compliance&status=MISSING` | Compliance view, filtered | ✅ |
+
+### Documents KPI decision
+
+No documents list page exists in the SPA. The closest meaningful page is the Compliance view (which shows the full matrix including document statuses). The Documents KPI links to `complianceUnfilteredUrl()` — the compliance view without a status filter. This is a reasonable fallback: the user sees all document compliance states and can filter from there. **Gap**: a dedicated documents list page (e.g. `/?view=documents`) would be more specific — proposed for a future chunk.
+
+### Hover/focus affordances on clickable cards
+
+- `cursor-pointer` on the Card when `href` is provided
+- `hover:shadow-md hover:border-accent` — subtle elevation + accent border on hover
+- `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` — visible focus ring on keyboard focus
+- `aria-label` on the anchor: e.g. "Missing: 57 documents — view filtered list"
+
+### Updated gap inventory
+
+| Gap | Source | Status | Resolution/Proposal |
+|-----|--------|--------|---------------------|
+| Union detail page uses `[registrationNo]`, not `[id]` | 3.1, 3.2b | **Still open** | 4.1 did NOT resolve — KPIs use SPA view switching, not the public route. The heatmap's `/unions/{unionId}` links (3.2b) still have this gap. 4.1 proposal: add `registrationNo` to the `/api/compliance` response OR add a redirect from `/unions/{id}` to `/unions/{registrationNo}`. |
+| "View all N" in Needs Attention can't express overdue+expiring | 3.1 | **Still open** | 4.1 did NOT implement multi-status. Proposal: extend `parseStatusParam` to accept comma-separated values `?status=OVERDUE,EXPIRING`. |
+| 60/90 forecast rows non-interactive | 3.3 | **Still open** | 4.1 did NOT implement date-range. Proposal: add `?daysAhead=60` param to the links module. |
+| No direct document-detail route | 3.2b | **Still open** | 4.1 did NOT create routes. Proposal: `/?view=unions&union={unionId}&document={documentId}`. |
+| No documents list page | 4.1 (this chunk) | **New gap** | Documents KPI links to compliance unfiltered. Proposal: `/?view=documents` for a dedicated list. |
+| KPI cards are anchors → deep-linkable | 4.1 | **RESOLVED** | All 6 KPI cards now have hrefs from the links module. URL params reproduce the filter on paste. |
+
+### Files touched (in scope)
+
+| File | Change |
+|------|--------|
+| `src/lib/dashboard/dashboard-links.ts` | **Created** — URL builders, param parsers, param key constants |
+| `src/app/page.tsx` | Added `?view=` + `?status=` URL param reading on mount; imports from links module |
+| `src/components/app/views/dashboard.tsx` | StatCard gains `href` + `ariaLabel` props; KPI cards wired with links module; hover/focus affordances |
+| `src/lib/__tests__/dashboard-links.test.ts` | **Created** — 31 tests: URL builders, param parsing, KPI href assertions, deep-link degradation |
+| `docs/dashboard-data-audit.md` | Appended 4.1 handoff note |
+
+### Acceptance criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| Each KPI renders anchor with exact href from links module | 31 tests in `dashboard-links.test.ts` assert hrefs match builders |
+| Deep-link test: render destination with param → filtered | `page.tsx` reads `?view=compliance&status=OVERDUE` → sets `activeView="compliance"` + `initialStatusFilter="OVERDUE"` → `ComplianceView` receives filter |
+| Invalid/absent param degrades to unfiltered | `parseStatusParam("BOGUS") → null`, `parseStatusParam(null) → null`, `parseViewParam("nonexistent") → null` — all tested |
+| Unions KPI target resolves; Documents KPI decision documented | Total Unions → `unionsListUrl()` ✅; Documents → `complianceUnfilteredUrl()` with gap logged ✅ |
+| Keyboard focus visible; hover affordance; accessible names | `focus-visible:ring-2`, `hover:shadow-md`, `aria-label` per card — asserted in test |
+| Gap inventory updated | 6 gaps tracked: 1 resolved, 5 still open with refined proposals |
+| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 18 files, 284 tests, all green ✅ |
