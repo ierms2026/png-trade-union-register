@@ -43,6 +43,21 @@ export type ComplianceStatus =
 export const EXPIRING_WINDOW_DAYS = 90;
 
 /**
+ * Forecast buckets for the Expiry Forecast card (chunk 3.3).
+ * Each value is a day-count boundary: (0, 30], (30, 60], (60, 90].
+ *
+ * NOTE: buckets[0] (30) is NOT equal to EXPIRING_WINDOW_DAYS (90).
+ * The expiring window is 90 days (any doc due within 90 days is "Expiring").
+ * The forecast buckets subdivide that window into finer-grained urgency
+ * buckets (30/60/90). The config test asserts buckets[0] <= EXPIRING_WINDOW_DAYS
+ * (the first bucket is within the expiring window), not equality.
+ *
+ * If someone later splits the expiring window from the forecast granularity,
+ * the test forces a conscious decision.
+ */
+export const FORECAST_BUCKETS = [30, 60, 90] as const;
+
+/**
  * Sentinel value for rules that effectively never expire (one-time filings
  * like a Constitution). Set renewalYears to this in the seed to mark a rule
  * as "no renewal required." Matches calculator.ts:145.

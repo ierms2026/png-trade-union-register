@@ -370,6 +370,109 @@ export function getNeedsAttention(
 export const NEEDS_ATTENTION_CAP = 10;
 
 // =============================================================================
+// Expiry Forecast — forward-looking buckets of documents coming due.
+// =============================================================================
+
+/** A single forecast bucket: how many docs fall within this day-range. */
+export interface ForecastBucket {
+  /** Upper bound in days (inclusive). */
+  days: number;
+  /** Lower bound in days (exclusive). Always the previous bucket's `days`, or 0 for the first. */
+  fromDays: number;
+  /** How many documents fall in this bucket. */
+  count: number;
+  /** Document IDs in this bucket. */
+  documentIds: string[];
+}
+
+/** The complete expiry forecast: 3 buckets + overdue count. */
+export interface ExpiryForecast {
+  buckets: ForecastBucket[];
+  /** Documents that are already past due (excluded from buckets — the forecast is forward-looking only). */
+  overdueCount: number;
+  /** Total across all buckets + overdueCount. */
+  totalActionable: number;
+}
+
+/**
+ * Compute the expiry forecast from compliance cells.
+ *
+ * Buckets are exclusive: (0, bucket[0]], (bucket[0], bucket[1]], (bucket[1], bucket[2]].
+ * A doc due exactly 30 days from now is in bucket 0 (inclusive upper bound).
+ * A doc due exactly 31 days from now is in bucket 1.
+ *
+ * Exclusions:
+ *   - Overdue docs (past due): excluded from buckets, counted in overdueCount
+ *   - Docs with no due date: excluded entirely
+ *   - Missing docs: never have a due date, never appear
+ *   - Docs due > 90 days out: excluded from display (beyond the last bucket)
+ *
+ * @param cells  ComplianceCell[] from the matrix
+ * @param now    Injectable "now" — defaults to new Date()
+ * @param buckets  Day-count boundaries from FORECAST_BUCKETS. Defaults to [30, 60, 90].
+ * @returns ExpiryForecast with 3 buckets + overdueCount
+ */
+export function getExpiryForecast(
+  cells: ComplianceCell[],
+  now: Date = new Date(),
+  buckets: readonly number[] = [30, 60, 90],
+): ExpiryForecast {
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const nowMs = now.getTime();
+  const maxBucketDays = buckets[buckets.length - 1];
+
+  // Initialize buckets
+  const forecastBuckets: ForecastBucket[] = buckets.map((days, i) => ({
+    days,
+    fromDays: i === 0 ? 0 : buckets[i - 1],
+    count: 0,
+    documentIds: [],
+  }));
+
+  let overdueCount = 0;
+
+  for (const cell of cells) {
+    // Exclude: no due date
+    if (!cell.expiryDate) continue;
+    // Exclude: MISSING (no document on file)
+    if (cell.status === "MISSING" || cell.status === "NOT_APPLICABLE") continue;
+
+    const diffDays = (cell.expiryDate.getTime() - nowMs) / MS_PER_DAY;
+
+    if (diffDays < 0) {
+      // Overdue: past due — count separately, not in buckets
+      overdueCount++;
+      continue;
+    }
+
+    // Beyond the last bucket (> 90 days): excluded from display
+    if (diffDays > maxBucketDays) continue;
+
+    // Find which bucket this falls into
+    // Buckets are (fromDays, days] — inclusive upper bound
+    for (let i = 0; i < forecastBuckets.length; i++) {
+      const bucket = forecastBuckets[i];
+      if (diffDays <= bucket.days) {
+        bucket.count++;
+        if (cell.documentId) {
+          bucket.documentIds.push(cell.documentId);
+        }
+        break;
+      }
+    }
+  }
+
+  const totalActionable =
+    forecastBuckets.reduce((sum, b) => sum + b.count, 0) + overdueCount;
+
+  return {
+    buckets: forecastBuckets,
+    overdueCount,
+    totalActionable,
+  };
+}
+
+// =============================================================================
 // UnionDocMatrix — the union × document-type compliance matrix.
 //
 // Per chunk 0.1 audit: required doc types are IDENTICAL for every union

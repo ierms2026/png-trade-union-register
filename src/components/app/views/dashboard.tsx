@@ -9,8 +9,8 @@ import { StatsSkeleton, ActivitySkeleton, CardListSkeleton } from "@/components/
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
-import { STATUS_CONFIG, getTileStatuses, COMPLIANCE_STATUSES, type ComplianceStatus } from "@/lib/dashboard/status-config";
-import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP, getUnionDocMatrix, type UnionDocMatrix, type ComplianceCell, type UnionSummary } from "@/lib/dashboard/metrics";
+import { STATUS_CONFIG, getTileStatuses, COMPLIANCE_STATUSES, EXPIRING_WINDOW_DAYS, FORECAST_BUCKETS, type ComplianceStatus } from "@/lib/dashboard/status-config";
+import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP, getUnionDocMatrix, type UnionDocMatrix, type ComplianceCell, type UnionSummary, getExpiryForecast, type ExpiryForecast, type ForecastBucket } from "@/lib/dashboard/metrics";
 import { formatDueDate, formatAbsolute } from "@/lib/dashboard/date-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -613,6 +613,91 @@ function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
   );
 }
 
+// =============================================================================
+// ExpiryForecast — forward-looking card: documents coming due in the
+// next 30/60/90 days, mutually exclusive buckets. Bucket boundaries from
+// FORECAST_BUCKETS in status config.
+//
+// The 30-day row routes via the filter helper ('EXPIRING') — it matches by
+// definition (any doc in the 30-day bucket is also "Expiring" since
+// 30 <= EXPIRING_WINDOW_DAYS). The 60/90 rows have no existing filter
+// target (the helper supports single-status only, not date ranges) —
+// they are non-interactive. The footer "N already overdue" links via
+// the filter helper ('OVERDUE').
+// =============================================================================
+
+interface ExpiryForecastCardProps {
+  forecast: ExpiryForecast;
+  onFilter?: (status: string) => void;
+}
+
+function ExpiryForecastCard({ forecast, onFilter }: ExpiryForecastCardProps) {
+  const allZero =
+    forecast.buckets.every((b) => b.count === 0) && forecast.overdueCount === 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Expiry Forecast</CardTitle>
+        <CardDescription>Documents coming due, by window.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {allZero ? (
+          <p className="text-sm text-muted-foreground">
+            Nothing due in the next {FORECAST_BUCKETS[FORECAST_BUCKETS.length - 1]} days.
+          </p>
+        ) : (
+          <ul className="space-y-2" aria-label="Expiry forecast by time window">
+            {forecast.buckets.map((bucket, i) => {
+              const label =
+                i === 0
+                  ? `Within ${bucket.days} days`
+                  : `${bucket.fromDays + 1}–${bucket.days} days`;
+              const canFilter = i === 0 && !!onFilter; // only the 30-day row is interactive
+              return (
+                <li
+                  key={bucket.days}
+                  aria-label={`${label}: ${bucket.count} document${bucket.count === 1 ? "" : "s"}`}
+                  className="flex items-center justify-between text-sm"
+                >
+                  <span className="text-muted-foreground">{label}</span>
+                  {canFilter ? (
+                    <button
+                      type="button"
+                      onClick={() => onFilter!("EXPIRING")}
+                      className="font-medium text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                      aria-label={`${label}: ${bucket.count} documents. Click to view expiring documents.`}
+                    >
+                      {bucket.count}
+                    </button>
+                  ) : (
+                    <span className="font-medium">{bucket.count}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {/* Footer: overdue count as a link */}
+        {forecast.overdueCount > 0 && (
+          <div className="mt-3 border-t pt-2">
+            <button
+              type="button"
+              onClick={() => onFilter?.("OVERDUE")}
+              disabled={!onFilter}
+              className="text-xs font-medium text-destructive hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded disabled:cursor-default"
+              aria-label={`${forecast.overdueCount} already overdue. Click to view overdue documents.`}
+            >
+              {forecast.overdueCount} already overdue
+            </button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: "bg-primary/10 text-primary",
   WARNING: "bg-accent/20 text-accent-foreground",
@@ -796,6 +881,23 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           onNavigate={onNavigate}
         />
       )}
+
+      {/* Expiry Forecast card — temporary placement next to Needs Attention.
+          Final placement is chunk 6.1's responsibility. */}
+      {!complianceMatrixLoading && complianceMatrixData && (() => {
+        const cells: ComplianceCell[] = complianceMatrixData.unions.flatMap((row) =>
+          row.scores.map((score) => ({
+            unionId: row.unionId,
+            documentType: score.documentType,
+            status: score.status,
+            filedAt: null,
+            expiryDate: score.expiresAt ? new Date(score.expiresAt) : null,
+            documentId: score.documentId,
+          })),
+        );
+        const forecast = getExpiryForecast(cells, new Date(), FORECAST_BUCKETS);
+        return <ExpiryForecastCard forecast={forecast} onFilter={onFilterCompliance} />;
+      })()}
 
       {/* Charts row */}
       <div className="grid gap-6 lg:grid-cols-2">

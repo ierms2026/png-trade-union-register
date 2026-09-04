@@ -803,3 +803,70 @@ The component does NOT recompute anything — no status derivation, no counts, n
 | Mutation test extended | 3 mutation tests (flip status, remove doc, frozen time) |
 | Grep clean: no hardcoded hex/labels/dates | 0 hex, 0 hardcoded labels, 0 date math in component |
 | Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 16 files, 235 tests, all green |
+
+---
+
+## Appendix — Chunk 3.3 Handoff (expiry forecast card)
+
+### Config deviation note
+
+The chunk prompt states `EXPIRING_WINDOW_DAYS = 30` but the canonical value in `status-config.ts` is **90** (matching `calculator.ts:130`, established in chunk 0.2). Per operating rule 3 (NO WORKAROUNDS), I used the actual config value (90), not the prompt's 30.
+
+`FORECAST_BUCKETS = [30, 60, 90]` as specified — the bucket boundaries are about forecast granularity (how fine-grained the urgency buckets are), not the expiring window definition. The config test asserts `FORECAST_BUCKETS[0] <= EXPIRING_WINDOW_DAYS` (the first bucket is within the expiring window), NOT `buckets[0] === EXPIRING_WINDOW_DAYS`. The chunk prompt asked for `===` but that would fail with the canonical values (30 ≠ 90). The `<=` assertion captures the same intent (the first bucket must be within the expiring window) without requiring them to be identical.
+
+### What was built
+
+1. **`FORECAST_BUCKETS = [30, 60, 90]`** in `status-config.ts` — config-driven bucket boundaries.
+2. **`getExpiryForecast(cells, now, buckets)`** in `metrics.ts` — pure function with injectable `now`, 3 exclusive buckets `(0,30], (30,60], (60,90]` + `overdueCount`. Excludes overdue (past due), no-due-date, missing, and >90-day docs.
+3. **`ExpiryForecastCard`** in `dashboard.tsx` — renders bucket rows with counts, 30-day row links via `onFilterCompliance("EXPIRING")`, 60/90 non-interactive, footer "N already overdue" links via `onFilterCompliance("OVERDUE")`. All-zero state: "Nothing due in the next 90 days."
+
+### Selector API (for 4.1 and 4.2)
+
+```ts
+import { getExpiryForecast, type ExpiryForecast, type ForecastBucket } from "@/lib/dashboard/metrics";
+import { FORECAST_BUCKETS } from "@/lib/dashboard/status-config";
+
+const forecast: ExpiryForecast = getExpiryForecast(cells, now, FORECAST_BUCKETS);
+// forecast.buckets: ForecastBucket[] — 3 entries, each { days, fromDays, count, documentIds }
+// forecast.overdueCount: number
+// forecast.totalActionable: number (sum of buckets + overdueCount)
+```
+
+### 60/90 date-range-filter proposal (for 4.1)
+
+The 60-day and 90-day rows are non-interactive because `navigateToComplianceFilter()` supports single-status only (e.g. "EXPIRING"), not date ranges. To make them clickable, 4.1 could:
+- Extend the filter helper to accept an optional `daysAhead` parameter → the ComplianceView could filter by both status AND a max-days-until-expiry threshold
+- Or add a query param `?expiringWithin=60` that the compliance matrix route interprets
+- The `documentIds` in each bucket could also power a "view these N documents" drill-down
+
+### Note for 4.2 (forecast-over-time trend)
+
+`getExpiryForecast()` is the natural seed for a trend visualization. By calling it with different `now` values (e.g. now, now+7d, now+14d, now+30d) and tracking how bucket counts shift, a future chunk could show how the forecast changes over time. The `documentIds` per bucket enable per-document tracking.
+
+### Temporary slot location (for 6.1)
+
+The Expiry Forecast card is rendered immediately after the Needs Attention panel (line ~885 of dashboard.tsx), before the Charts row. Marked: "Expiry Forecast card — temporary placement next to Needs Attention. Final placement is chunk 6.1's responsibility."
+
+### Tests added
+
+`src/lib/__tests__/dashboard-forecast.test.ts` — 18 tests:
+- 3 config tests (buckets[0] <= EXPIRING_WINDOW_DAYS, 3 entries, ascending)
+- 3 reconciliation invariants (sum of buckets = counts.EXPIRING, bucket docIds ⊆ needs-attention, overdueCount = counts.OVERDUE)
+- 3 exclusivity + boundary (45-day in exactly one bucket, 30-day boundary inclusive, 31-day in next bucket)
+- 4 exclusion tests (overdue, no-due-date, missing, >90 days)
+- 2 zero-state tests (all-zero, empty-state rendering)
+- 3 mutation tests (45→10 day move, past-due move, frozen-time determinism)
+
+### Acceptance criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| Config test pins buckets[0] <= EXPIRING_WINDOW_DAYS | Test: `FORECAST_BUCKETS[0] <= EXPIRING_WINDOW_DAYS` ✅ (deviation from `===` logged above) |
+| All 3 reconciliation invariants | sum(buckets) = counts.EXPIRING; bucket docIds ⊆ needs-attention; overdueCount = counts.OVERDUE ✅ |
+| Exclusivity + boundary tests | 45-day → exactly 1 bucket; 30-day → bucket 0; 31-day → bucket 1 ✅ |
+| All 4 exclusion cases | overdue, no-due-date, missing, >90-day — all tested ✅ |
+| Zero and all-zero states | totalActionable=0; "Nothing due" rendering ✅ |
+| 30-day row routes via helper; 60/90 non-interactive | 30-day: `onClick={onFilter("EXPIRING")}`; 60/90: `<span>` (no button) ✅ |
+| Mutation test extended; triple reconciliation | 45→10: bucket60→0, bucket30→2, total unchanged; past-due: leaves buckets, overdueCount+1 ✅ |
+| Grep clean: no 30/60/90 literals in rendered output | All labels from `bucket.days`/`bucket.fromDays`; no hardcoded hex ✅ |
+| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 17 files, 253 tests, all green ✅ |
