@@ -1,5 +1,5 @@
 {
-  "backedUpAt": "2026-09-04T03:56:58.308Z",
+  "backedUpAt": "2026-09-04T04:19:54.702Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.19.0",
   "fileCount": 181,
@@ -65,12 +65,6 @@
       "mtime": "2026-08-19T03:49:52.000Z"
     },
     {
-      "path": "src/app/api/auth/sessions/[jti]/route.ts",
-      "checksum": "9e262b174f1a91abf861a7474572700c11c7a7e0f172450f541b7d9582b0d1d4",
-      "size": 3561,
-      "mtime": "2026-08-19T03:50:54.000Z"
-    },
-    {
       "path": "src/app/api/auth/sessions/route.ts",
       "checksum": "6b83fd98be8a98f6e202349c51e8d14f0547ad1281a17a4a343c65f9d40fadc0",
       "size": 2800,
@@ -99,12 +93,6 @@
       "checksum": "27eee98e26dac54839df819b7184783b04aca3b17317a86784bbf6476889180b",
       "size": 6514,
       "mtime": "2026-08-19T03:56:53.000Z"
-    },
-    {
-      "path": "src/app/api/compliance/rules/preview/route.ts",
-      "checksum": "8a3197711fcc885ec0d4b229bf568556192aadf7e394de7e716994f0fd86b4cb",
-      "size": 10565,
-      "mtime": "2026-08-19T03:56:54.000Z"
     },
     {
       "path": "src/app/api/compliance/rules/route.ts",
@@ -143,6 +131,12 @@
       "mtime": "2026-09-01T03:37:53.000Z"
     },
     {
+      "path": "src/app/api/dispositions/[documentId]/execute/route.ts",
+      "checksum": "f4886429c83edc6a7cf810212b594c16a9e9e6411fd1c28284fd0be02fec809d",
+      "size": 8664,
+      "mtime": "2026-09-01T03:38:30.000Z"
+    },
+    {
       "path": "src/app/api/dispositions/route.ts",
       "checksum": "dd6089b7e1af994443e88cd55a1da226c297f893861cc1362238c8ab21dce8e6",
       "size": 2302,
@@ -155,16 +149,10 @@
       "mtime": "2026-09-01T03:37:04.000Z"
     },
     {
-      "path": "src/app/api/legal-holds/[documentId]/place/route.ts",
-      "checksum": "fe20014af3184347f92baa01b723b5fc2f6af4319d29eba133e71737f22caa38",
-      "size": 3365,
-      "mtime": "2026-09-01T03:36:56.000Z"
-    },
-    {
-      "path": "src/app/api/legislation/route.ts",
-      "checksum": "838555ecb62975b8db9d9c8bd0b34189781410c99f9beaf389f89897a0f4339a",
-      "size": 2307,
-      "mtime": "2026-08-19T03:56:05.000Z"
+      "path": "src/app/api/notifications/[id]/read/route.ts",
+      "checksum": "7c564ce54ccb01edbdb19f491bd8638daa17dde08217dd3f16199e9493b91545",
+      "size": 2067,
+      "mtime": "2026-08-19T03:54:36.000Z"
     },
     {
       "path": "src/app/api/notifications/route.ts",
@@ -221,12 +209,6 @@
       "mtime": "2026-09-01T00:42:35.000Z"
     },
     {
-      "path": "src/app/api/reviews/[documentId]/reject/route.ts",
-      "checksum": "8e6d63f74eea7456c761f20e0177145f5e845aa503e1946440f2cc4ea0237371",
-      "size": 4544,
-      "mtime": "2026-09-01T00:42:47.000Z"
-    },
-    {
       "path": "src/app/api/reviews/route.ts",
       "checksum": "0e407fa46835735b5be11779689b584bdc52fa8118ddb421a385ba04c0aeeb7d",
       "size": 2788,
@@ -257,12 +239,6 @@
       "mtime": "2026-08-19T03:57:09.000Z"
     },
     {
-      "path": "src/app/api/security/unlock/route.ts",
-      "checksum": "21597cd246888223025f05a118f892dd0846b5e50598180bc593a8bb77c7b3a8",
-      "size": 6704,
-      "mtime": "2026-08-19T03:57:09.000Z"
-    },
-    {
       "path": "src/app/api/tasks/[id]/route.ts",
       "checksum": "013dbeee4a5b18be145f9fa4b876fed63fbc7f515462ea17fe4ec498ef1b59d8",
       "size": 8997,
@@ -287,10 +263,22 @@
       "mtime": "2026-09-02T01:49:26.000Z"
     },
     {
+      "path": "src/app/api/unions/[unionId]/documents/[documentId]/extract-text/route.ts",
+      "checksum": "7824a99c4dcbb098306a6b1b67c3738ea548abd55b6e80cc358e877e0f13938f",
+      "size": 3993,
+      "mtime": "2026-09-02T01:51:24.000Z"
+    },
+    {
       "path": "src/app/api/unions/[unionId]/documents/[documentId]/restore/route.ts",
       "checksum": "019774c9240c4dc3039f45c549b24b79aefa812fc128dae297344ee024e8e367",
       "size": 7433,
       "mtime": "2026-09-02T01:50:58.000Z"
+    },
+    {
+      "path": "src/app/api/unions/[unionId]/documents/[documentId]/versions/route.ts",
+      "checksum": "ad9ba139c69e9f47213cbaf8140f53aee150506439696f4834a692bd3cbf7254",
+      "size": 3259,
+      "mtime": "2026-09-02T01:08:10.000Z"
     },
     {
       "path": "src/app/api/unions/[unionId]/documents/route.ts",
@@ -363,6 +351,12 @@
       "checksum": "38df34f88ab184e25b5b702557e912cd4e3ec9dd1e34cf969c3dba86cc684174",
       "size": 12799,
       "mtime": "2026-09-02T01:44:57.000Z"
+    },
+    {
+      "path": "src/components/app/document-list.tsx",
+      "checksum": "679680cc0330fc7bb8a072ecebc65be160124165d275ed0dbc6e0f4cf5c6f3cc",
+      "size": 4295,
+      "mtime": "2026-08-26T02:09:53.000Z"
     },
     {
       "path": "src/components/app/document-preview-modal.tsx",
@@ -492,9 +486,9 @@
     },
     {
       "path": "src/components/app/views/dashboard.tsx",
-      "checksum": "e44bfedfe444d615085619a24f8268fc54d8824cf143476463095e562fc682be",
-      "size": 31506,
-      "mtime": "2026-09-04T03:29:09.053Z"
+      "checksum": "ec78fab88268f083e374853dab23337bf6eaad1f085c59bde9efe8d36da43da9",
+      "size": 39888,
+      "mtime": "2026-09-04T04:16:00.988Z"
     },
     {
       "path": "src/components/app/views/retention.tsx",
@@ -855,6 +849,12 @@
       "checksum": "c775b1d8b7dcd6e1ca58d0cae06cef0592c311da5d56e96a2bc61c5fabf6501c",
       "size": 2976,
       "mtime": "2026-09-04T03:32:18.438Z"
+    },
+    {
+      "path": "src/lib/__tests__/dashboard-heatmap.test.ts",
+      "checksum": "210e892f6df6dd3e191995ba15b3810e9c2c01481d2bcc16ea7b95bd2665f7f8",
+      "size": 12833,
+      "mtime": "2026-09-04T04:16:59.924Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-metrics.test.ts",
