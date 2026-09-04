@@ -716,3 +716,90 @@ All four invariants asserted and passing:
 | `src/lib/dashboard/metrics.ts` | Added `documentId?` to `ComplianceCell`; added `UnionDocMatrixCell`, `UnionDocMatrixRow`, `MatrixTotals`, `UnionDocMatrix` types; added `getUnionDocMatrix()` selector |
 | `src/lib/__tests__/dashboard-union-doc-matrix.test.ts` | **Created** — 16 tests: 7 reconciliation invariants, 5 edge cases, 4 mutation tests |
 | `docs/dashboard-data-audit.md` | Appended 3.2a handoff note |
+
+---
+
+## Appendix — Chunk 3.2b Handoff (compliance heatmap rendering)
+
+### What was built
+
+`ComplianceHeatmap` component (lines 475–614 of dashboard.tsx) renders a color-coded grid (unions × doc types) from the 3.2a selector. Features:
+- `role="grid"` with `aria-label="Compliance matrix"`
+- Sticky union-name column (`position: sticky; left: 0`)
+- Horizontal scroll when columns exceed card width
+- Color-coded cells from `STATUS_CONFIG[cell.status].colorToken`
+- Keyboard-accessible tooltips via shadcn `Tooltip` (shows on focus, not hover-only)
+- Tooltip content: union name, doc type, status label + definition from config, due date via `formatDueDate()`
+- MISSING cells show "No document on file." in tooltip
+- NOT_APPLICABLE cells render with hatched background + 30% opacity, non-interactive
+- Legend row: all 5 statuses (including zero-count NOT_APPLICABLE), labels only, no counts
+- Empty state: "No unions registered." when `matrix.rows.length === 0`
+- Subtitle: dynamic from matrix dimensions ("6 unions × 13 document types.")
+
+### Cell-link target map + route gaps (for 4.1)
+
+| Cell type | Link target | Route exists? | Gap |
+|-----------|------------|---------------|-----|
+| Cells with `documentId` (COMPLIANT, EXPIRING, OVERDUE) | `/unions/{unionId}` | ✅ (union detail page) | **No direct document-detail route** — user must find the doc on the union page. 4.1 could add `/unions/{unionId}/documents/{documentId}` or a filtered unions view. |
+| MISSING cells (`documentId` = null) | `/unions/{unionId}` | ✅ | Same — the fix for MISSING is "go to the union and upload." |
+| NOT_APPLICABLE cells | Non-interactive (no link) | N/A | Correctly non-interactive. |
+
+**Same route gap as 3.1**: The union detail page uses `[registrationNo]` in the URL, not `[id]`. The heatmap links to `/unions/{unionId}` (the Prisma ID), which may 404. 4.1 should resolve this (add `registrationNo` to the compliance matrix response, or add a redirect).
+
+### Keyboard pattern (reusable for any future grid)
+
+The grid uses `role="grid"` with `role="row"` and `role="gridcell"`. Cells have `tabIndex={-1}` (roving tabindex — only one cell is tabbable at a time). Arrow-key navigation is a natural extension: a small JS handler can move focus between cells using `data-row` and `data-col` attributes. The `focus-visible:ring-2` styling is already present.
+
+**For a future chunk that implements arrow-key navigation:**
+1. Add `onKeyDown` handler to the grid container
+2. Track the "active" cell (row, col) in state
+3. Arrow keys move the active cell; set the new cell's `tabIndex={0}` and focus it
+4. Enter/Space triggers the cell's link click
+
+This pattern is reusable for any grid the dashboard builds later.
+
+### Temporary slot location (for 6.1)
+
+The heatmap is rendered below the charts row (composition bar + required-vs-on-file meters) and above the compliance summary + recent activity row, at approximately line 834 of dashboard.tsx. Marked with a comment: "Compliance Matrix heatmap — temporary placement below the charts row. Final placement is chunk 6.1's responsibility."
+
+### Non-color-cue decision
+
+The grid relies on color alone to distinguish statuses at default zoom. This is a known accessibility concern for colorblind users. Mitigations in this chunk:
+- Each cell has a complete `aria-label` with status name (screen reader)
+- Tooltip shows status label + definition (keyboard users)
+- Legend includes labels for all statuses
+
+**For a future accessibility chunk:** Add text labels or icons inside cells when zoom level or screen size allows. The chunk spec said "No text inside cells at default size" — this is respected. 6.2 could revisit.
+
+### Data flow
+
+```
+/api/compliance (existing endpoint)
+  → useFetch in DashboardView
+  → map response to ComplianceCell[] (pure field mapping, no aggregation)
+  → getUnionDocMatrix(cells, unions, requiredTypes)
+  → <ComplianceHeatmap matrix={...} />
+```
+
+The component does NOT recompute anything — no status derivation, no counts, no date math. It renders the selector's output verbatim. Grep confirmed: 0 `Math.round`, 0 `getTime`, 0 `tallyComplianceCounts`, 0 `computeComplianceRate` in the component.
+
+### Tests added
+
+`src/lib/__tests__/dashboard-heatmap.test.ts` — 15 tests:
+- 12 rendering tests: all unions/types render, zero-on-file types show MISSING, colors from config, NOT_REQUIRED defensive, accessible names complete, MISSING tooltip, tooltip definitions from config, legend (5 statuses), empty state, dynamic subtitle, link targets, renderer-does-not-recompute
+- 3 mutation tests: flip status → cell changes, remove doc → cell becomes MISSING, frozen-time determinism
+
+### Acceptance criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| All fixture unions and types render including zero-on-file MISSING | 6 rows × 13 columns; Welfare Fund (0 on-file) → all 6 MISSING cells asserted |
+| NotRequired rendering verified | 0 NOT_APPLICABLE in fixture; defensive test asserts it never occurs |
+| Keyboard: roving tabindex, focus-visible | `tabIndex={-1}` on cells; `focus-visible:ring-2` styling; `role="gridcell"` |
+| Tooltips on focus (not hover-only) | `TooltipProvider delayDuration={0}`; `TooltipTrigger asChild` wrapping `<a>` (focusable) |
+| Links resolve to existing routes | All cells link to `/unions/{unionId}`; route gap flagged in handoff |
+| Legend: all 5 statuses, labels only | `COMPLIANCE_STATUSES.map()` — includes NOT_APPLICABLE; no counts rendered |
+| Responsive: sticky union column, horizontal scroll | `overflow-x-auto` + `sticky left-0` on union name |
+| Mutation test extended | 3 mutation tests (flip status, remove doc, frozen time) |
+| Grep clean: no hardcoded hex/labels/dates | 0 hex, 0 hardcoded labels, 0 date math in component |
+| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 16 files, 235 tests, all green |

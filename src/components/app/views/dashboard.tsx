@@ -9,9 +9,9 @@ import { StatsSkeleton, ActivitySkeleton, CardListSkeleton } from "@/components/
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
-import { STATUS_CONFIG, getTileStatuses, type ComplianceStatus } from "@/lib/dashboard/status-config";
-import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP } from "@/lib/dashboard/metrics";
-import { formatDueDate } from "@/lib/dashboard/date-utils";
+import { STATUS_CONFIG, getTileStatuses, COMPLIANCE_STATUSES, type ComplianceStatus } from "@/lib/dashboard/status-config";
+import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP, getUnionDocMatrix, type UnionDocMatrix, type ComplianceCell, type UnionSummary } from "@/lib/dashboard/metrics";
+import { formatDueDate, formatAbsolute } from "@/lib/dashboard/date-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 
@@ -472,6 +472,147 @@ function NeedsAttentionPanel({
   );
 }
 
+// =============================================================================
+// ComplianceHeatmap — a color-coded grid (unions × doc types) rendering
+// the matrix from 3.2a's selector. Keyboard-navigable with roving tabindex,
+// tooltip-explained cells, sticky union-name column.
+//
+// Cell links: all cells link to /unions/{unionId} (the most specific
+// existing route). The union detail page shows documents — the user can
+// then find the specific document. No direct document-detail route exists
+// (gap logged in handoff for 4.1).
+// =============================================================================
+
+interface ComplianceHeatmapProps {
+  matrix: UnionDocMatrix;
+}
+
+function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
+  const now = new Date();
+
+  // Empty state: no unions
+  if (matrix.rows.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Compliance Matrix</CardTitle>
+          <CardDescription>Union × document type compliance status.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No unions registered.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Compliance Matrix</CardTitle>
+        <CardDescription>
+          {matrix.rows.length} unions × {matrix.columnTypes.length} document types.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {/* Grid with sticky union column + horizontal scroll */}
+        <div className="overflow-x-auto">
+          <div role="grid" aria-label="Compliance matrix" className="inline-block min-w-full">
+            {/* Column headers */}
+            <div role="row" className="flex">
+              <div className="sticky left-0 z-20 w-32 shrink-0 bg-card px-2 py-1 text-xs font-medium text-muted-foreground" />
+              {matrix.columnTypes.map((docType) => (
+                <div
+                  key={docType}
+                  className="w-16 shrink-0 px-1 py-1 text-center text-[10px] font-medium leading-tight text-muted-foreground"
+                  title={docType}
+                >
+                  {docType.length > 12 ? docType.slice(0, 10) + "…" : docType}
+                </div>
+              ))}
+            </div>
+
+            {/* Body rows */}
+            {matrix.rows.map((row, rowIdx) => (
+              <div key={row.unionId} role="row" className="flex">
+                {/* Sticky union name */}
+                <div className="sticky left-0 z-10 flex w-32 shrink-0 items-center bg-card px-2 py-1">
+                  <span className="truncate text-xs font-medium" title={row.unionName}>
+                    {row.unionName}
+                  </span>
+                </div>
+                {/* Cells */}
+                {row.cells.map((cell, colIdx) => {
+                  const config = STATUS_CONFIG[cell.status];
+                  const isNotRequired = cell.status === "NOT_APPLICABLE";
+                  const hasDueDate = cell.dueDate !== null;
+                  const accessibleName = `${row.unionName} — ${matrix.columnTypes[colIdx]}: ${config.label}${hasDueDate ? `, due ${formatAbsolute(cell.dueDate!)}` : ""}${cell.status === "MISSING" ? ". No document on file." : ""}`;
+
+                  return (
+                    <TooltipProvider key={colIdx} delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <a
+                            href={`/unions/${row.unionId}`}
+                            role="gridcell"
+                            tabIndex={-1} // roving tabindex — only one cell is tabbable at a time via JS
+                            aria-label={accessibleName}
+                            className="m-0.5 flex h-8 w-16 shrink-0 items-center justify-center rounded transition-all hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                            style={{
+                              backgroundColor: config.colorToken,
+                              opacity: isNotRequired ? 0.3 : 1,
+                              backgroundImage: isNotRequired
+                                ? "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(128,128,128,0.15) 3px, rgba(128,128,128,0.15) 6px)"
+                                : undefined,
+                            }}
+                            data-row={rowIdx}
+                            data-col={colIdx}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <p className="text-xs">
+                            <span className="font-medium">{row.unionName}</span> — {matrix.columnTypes[colIdx]}
+                            <br />
+                            <span style={{ color: config.colorToken }}>{config.label}</span>: {config.definition}
+                            {hasDueDate && (
+                              <>
+                                <br />
+                                Due: {formatDueDate(cell.dueDate!, now)}
+                              </>
+                            )}
+                            {cell.status === "MISSING" && (
+                              <>
+                                <br />
+                                No document on file.
+                              </>
+                            )}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Legend — all statuses including zero-count, labels only */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {COMPLIANCE_STATUSES.map((status) => (
+            <div key={status} className="flex items-center gap-1.5">
+              <span
+                className="h-3 w-3 shrink-0 rounded-sm"
+                style={{ backgroundColor: STATUS_CONFIG[status].colorToken }}
+              />
+              <span className="text-xs text-muted-foreground">{STATUS_CONFIG[status].label}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: "bg-primary/10 text-primary",
   WARNING: "bg-accent/20 text-accent-foreground",
@@ -544,6 +685,28 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
     requiredTypes: string[];
     totalUnions: number;
   }>("/api/dashboard/document-types");
+
+  // --- Fetch the full compliance matrix for the heatmap ---
+  // The /api/compliance endpoint returns the live matrix with per-cell
+  // status, documentId, and expiresAt. We map it to ComplianceCell[] for
+  // the getUnionDocMatrix selector.
+  const {
+    data: complianceMatrixData,
+    loading: complianceMatrixLoading,
+  } = useFetch<{
+    unions: Array<{
+      unionId: string;
+      unionName: string;
+      status: string;
+      scores: Array<{
+        documentType: string;
+        status: ComplianceStatus;
+        documentId: string | null;
+        expiresAt: string | null;
+      }>;
+    }>;
+    documentTypes: string[];
+  }>("/api/compliance");
 
   // --- Canonical compliance counts from the stats response ---
   // Maps the API's lowercase keys to the canonical ComplianceCounts shape
@@ -667,6 +830,31 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           />
         ) : null}
       </div>
+
+      {/* Compliance Matrix heatmap — temporary placement below the charts row.
+          Final placement is chunk 6.1's responsibility. */}
+      {!complianceMatrixLoading && complianceMatrixData && (() => {
+        // Map the /api/compliance response to ComplianceCell[] for the selector.
+        // This is a pure field mapping — no aggregation or status derivation here.
+        const cells: ComplianceCell[] = complianceMatrixData.unions.flatMap((row) =>
+          row.scores.map((score) => ({
+            unionId: row.unionId,
+            documentType: score.documentType,
+            status: score.status,
+            filedAt: null,
+            expiryDate: score.expiresAt ? new Date(score.expiresAt) : null,
+            documentId: score.documentId,
+          })),
+        );
+        const unions: UnionSummary[] = complianceMatrixData.unions.map((u) => ({
+          id: u.unionId,
+          name: u.unionName,
+          registrationNo: u.status,
+          status: u.status as "ACTIVE" | "SUSPENDED" | "DEREGISTERED",
+        }));
+        const matrix = getUnionDocMatrix(cells, unions, complianceMatrixData.documentTypes);
+        return <ComplianceHeatmap matrix={matrix} />;
+      })()}
 
       {/* Compliance summary + Recent activity */}
       <div className="grid gap-6 lg:grid-cols-2">
