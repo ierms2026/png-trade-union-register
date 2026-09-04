@@ -295,3 +295,74 @@ export function getRequiredVsOnFileByType(
 export function sumOnFile(entries: RequiredVsOnFileEntry[]): number {
   return entries.reduce((sum, e) => sum + e.onFile, 0);
 }
+
+/**
+ * A single actionable compliance cell — overdue or expiring — with enough
+ * context for the Needs Attention panel to render a row.
+ */
+export interface NeedsAttentionEntry {
+  unionId: string;
+  unionName: string;
+  documentType: string;
+  status: ComplianceStatus;
+  /** When the document expires. Null if no version (shouldn't happen for OVERDUE/EXPIRING). */
+  expiryDate: Date | null;
+}
+
+/**
+ * Extract overdue + expiring cells from the compliance matrix, sorted for
+ * the Needs Attention panel.
+ *
+ * Sort order:
+ *   1. OVERDUE before EXPIRING (overdue is more urgent)
+ *   2. Within each group, by expiryDate ascending (most urgent first)
+ *   3. Ties broken by unionName ascending (deterministic)
+ *
+ * @param cells   ComplianceCell[] from the matrix
+ * @param unions  UnionSummary[] (for name lookup)
+ * @param now     Injectable "now" for testability — defaults to new Date()
+ * @returns Sorted NeedsAttentionEntry[] — only OVERDUE + EXPIRING cells
+ */
+export function getNeedsAttention(
+  cells: ComplianceCell[],
+  unions: UnionSummary[],
+  now: Date = new Date(),
+): NeedsAttentionEntry[] {
+  const unionNameById = new Map(unions.map((u) => [u.id, u.name]));
+
+  const entries: NeedsAttentionEntry[] = [];
+  for (const cell of cells) {
+    if (cell.status !== "OVERDUE" && cell.status !== "EXPIRING") continue;
+    if (!cell.expiryDate) continue;
+
+    entries.push({
+      unionId: cell.unionId,
+      unionName: unionNameById.get(cell.unionId) ?? "Unknown Union",
+      documentType: cell.documentType,
+      status: cell.status,
+      expiryDate: cell.expiryDate,
+    });
+  }
+
+  // Sort: OVERDUE first, then by expiryDate ASC, then by unionName ASC
+  entries.sort((a, b) => {
+    // OVERDUE (0) before EXPIRING (1)
+    const aPriority = a.status === "OVERDUE" ? 0 : 1;
+    const bPriority = b.status === "OVERDUE" ? 0 : 1;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+
+    // By expiryDate ascending (most urgent first)
+    if (a.expiryDate && b.expiryDate) {
+      const dateDiff = a.expiryDate.getTime() - b.expiryDate.getTime();
+      if (dateDiff !== 0) return dateDiff;
+    }
+
+    // Ties by unionName ascending
+    return a.unionName.localeCompare(b.unionName);
+  });
+
+  return entries;
+}
+
+/** Maximum number of rows to display in the Needs Attention panel. */
+export const NEEDS_ATTENTION_CAP = 10;

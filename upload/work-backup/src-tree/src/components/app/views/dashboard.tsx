@@ -10,8 +10,10 @@ import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
 import { STATUS_CONFIG, getTileStatuses, type ComplianceStatus } from "@/lib/dashboard/status-config";
-import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry } from "@/lib/dashboard/metrics";
+import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP } from "@/lib/dashboard/metrics";
+import { formatDueDate } from "@/lib/dashboard/date-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -25,6 +27,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 // fetch are separate, so a slow activity endpoint doesn't block the
 // stats from rendering.
 // =============================================================================
+
+interface NeedsAttentionItem {
+  unionId: string;
+  unionName: string;
+  documentType: string;
+  status: string;
+  expiryDate: string;
+}
 
 interface StatsResponse {
   totalUnions: number;
@@ -42,6 +52,7 @@ interface StatsResponse {
       percentage: number;
     };
   };
+  needsAttention: NeedsAttentionItem[];
 }
 
 interface ActivityEntry {
@@ -367,6 +378,100 @@ function RequiredVsOnFileMeters({
   );
 }
 
+// =============================================================================
+// NeedsAttentionPanel — "what needs action today": every Overdue and
+// Expiring document, most urgent first, with direct links.
+//
+// Data comes from stats.needsAttention (extracted from the compliance
+// matrix by the stats API route). The selector getNeedsAttention() lives
+// in the metrics module; the API route uses it to sort. The component
+// receives pre-sorted data and only renders.
+//
+// Rows are NOT interactive in this chunk beyond the link — drill-through
+// filtering is deferred to 4.1.
+// =============================================================================
+
+function NeedsAttentionPanel({
+  items,
+  total,
+  onNavigate,
+}: {
+  items: NeedsAttentionItem[];
+  total: number;
+  onNavigate?: (view: string) => void;
+}) {
+  const now = new Date();
+  const visibleItems = items.slice(0, NEEDS_ATTENTION_CAP);
+  const hasMore = total > NEEDS_ATTENTION_CAP;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Needs Attention</CardTitle>
+        <CardDescription>Overdue and expiring documents across all unions.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {total === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nothing needs attention — all required documents are compliant or not yet due.
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-2" aria-label="Documents needing attention">
+              {visibleItems.map((item, index) => {
+                const statusKey = item.status as ComplianceStatus;
+                const config = STATUS_CONFIG[statusKey];
+                const Icon = config.icon;
+                const expiryDate = new Date(item.expiryDate);
+                return (
+                  <li
+                    key={`${item.unionId}-${item.documentType}-${index}`}
+                    className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon
+                        className="h-4 w-4 shrink-0"
+                        style={{ color: config.colorToken }}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{item.documentType}</p>
+                        <p className="truncate text-xs text-muted-foreground">{item.unionName}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {formatDueDate(expiryDate, now)}
+                      </span>
+                      <a
+                        href={`/unions/${item.unionId}`}
+                        className="text-xs font-medium text-primary hover:underline"
+                        aria-label={`View ${item.documentType} for ${item.unionName}`}
+                      >
+                        View
+                      </a>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {hasMore && (
+              <div className="mt-3 border-t pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.("compliance")}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  View all {total}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: "bg-primary/10 text-primary",
   WARNING: "bg-accent/20 text-accent-foreground",
@@ -518,6 +623,16 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           ))}
         </div>
       ) : null}
+
+      {/* Needs Attention panel — temporary placement below KPI band.
+          Final placement is chunk 6.1's responsibility. */}
+      {stats && (
+        <NeedsAttentionPanel
+          items={stats.needsAttention || []}
+          total={stats.needsAttention?.length || 0}
+          onNavigate={onNavigate}
+        />
+      )}
 
       {/* Charts row */}
       <div className="grid gap-6 lg:grid-cols-2">
