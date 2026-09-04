@@ -31,6 +31,10 @@ export async function resetDb(): Promise<void> {
   await testDb.user.deleteMany();
   await testDb.union.deleteMany();
   await testDb.complianceRule.deleteMany();
+  // chunk 4.2a: ComplianceSnapshot table is wiped between tests so each
+  // snapshot test starts from a known empty state (no carryover from the
+  // previous test's seed fixture).
+  await testDb.complianceSnapshot.deleteMany();
 }
 
 afterAll(async () => { await testDb.$disconnect(); });

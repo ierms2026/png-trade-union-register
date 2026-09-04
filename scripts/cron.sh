@@ -2,9 +2,15 @@
 # =============================================================================
 # cron.sh — cron invocation guide for the Union Records Management System.
 #
-# Schedules the two automated sweep endpoints:
-#   1. POST /api/cron/compliance-sweep — daily at 8:00 AM
-#   2. POST /api/cron/audit-retention-sweep — weekly (Sunday 2:00 AM)
+# Schedules the three automated sweep/snapshot endpoints:
+#   1. POST /api/cron/compliance-snapshot — daily at 7:55 AM (chunk 4.2a)
+#   2. POST /api/cron/compliance-sweep    — daily at 8:00 AM
+#   3. POST /api/cron/audit-retention-sweep — weekly (Sunday 2:00 AM)
+#
+# The snapshot fires 5 minutes BEFORE the sweep so it captures the
+# pre-notification state. The sweep only generates notifications — it
+# doesn't mutate compliance statuses — so the snapshot's counts are
+# identical regardless of order; the 5-minute gap is purely cosmetic.
 #
 # PREREQUISITES:
 #   1. Set CRON_SECRET in .env: openssl rand -hex 32
@@ -12,10 +18,11 @@
 #   3. The app must be running and reachable from the cron host.
 #
 # USAGE:
-#   ./scripts/cron.sh compliance    — run the compliance sweep now
-#   ./scripts/cron.sh audit         — run the audit retention sweep now
-#   ./scripts/cron.sh crontab       — print the crontab lines to install
-#   ./scripts/cron.sh help          — print this help
+#   ./scripts/cron.sh snapshot    — capture today's compliance snapshot now
+#   ./scripts/cron.sh compliance — run the compliance sweep now
+#   ./scripts/cron.sh audit       — run the audit retention sweep now
+#   ./scripts/cron.sh crontab     — print the crontab lines to install
+#   ./scripts/cron.sh help        — print this help
 # =============================================================================
 
 set -euo pipefail
@@ -23,7 +30,7 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 SECRET_FILE="${SECRET_FILE:-$HOME/.urm-cron-secret}"
 
-print_help() { sed -n '2,30p' "$0"; }
+print_help() { sed -n '2,26p' "$0"; }
 
 print_crontab() {
   cat << EOF
@@ -35,6 +42,10 @@ print_crontab() {
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 BASE_URL=$BASE_URL
 
+# --- Compliance snapshot: daily at 7:55 AM (chunk 4.2a) ---
+# Captures the canonical compliance counts as a daily history row.
+55 7 * * * $0 snapshot >> /var/log/urm-compliance-snapshot.log 2>&1
+
 # --- Compliance sweep: daily at 8:00 AM ---
 0 8 * * * $0 compliance >> /var/log/urm-compliance-sweep.log 2>&1
 
@@ -43,7 +54,7 @@ BASE_URL=$BASE_URL
 
 # =============================================================================
 # LOG ROTATION (recommended):
-# /var/log/urm-compliance-sweep.log /var/log/urm-audit-sweep.log {
+# /var/log/urm-compliance-snapshot.log /var/log/urm-compliance-sweep.log /var/log/urm-audit-sweep.log {
 #   weekly rotate 12 compress missingok notifempty create 640 root adm
 # }
 # =============================================================================
@@ -53,9 +64,10 @@ EOF
 case "${1:-help}" in
   crontab) print_crontab; exit 0 ;;
   help|--help|-h) print_help; exit 0 ;;
-  compliance|audit) : ;;
+  compliance|audit|snapshot) : ;;
   *)
-    echo "Usage: $0 {compliance|audit|crontab|help}" >&2
+    echo "Usage: $0 {snapshot|compliance|audit|crontab|help}" >&2
+    echo "  snapshot    — capture today's compliance snapshot now" >&2
     echo "  compliance  — run the compliance sweep now" >&2
     echo "  audit       — run the audit retention sweep now" >&2
     echo "  crontab     — print the crontab lines to install" >&2
@@ -87,6 +99,7 @@ run_sweep() {
 }
 
 case "${1:-}" in
+  snapshot) run_sweep "compliance-snapshot" ;;
   compliance) run_sweep "compliance-sweep" ;;
   audit) run_sweep "audit-retention-sweep" ;;
 esac

@@ -332,3 +332,54 @@ model DispositionRequest {
   cancelledBy     User?              @relation("DispositionCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
   @@index([documentId, status])
 }
+
+// =============================================================================
+// ComplianceSnapshot — chunk 4.2a: append-only daily history of the canonical
+// compliance counts. One row per UTC calendar date (UNIQUE on `date`).
+//
+// SEMANTICS:
+//   - Today's row is PROVISIONAL: re-triggering today overwrites it with
+//     current values (intra-day changes stay current).
+//   - Past rows are IMMUTABLE: any write attempt against a past date fails
+//     loudly (error) and leaves the row untouched — drift alarm.
+//   - Gaps are preserved: a day with no snapshot stays a gap forever (NO
+//     interpolation, NO synthetic seeds outside test fixtures).
+//
+// DERIVATION:
+//   All counts come from the SHARED canonical derivation:
+//     fetchMatrixData() -> buildComplianceMatrix(data, now) -> tally statuses
+//   The dashboard's `metrics.ts` `tallyComplianceCounts` operates on a
+//   different cell shape but with the SAME status field — the reconciliation
+//   test in `dashboard-snapshot.test.ts` proves end-to-end equality.
+//
+// DEFINITION STAMP:
+//   `capturedWith` records the live config at capture time (expiringWindowDays,
+//   requiredTypesCount). If the window or required types change later, old
+//   rows still say what they were measured under — chart discontinuities
+//   after a definition change are HONEST.
+//
+// Percentage is NOT stored — derivable from numerator/denominator (1.2 principle).
+// =============================================================================
+
+model ComplianceSnapshot {
+  id               String   @id @default(cuid())
+  // UTC calendar date (YYYY-MM-DD) — one row per day.
+  date             String   @unique
+  compliant        Int
+  expiring         Int
+  overdue          Int
+  missing          Int
+  // Compliance rate numerator (COMPLIANT count) and denominator (COMPLIANT
+  // + EXPIRING + OVERDUE + MISSING). NOT_APPLICABLE excluded from both.
+  rateNumerator    Int
+  rateDenominator  Int
+  // Live config at capture time — JSON object:
+  //   { expiringWindowDays: number, requiredTypesCount: number }
+  // Stored as TEXT (Prisma has no native JSON for SQLite); serialized/
+  // deserialized by the writer/selector. Allows old rows to honestly
+  // declare "I was measured under a 90-day window with 13 required types"
+  // even if those values change later.
+  capturedWith     String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

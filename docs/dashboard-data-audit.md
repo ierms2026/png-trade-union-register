@@ -957,3 +957,202 @@ No documents list page exists in the SPA. The closest meaningful page is the Com
 | Keyboard focus visible; hover affordance; accessible names | `focus-visible:ring-2`, `hover:shadow-md`, `aria-label` per card — asserted in test |
 | Gap inventory updated | 6 gaps tracked: 1 resolved, 5 still open with refined proposals |
 | Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 18 files, 284 tests, all green ✅ |
+---
+
+## Chunk 4.2a Handoff — Immutable Daily Compliance Snapshots & Trend Selector (data half)
+
+### Gate determination (with evidence)
+
+**GATE (b) fired.** No historical daily aggregate existed in the schema before this chunk (13 models audited: User, ApiKey, Session, LoginAttempt, AuditLog, ComplianceRule, Union, Document, DocumentVersion, Task, Notification, LegalHold, DispositionRequest — none stored per-day numbers). Cron infrastructure existed:
+
+- `src/app/api/cron/compliance-sweep/route.ts` — daily BJS-01 sweep (Bearer-token auth via `CRON_SECRET`, constant-time comparison)
+- `src/app/api/cron/audit-retention-sweep/route.ts` — weekly audit retention sweep
+- `scripts/cron.sh` — cron invocation guide (crontab entries + invocation wrapper)
+
+**Under gate (b)**: the snapshot writer is wired into a sibling cron route at `src/app/api/cron/compliance-snapshot/route.ts` (same Bearer-token auth pattern as `compliance-sweep`). Recommended scheduling: daily at 7:55 AM UTC, 5 minutes BEFORE the compliance-sweep (so the snapshot captures pre-notification state — though the sweep only writes notifications, it doesn't mutate compliance statuses, so the snapshot's counts are identical regardless of order; the 5-minute gap is purely cosmetic).
+
+### Shared-derivation check (with evidence)
+
+**Feasible.** Next.js monorepo — frontend and backend share the same `src/lib/` tree. No packaging boundary.
+
+The canonical derivation chain:
+- `calculateStatusFromRows()` — pure function in `src/lib/compliance/calculator.ts`. THE single source of truth for compliance status.
+- `buildComplianceMatrix(data, now)` — pure function in `src/lib/compliance/matrix.ts`. Calls `calculateStatusFromRows` for every (union × rule) pair.
+
+Both are already imported by:
+- `/api/dashboard/stats` route (server-side, line 4)
+- `/api/cron/compliance-sweep` route (server-side, line 5)
+- `/api/compliance` GET handler (the live matrix endpoint)
+
+The snapshot writer (`src/lib/dashboard/snapshot.ts`) calls the SAME `fetchMatrixData() → buildComplianceMatrix()` chain. The dashboard's `metrics.ts` `tallyComplianceCounts` operates on a different cell shape (`ComplianceCell` with `expiryDate: Date` vs `ComplianceScoreCell` with `expiresAt: string`) but with the SAME `status` field — both produced by the canonical derivation. **Zero duplicated derivation logic.**
+
+The reconciliation test in `dashboard-snapshot.test.ts` proves equality end-to-end:
+1. Compute the canonical matrix once (frozen now)
+2. Convert matrix scores → `ComplianceCell[]` (preserving `status` exactly)
+3. Build `DashboardMetrics` via `buildDashboardMetrics`
+4. Get counts via `getComplianceCounts(metrics)` (dashboard canonical selector)
+5. Snapshot uses `tallyMatrix(matrix)` (same matrix, same status field)
+6. Assert all 4 counts + numerator/denominator match ✅
+
+### Day-boundary decision
+
+**UTC.** The app's documented timezone convention is in `src/lib/auth/constants.ts` line 76: "BJS-01 daily sweep runs at this hour (UTC) every day". The existing cron route uses `Date.now()` throughout with no local-timezone conversion. We continue this convention: the snapshot's `date` field is the UTC calendar date (`YYYY-MM-DD`), computed via `getUTCFullYear/Month/Date` in `formatUtcDate()`. This explicitly avoids local-TZ shift (which would produce a different calendar date on hosts at UTC+12 vs UTC-10).
+
+### Point shape (4.2b's contract)
+
+```ts
+// src/lib/dashboard/snapshot.ts
+export interface ComplianceTrendPoint {
+  date: string;            // UTC YYYY-MM-DD — ascending in the returned array
+  compliant: number;
+  expiring: number;
+  overdue: number;
+  missing: number;
+  rateNumerator: number;   // = compliant count
+  rateDenominator: number; // = compliant + expiring + overdue + missing (excludes NOT_APPLICABLE)
+}
+```
+
+The `capturedWith` JSON stamp (config at capture time) is NOT included in the trend point — it's an internal column for "definition changed" annotations. 4.2b may expose a sibling selector `getCapturedWithHistory()` if it needs the stamp for chart discontinuity annotations. This keeps the trend point's shape minimal.
+
+```ts
+export interface SnapshotCapturedWith {
+  expiringWindowDays: number;   // EXPIRING_WINDOW_DAYS at capture time (90 today)
+  requiredTypesCount: number;   // number of required ComplianceRules at capture time (13 today)
+}
+```
+
+### Gap semantics
+
+**Gaps (missed days) are returned AS-IS.** No interpolation, no synthetic zero-days. A day with no snapshot stays a gap forever. The frontend chart renderer (4.2b) is responsible for visually handling gaps (e.g., dashed line connecting past the gap, or a "missing data" annotation).
+
+Evidence: `dashboard-snapshot.test.ts` has a deliberate-gap test that seeds 2026-06-13 and 2026-06-15 but NOT 2026-06-14, then asserts `trend.map(p => p.date) === ["2026-06-13", "2026-06-15"]` and `!trend.some(p => p.date === "2026-06-14")`.
+
+### hasSufficientHistory helper
+
+```ts
+// Returns true if the trend has enough points to render a meaningful chart.
+// A single point is a moment-in-time reading, not a trend. Two points are
+// the minimum to draw a line segment.
+hasSufficientHistory(points: ComplianceTrendPoint[], minPoints = 2): boolean
+```
+
+The chart component (4.2b) uses this to decide whether to render a chart or a "data collecting" placeholder. The placeholder is owned by 4.2b — this function only answers the yes/no question.
+
+### Selector API (for 4.2b)
+
+```ts
+import {
+  getComplianceTrend,
+  hasSufficientHistory,
+  type ComplianceTrendPoint,
+} from "@/lib/dashboard/snapshot";
+
+// In a React Server Component or client-side fetch:
+const trend: ComplianceTrendPoint[] = await getComplianceTrend(now);
+// trend is empty [] if no snapshots exist (new deployment, first run)
+// trend is ascending by date
+// Each point has the 7 keys listed above
+
+if (hasSufficientHistory(trend, 2)) {
+  // render chart
+} else {
+  // render "data collecting" placeholder (4.2b's responsibility)
+}
+```
+
+### Trigger mechanism
+
+**Gate (b) → scheduled daily job.** The trigger lives at `src/app/api/cron/compliance-snapshot/route.ts` (POST, Bearer-token auth via `CRON_SECRET`). To activate:
+
+1. Set `CRON_SECRET` in `.env` (`openssl rand -hex 32`)
+2. Install the crontab via `./scripts/cron.sh crontab`
+3. The snapshot fires daily at 7:55 AM UTC (5 minutes before the existing compliance-sweep)
+
+**Tradeoff (b vs c):** Gate (b) means snapshots only capture once per day, at the scheduled time — intra-day changes only reflect in the next day's snapshot if the trigger runs again, OR if an operator manually invokes `./scripts/cron.sh snapshot` to capture the current state. Under gate (c), `ensureSnapshotForToday()` would have been called from the dashboard's data-loading endpoint, capturing on every page load — much higher write rate, but always-fresh today's row. The gate (b) choice reflects that the project already has a daily-sweep pattern (BJS-01) and adding a snapshot to the same schedule is the consistent design.
+
+**Manual trigger today**: `./scripts/cron.sh snapshot` (with CRON_SECRET set). The endpoint is idempotent: re-invoking on the same UTC day overwrites today's row with current values.
+
+### Definition stamp
+
+`capturedWith` is a JSON column that records the live config at capture time:
+
+```json
+{"expiringWindowDays":90,"requiredTypesCount":13}
+```
+
+- `expiringWindowDays` comes from `EXPIRING_WINDOW_DAYS` in `src/lib/dashboard/status-config.ts` (90 today)
+- `requiredTypesCount` is `matrix.documentTypes.length` — the count of required `ComplianceRule`s the matrix was built against
+
+**If those values change later**, old rows still honestly declare what they were measured under. Chart discontinuities after a definition change are HONEST (and visible to the chart renderer via `parseCapturedWith()` if 4.2b wants to render "definition changed" annotations). This is the canonical anti-drift mechanism: a number is meaningless without knowing the definition it was measured under.
+
+### Tests added
+
+`src/lib/__tests__/dashboard-snapshot.test.ts` — 30 tests:
+
+| Group | Tests | What it covers |
+|---|---|---|
+| `formatUtcDate` | 3 | UTC day-boundary, no local-TZ shift, zero-padding |
+| `tallyMatrix` | 2 | Pure tally; rateNumerator/denominator invariants |
+| `capturedWith` | 4 | Build/round-trip/parse; assert against canonical config; defensive null on malformed |
+| Idempotency | 4 | Created; same-day two-trigger → one row; overwrite with latest; DB-level UNIQUE |
+| Past-day immutability | 3 | No `date` API; yesterday NOT overwritten by today's trigger; PastDayImmutabilityError exported |
+| Reconciliation vs `getComplianceCounts` | 2 | Snapshot === dashboard counts under frozen now; persisted row === dashboard counts |
+| Mutation test | 1 | Flip doc status → today reflects + yesterday byte-identical + two-triggers-one-row |
+| `getComplianceTrend` | 5 | Empty → []; ascending; gaps preserved (deliberate-gap test); point shape; round-trip |
+| `hasSufficientHistory` | 4 | Empty/single/2+/custom minPoints |
+| No interpolation/synthesis | 2 | Module exports no fabricator; selector returns DB rows only |
+
+### Acceptance criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| Gate determination documented with evidence | Gate (b) above + module header comment |
+| Idempotency tested: two triggers, same day, one row, latest values win | `two triggers on the same day → still ONE row (UNIQUE date enforced)` + `second trigger on the same day OVERWRITES today's row with latest values` + `UNIQUE constraint on date is enforced at the DB level` ✅ |
+| Past-day immutability tested: write attempt against past date fails loudly; row unchanged | `ensureSnapshotForToday has no API for writing a past date (no date param)` + `a row written yesterday is NOT overwritten by a trigger with a later now` (byte-identical assertion) ✅ |
+| Snapshot-vs-getComplianceCounts() reconciliation passes under frozen now | `snapshot counts === getComplianceCounts(buildDashboardMetrics(converted cells))` + `the persisted snapshot row's counts match getComplianceCounts() too` ✅ |
+| Definition stamp present and asserted against config | `buildCapturedWith returns the live config` + `stamp asserts against the canonical EXPIRING_WINDOW_DAYS config value` ✅ |
+| getComplianceTrend: ascending, gaps preserved, empty history → [] | `returns [] for empty history` + `returns stored points ascending by date` + `gaps are preserved — NO interpolation, NO synthetic zero-days (deliberate-gap test)` ✅ |
+| Mutation test passes (today mutable, yesterday frozen) | `flip one fixture document's status → today's row reflects the change AND yesterday's is byte-identical` ✅ |
+| Grep + test evidence of zero interpolation/synthesis | `grep -iE "(interpolat|backfill|synthesiz|...)" src/lib/dashboard/snapshot.ts` → only matches in comments explicitly forbidding these patterns + `the snapshot module exports no function that fabricates historical data` + `getComplianceTrend returns DB rows ONLY — no computed/synthesized entries` ✅ |
+| Build, lint, tests pass; suite stable (frozen time) | `tsc --noEmit` clean for all 4.2a-touched files; `vitest run` → 19 files, 314 tests, all green; FROZEN_NOW = `new Date("2026-06-15T12:00:00Z")` ✅ |
+
+### Files touched (in scope)
+
+| File | Change |
+|------|--------|
+| `prisma/schema.prisma` | **Added** `ComplianceSnapshot` model: one row per UTC date (UNIQUE), counts + numerator/denominator, `capturedWith` JSON stamp, `createdAt`/`updatedAt`. No percentage column (derivable per 1.2). |
+| `src/lib/dashboard/snapshot.ts` | **Created** — `ensureSnapshotForToday(now)`, `getComplianceTrend(now)`, `hasSufficientHistory()`, `tallyMatrix()`, `buildCapturedWith()`, `parseCapturedWith()`, `formatUtcDate()`, `PastDayImmutabilityError`. |
+| `src/app/api/cron/compliance-snapshot/route.ts` | **Created** — POST handler with Bearer-token auth (same pattern as compliance-sweep). Calls `ensureSnapshotForToday()`. |
+| `scripts/cron.sh` | Updated: added `snapshot` subcommand, crontab entry (`55 7 * * *` — 5 min before compliance-sweep), help text, log rotation list. |
+| `src/lib/__tests__/setup.ts` | Added `testDb.complianceSnapshot.deleteMany()` to `resetDb()` (so each test starts from a known empty snapshot state). |
+| `src/lib/__tests__/dashboard-snapshot.test.ts` | **Created** — 30 tests covering all "Done when" criteria. |
+| `docs/dashboard-data-audit.md` | Appended this 4.2a handoff note. |
+
+### Out-of-scope TODOs (recorded for future chunks)
+
+1. **Per-union breakdowns** — the snapshot currently stores only aggregate counts. A per-union snapshot would widen the schema (one row per union × date, or a JSON column with per-union counts). 4.2b may want this for "compliance-by-union over time" charts. **Not implemented in 4.2a** (scope guard: "Do not widen the snapshot schema").
+2. **Per-type counts** — same as above, but per document-type.
+3. **Retention policy** — old snapshots should eventually be pruned (e.g., keep daily for 90 days, then weekly summaries forever). Out of scope; **TODO**: add a `deleteOlderThan(days)` helper to the snapshot module, invoke it from the same cron route. The `audit-retention-sweep` pattern (sibling cron route) is the model.
+4. **Manual backfill** — if a deployment misses a day, the operator may want to insert a row for that date using a past state. **Currently impossible** by design (no `date` param on `ensureSnapshotForToday`). A future admin-only endpoint could accept an explicit `date` + counts payload — but this would defeat the "history is measured, never synthesized" guarantee, so it should require explicit data-upload semantics (not a recompute).
+
+### Updated gap inventory (additive — 4.2a did NOT modify any existing gaps)
+
+| Gap | Source | Status | Notes |
+|-----|--------|--------|-------|
+| Union detail page uses `[registrationNo]`, not `[id]` | 3.1, 3.2b | Still open | 4.2a did not touch — unrelated to trend data. |
+| "View all N" in Needs Attention can't express overdue+expiring | 3.1 | Still open | 4.2a did not touch — would need multi-status URL param. |
+| 60/90 forecast rows non-interactive | 3.3 | Still open | 4.2a did not touch — would need `?daysAhead=60` URL param. |
+| No direct document-detail route | 3.2b | Still open | 4.2a did not touch. |
+| No documents list page | 4.1 | Still open | 4.2a did not touch. |
+| **NEW**: Per-union / per-type trend breakdowns | 4.2a | New gap | Future chunk: widen schema or add JSON column. |
+| **NEW**: Snapshot retention policy | 4.2a | New gap | Future chunk: `deleteOlderThan(days)` helper + cron invocation. |
+
+### Next-chunk notes (4.2b — Trend UI)
+
+- **Selector contract**: `getComplianceTrend(now)` returns `ComplianceTrendPoint[]` ascending by date. Empty `[]` if no snapshots.
+- **Placeholder**: `hasSufficientHistory(trend, 2)` decides chart vs "data collecting" placeholder. The placeholder is 4.2b's responsibility — render when `trend.length < 2`.
+- **Gap handling**: gaps are real (no interpolation). 4.2b should render gaps visually (dashed line connecting past the gap, or "no data" annotation).
+- **Rate computation**: percentage is NOT stored. Compute it client-side from `rateNumerator / rateDenominator × 100` (rounded). 4.2b may want to render this as a sparkline or a "% over time" line.
+- **Definition stamp**: if 4.2b wants to render "definition changed at this date" annotations, call `parseCapturedWith(row.capturedWith)` (needs a sibling selector — currently the trend point drops `capturedWith` to keep the shape minimal).
+- **No UI in 4.2a**: the dashboard.tsx component has NOT been modified. 4.2b owns all rendering.
