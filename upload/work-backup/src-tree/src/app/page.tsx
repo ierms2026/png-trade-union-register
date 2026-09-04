@@ -20,6 +20,7 @@ import { SecurityView } from "@/components/app/views/security";
 import { ApiKeysView } from "@/components/app/views/api-keys";
 import { AccountSecurityView } from "@/components/app/views/account-security";
 import { navigateToComplianceFilter } from "@/lib/dashboard/status-filter";
+import { parseStatusParam, parseViewParam, PARAM_VIEW, PARAM_STATUS } from "@/lib/dashboard/dashboard-links";
 
 interface AuthUser {
   id: string;
@@ -61,10 +62,21 @@ export default function Home() {
         if (data.user) {
           setUser(data.user);
           setMode("auth");
+          // Read deep-link params for view + status filter (chunk 4.1)
+          const viewParam = parseViewParam(urlParams.get(PARAM_VIEW));
+          const statusParam = parseStatusParam(urlParams.get(PARAM_STATUS));
           const unionId = urlParams.get("union");
-          if (unionId) {
+          if (viewParam === "compliance") {
+            setActiveView("compliance");
+            if (statusParam) {
+              setInitialStatusFilter(statusParam);
+            }
+            window.history.replaceState({}, "", "/");
+          } else if (viewParam === "unions" || unionId) {
             setActiveView("unions");
-            setInitialUnionId(unionId);
+            if (unionId) {
+              setInitialUnionId(unionId);
+            }
             window.history.replaceState({}, "", "/");
           }
         } else {
