@@ -1,0 +1,959 @@
+     1→# Dashboard Data Audit — Chunk 0.1
+     2→
+     3→**Date:** 2026-09-02
+     4→**Scope:** Investigation only. No code changes. Fixes belong to chunk 1.1.
+     5→
+     6→## Summary of findings
+     7→
+     8→| Number | Where it appears | Source | Value |
+     9→|--------|------------------|--------|-------|
+    10→| 23 | "Documents" KPI stat card | `/api/dashboard/stats` → `db.document.count()` (no filter) | 23 |
+    11→| 21 | "Documents by Type" subtitle ("21 documents across 8 types") | `/api/dashboard/document-types` → `db.document.findMany({ where: { disposedAt: null } })` → `.length` | 21 |
+    12→| 78 | Sum of 4 compliance KPI tiles (Compliant 14 + Expiring 2 + Overdue 2 + Missing 57 = 75... see note)¹ | `/api/dashboard/stats` → `buildComplianceMatrix()` → cell tally | 78 |
+    13→
+    14→¹ The chunk prompt said "tiles sum to 78" but live DB query shows 17 + 2 + 2 + 57 = 78 (not 14 + 2 + 2 + 57 = 75). The "14" in the chunk prompt likely came from a prior session's data; the live value as of this audit is 17 compliant. The 78 sum itself is correct and explained below.
+    15→
+    16→---
+    17→
+    18→## Discrepancy #1: Documents KPI (23) vs Documents-by-Type subtitle (21)
+    19→
+    20→### Root cause: **different definitions, not a data bug**
+    21→
+    22→The two numbers use **different filter predicates** on the same `Document` table:
+    23→
+    24→| Endpoint | Query | Count |
+    25→|----------|-------|-------|
+    26→| `GET /api/dashboard/stats` (line 44) | `db.document.count({ where: {} })` — no filter | **23** |
+    27→| `GET /api/dashboard/document-types` (line 22) | `db.document.findMany({ where: { disposedAt: null } })` then `.length` | **21** |
+    28→
+    29→The 2-document gap = disposed documents. Verified via DB query:
+    30→
+    31→```
+    32→Total documents (stats route — no disposedAt filter):    23
+    33→Non-disposed documents (document-types route):           21
+    34→Disposed documents:                                       2
+    35→Discrepancy:                                              2  ← matches 23 - 21
+    36→```
+    37→
+    38→### Why this is confusing to users
+    39→
+    40→The dashboard shows **two different document counts simultaneously**:
+    41→- The "Documents" stat card (top row, KPI band) shows **23** — counts everything, including disposed docs
+    42→- The "Documents by Type" card subtitle shows **21** — counts only non-disposed docs
+    43→
+    44→A user looking at both at the same time sees "23 documents" in one place and "21 documents" in another and reasonably wonders which is correct. Neither is wrong — they answer different questions — but the dashboard gives no hint that the definitions differ.
+    45→
+    46→### Which definition is "correct"?
+    47→
+    48→That's a product decision for chunk 1.1. Two reasonable options:
+    49→- **Option A (consistency):** Both endpoints use the same filter. The KPI card is the more prominent surface, so likely it should match the document-types card and exclude disposed docs (a disposed doc is "gone from active views" per the codebase's own comment in `calculator.ts:252`).
+    50→- **Option B (clarity):** Keep both numbers but relabel them — "23 Documents (all)" vs "21 Active documents (non-disposed)" — so the distinction is explicit.
+    51→
+    52→Either way, the current state (same label "documents", two different counts, no explanation) is the bug.
+    53→
+    54→### Code locations (for chunk 1.1)
+    55→
+    56→- `src/app/api/dashboard/stats/route.ts:42-50` — the `db.document.count` call with no `where` filter (other than Officer scoping)
+    57→- `src/app/api/dashboard/document-types/route.ts:22-30` — the `db.document.findMany` with `where: { disposedAt: null }`
+    58→- `src/components/app/views/dashboard.tsx:251` — the StatCard showing `stats.totalDocuments` (23)
+    59→- `src/components/app/views/dashboard.tsx:323` — the subtitle showing `docTypesData?.total` (21)
+    60→
+    61→---
+    62→
+    63→## Discrepancy #2: Compliance tiles sum to 78
+    64→
+    65→### Root cause: **matrix dimensions, not a bug** — 6 unions × 13 required rules = 78 cells
+    66→
+    67→The 4 compliance tiles (Compliant / Expiring / Overdue / Missing) tally cells from the compliance matrix. The matrix has one cell per **(union × required compliance rule)** pair. Verified via DB query:
+    68→
+    69→```
+    70→Total unions:                       6
+    71→Total compliance rules:            13
+    72→Required rules (required: true):   13  ← all 13 rules are required
+    73→Matrix dimensions:                 6 × 13 = 78 cells
+    74→```
+    75→
+    76→The compliance matrix's cell tally (from `/api/dashboard/stats` → `buildComplianceMatrix`):
+    77→
+    78→```
+    79→COMPLIANT:      17
+    80→EXPIRING:        2
+    81→OVERDUE:         2
+    82→MISSING:        57
+    83→NOT_APPLICABLE:  0
+    84→───────────────────
+    85→Total cells:    78  ← matches 6 × 13
+    86→```
+    87→
+    88→Sum of the 4 tiles shown in the dashboard (excluding NOT_APPLICABLE which is 0 here): 17 + 2 + 2 + 57 = **78**. ✅
+    89→
+    90→### Why all 13 rules count toward the matrix (none are NOT_APPLICABLE)
+    91→
+    92→The `calculateStatus` function in `src/lib/compliance/calculator.ts:246-248` returns `NOT_APPLICABLE` only when `!rule.required`. Since all 13 rules in the seed have `required: true` (the default), every (union × rule) pair produces one of COMPLIANT / EXPIRING / OVERDUE / MISSING. There is no rule with `required: false` in the current config, so `NOT_APPLICABLE = 0`.
+    93→
+    94→This is **not a bug** — it's the intended design. The matrix is supposed to cover every (union × required-rule) pair. The sum 78 is correct and meaningful: it represents the total compliance burden across the registry (6 unions × 13 required filings each = 78 required filings).
+    95→
+    96→### Caveat: the chunk prompt's "14" vs the live "17"
+    97→
+    98→The chunk prompt says "Compliant (14, green)" but the live DB shows 17 compliant cells. This is a data drift, not a code bug — likely the prompt was written against an earlier session's data. The audit is against live data (2026-09-02 01:55 UTC backup), which has 17. Chunk 1.1 should not "fix" 17 → 14; the live data is authoritative.
+    99→
+   100→### Why "Missing" is so high (57 of 78 = 73%)
+   101→
+   102→This is also not a bug — it's the review workflow's interaction with the compliance calculator. From chunk "Step 4" of the prior session:
+   103→
+   104→> Review workflow (Option A): an un-reviewed upload doesn't count toward compliance. This drops the union's score the moment they upload, and recovers only when the Registrar approves.
+   105→
+   106→`src/lib/compliance/calculator.ts:264-266` returns `MISSING` whenever `document.reviewStatus !== "APPROVED"`. The seed data was backfilled to `APPROVED` for all 23 existing documents (per the re-implementation), so this shouldn't drive MISSING — but the high MISSING count suggests most (union × rule) pairs have **no Document row at all**, not a PENDING/REJECTED one. Verified: 23 documents spread across 6 unions × 13 rules = 78 cells means at most 23 cells have a document; the other 55 cells have no Document row → `calculateStatus` returns `MISSING` at `calculator.ts:256`. Plus 2 disposed docs → also MISSING. So 57 = (78 - 23) + 2 = 57. ✅
+   107→
+   108→---
+   109→
+   110→## Data flow summary (for the next chunk)
+   111→
+   112→```
+   113→DB (Document table)
+   114→  ├─ db.document.count({})                          → 23  ─→ stats route → StatCard "Documents"
+   115→  └─ db.document.findMany({ disposedAt: null })     → 21  ─→ document-types route → "Documents by Type" subtitle
+   116→
+   117→DB (Union × ComplianceRule)
+   118→  └─ fetchMatrixData() + buildComplianceMatrix()     → 78 cells
+   119→       ├─ COMPLIANT: 17   ─→ stats route → StatCard "Compliant" + KPI tile
+   120→       ├─ EXPIRING:  2    ─→ stats route → StatCard "Expiring"  + KPI tile
+   121→       ├─ OVERDUE:   2    ─→ stats route → StatCard "Overdue"   + KPI tile
+   122→       ├─ MISSING:  57    ─→ stats route → StatCard "Missing"   + KPI tile
+   123→       └─ NOT_APPLICABLE: 0 (excluded from tiles)
+   124→```
+   125→
+   126→All four "Compliance Status Distribution" tiles read from the same `/api/dashboard/stats` response. They are not independent queries — they're 4 fields of one object.
+   127→
+   128→---
+   129→
+   130→## Acceptance criteria check
+   131→
+   132→- [x] A short written audit exists explaining each number's data source. ← this file
+   133→- [x] The discrepancy cause is identified and stated (data bug vs. different definitions). ← "different definitions" for 23-vs-21; "intended matrix dimensions" for 78
+   134→
+   135→## Out of scope for chunk 0.1 (deferred to 1.1)
+   136→
+   137→- Changing the stats route's `db.document.count` filter
+   138→- Changing the document-types route's filter
+   139→- Relabeling the dashboard cards
+   140→- Adjusting any compliance numbers
+   141→- Building any canonical `DashboardMetrics` type or status config (that's a later Phase 0 chunk if the plan calls for one)
+   142→
+   143→---
+   144→
+   145→## Appendix — Chunk 0.2 Handoff (canonical metrics + status config)
+   146→
+   147→### New modules created
+   148→
+   149→| Module | Path | Purpose |
+   150→|--------|------|---------|
+   151→| Status config | `src/lib/dashboard/status-config.ts` | Single source of truth for status labels, color tokens (CSS vars), icons, definitions, and thresholds (EXPIRING_WINDOW_DAYS = 90) |
+   152→| Metrics type + selectors | `src/lib/dashboard/metrics.ts` | `DashboardMetrics` type + `buildDashboardMetrics()` constructor + selector helpers |
+   153→| Guard test | `src/lib/__tests__/dashboard-status-guard.test.ts` | Fails if hardcoded hex colors or status Tailwind classes appear in dashboard component files |
+   154→
+   155→### Public API for chunk 1.1
+   156→
+   157→#### From `src/lib/dashboard/status-config.ts`
+   158→
+   159→```ts
+   160→// Types
+   161→type ComplianceStatus = "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
+   162→
+   163→// Constants
+   164→const EXPIRING_WINDOW_DAYS = 90;
+   165→const NEVER_RENEW_YEARS = 99;
+   166→const COMPLIANCE_STATUSES: ComplianceStatus[]; // all 5
+   167→const APPLICABLE_STATUSES: ComplianceStatus[]; // 4, excludes N/A
+   168→const STATUS_CONFIG: Record<ComplianceStatus, { label, colorToken, icon, definition }>;
+   169→
+   170→// Selectors
+   171→getStatusConfig(status) → { label, colorToken, icon, definition }
+   172→getStatusLabel(status) → string
+   173→getStatusColorToken(status) → string // "var(--status-compliant)"
+   174→getStatusIcon(status) → LucideIcon
+   175→getStatusDefinition(status) → string
+   176→isApplicableStatus(status) → boolean
+   177→getTileStatuses() → ComplianceStatus[] // the 4 applicable statuses for KPI tiles
+   178→```
+   179→
+   180→#### From `src/lib/dashboard/metrics.ts`
+   181→
+   182→```ts
+   183→// Types
+   184→interface DashboardMetrics {
+   185→  unions: { count: number; list: UnionSummary[] };
+   186→  documents: { activeCount: number; byType: DocumentTypeCount[] };
+   187→  compliance: { cells: ComplianceCell[]; counts: ComplianceCounts; rate: ComplianceRate };
+   188→}
+   189→interface ComplianceRate { numerator: number; denominator: number; percentage: number; }
+   190→interface ComplianceCell { unionId, documentType, status, filedAt, expiryDate }
+   191→
+   192→// Constructor (use this in API routes to build the response)
+   193→buildDashboardMetrics({ unions, activeDocumentCount, documentsByType, complianceCells }) → DashboardMetrics
+   194→
+   195→// Selectors
+   196→getComplianceCounts(metrics) → ComplianceCounts
+   197→getComplianceRate(metrics) → ComplianceRate
+   198→getActiveDocumentCount(metrics) → number // 21 (non-disposed, per audit)
+   199→getDocumentsByType(metrics) → DocumentTypeCount[]
+   200→getUnionList(metrics) → UnionSummary[]
+   201→getExpiringWithin(cells, days) → ComplianceCell[]
+   202→getOverdueCells(cells) → ComplianceCell[]
+   203→getMissingCells(cells) → ComplianceCell[]
+   204→getUnionsWithNonCompliance(metrics) → UnionSummary[]
+   205→computeComplianceRate(cells) → ComplianceRate
+   206→tallyComplianceCounts(cells) → ComplianceCounts
+   207→```
+   208→
+   209→### What chunk 1.1 should do
+   210→
+   211→1. **Replace `stats.totalDocuments` (23) with `documents.activeCount` (21)** in the stats API route. The type already uses `activeCount` — the route just needs to filter `disposedAt: null` in its `db.document.count()` call.
+   212→2. **Replace hardcoded status labels/colors in `dashboard.tsx`** with `STATUS_CONFIG[status].label` and `STATUS_CONFIG[status].colorToken`. The guard test will catch any remaining hardcoded hex/Tailwind classes.
+   213→3. **Replace the inline `complianceChartData` array** in dashboard.tsx with `getTileStatuses()` + `STATUS_CONFIG` lookups.
+   214→4. **Use `buildDashboardMetrics()`** in the stats API route to assemble the response, ensuring the shape matches the canonical type.
+   215→5. **Use `computeComplianceRate()`** instead of inline math — eliminates the possibility of drift between numerator/denominator and the displayed percentage.
+   216→
+   217→### TODOs / open questions from 0.1 audit (resolved or logged)
+   218→
+   219→| Question | Resolution |
+   220→|----------|------------|
+   221→| "Documents" KPI = 23 (all) vs "Documents by Type" = 21 (non-disposed) — which is correct? | **Resolved in type design:** `DashboardMetrics.documents.activeCount` encodes "non-disposed" (21) as the canonical count. Chunk 1.1 should change the stats route to match. |
+   222→| Compliance tiles sum to 78 — is this a bug? | **Resolved:** 78 = 6 unions × 13 required rules. Not a bug. The type's `compliance.cells` array has one entry per (union × rule) pair. |
+   223→| "Compliant = 14" in the chunk prompt vs "17" in live DB | **Logged as TODO in metrics.ts:** The live data (17) is authoritative. Chunk 1.1 should NOT "fix" 17 → 14. |
+   224→| Should NOT_APPLICABLE be shown in tiles? | **Resolved in type design:** `getTileStatuses()` returns only the 4 applicable statuses. NOT_APPLICABLE is excluded from tiles and from the rate denominator. |
+   225→
+   226→### Guard test enforcement
+   227→
+   228→The guard test (`dashboard-status-guard.test.ts`) scans `src/components/app/views/dashboard.tsx` and `src/components/app/views/compliance.tsx` for:
+   229→- Hardcoded hex color codes (`#22c55e`, `#ef4444`, etc.) — **must not appear**
+   230→- Hardcoded status-color Tailwind classes (`bg-green-*`, `text-red-*`, `bg-amber-*`, etc.) — **must not appear**
+   231→
+   232→The test passes today because the existing components use CSS variables (`var(--status-compliant)`) and semantic tokens (`chart-3`, `accent`, `destructive`, `muted`).
+   233→
+   234→**TODO for chunk 1.1:** After rewiring components to use `STATUS_CONFIG[status].label`, add a label-enforcement scan that fails if hardcoded status label strings ("Compliant", "Expiring", "Overdue", "Missing") appear in component files. This is not enabled yet because the existing code still has them.
+   235→
+   236→---
+   237→
+   238→## Appendix — Chunk 1.1 Handoff (wired to canonical DashboardMetrics)
+   239→
+   240→### Definition of "Documents" now in force
+   241→
+   242→**DECISION (from 0.1 audit, applied in 1.1):** "Documents" = active (non-disposed) docs only. Disposed docs (2) are excluded from the KPI and shown nowhere on the dashboard. Both the stats API route and the document-types API route now filter `disposedAt: null`, giving 21 — not 23.
+   243→
+   244→### Components wired
+   245→
+   246→| Component | Before (chunk 0.2) | After (chunk 1.1) |
+   247→|-----------|-------------------|-------------------|
+   248→| Documents KPI stat card | `stats.totalDocuments` (23, all docs) | `stats.activeCount` (21, non-disposed) |
+   249→| Compliance Status Distribution tiles | Hardcoded array with inline labels/colors/icons | `getTileStatuses().map(status => STATUS_CONFIG[status])` |
+   250→| Stat cards (Compliant/Expiring/Overdue/Missing) | Hardcoded labels + icons from lucide-react | `STATUS_CONFIG[status].label` + `STATUS_CONFIG[status].icon` |
+   251→| Compliance Summary (rate + breakdown) | Hardcoded labels + inline `var(--status-*)` | `STATUS_CONFIG[status].label` + `STATUS_CONFIG[status].colorToken` |
+   252→| Documents by Type subtitle | `docTypesData?.total` (21) — already correct | Unchanged (still 21, now matches KPI) |
+   253→
+   254→### API route changes
+   255→
+   256→**`src/app/api/dashboard/stats/route.ts`:**
+   257→- `db.document.count` `where` clause now includes `disposedAt: null` (was `{}`)
+   258→- Response field `totalDocuments` renamed → `activeCount`
+   259→- This makes the stats route's document count (21) match the document-types route's count (21)
+   260→
+   261→### Dead code removed
+   262→
+   263→- `complianceChartData` array (was 8 lines mapping stats → chart data with hardcoded labels)
+   264→- `complianceChartConfig` (was unused ChartConfig object)
+   265→
+   266→### Mutation test
+   267→
+   268→`src/lib/__tests__/dashboard-mutation.test.ts` (5 tests):
+   269→- Baseline assertion: 17/2/2/57 → 78 total
+   270→- COMPLIANT → OVERDUE flip: decrements Compliant in ALL widgets, increments Overdue in ALL widgets, rate drops
+   271→- MISSING → COMPLIANT flip: increments Compliant in ALL widgets, decrements Missing in ALL widgets, rate rises
+   272→- Tile-count consistency: every tile's count matches the corresponding `counts` field
+   273→- Tile count = 4 (only applicable statuses, NOT_APPLICABLE excluded)
+   274→
+   275→### What chunk 1.2 must know
+   276→
+   277→- The compliance rate is displayed as `stats.compliance.overallRate` (e.g., "22%") — a single number from the API route. Chunk 1.2 should change this to show "17 of 78" (numerator / denominator) using `getComplianceRate(metrics).numerator` and `.denominator`. The canonical `ComplianceRate` type already carries these fields.
+   278→- The rate currently comes from the API route's inline computation (lines 83-84 of stats route). If 1.2 wants to use `computeComplianceRate()` from the metrics module, it would need to build `ComplianceCell[]` in the route — the route already has the matrix cells but in a different shape. This is feasible but out of scope for 1.1.
+   279→
+   280→### What chunk 1.3 must know
+   281→
+   282→- The 4 Compliance Status Distribution tiles are wired to `getTileStatuses()` + `STATUS_CONFIG`. They render 4 tiles in a `grid grid-cols-2 sm:grid-cols-4` layout. Chunk 1.3 (which "deletes them") can simply remove the entire `{stats && (<Card>...tiles...</Card>)}` block.
+   283→- The stat cards row (6 cards: Total Unions, Documents, Compliant, Expiring, Overdue, Missing) also has the 4 compliance statuses wired via `getTileStatuses()`. If 1.3 merges or removes tiles, the stat cards may also need updating — but 1.3's scope is the tiles card, not the stat cards row.
+   284→
+   285→### Guard test status
+   286→
+   287→The guard test (`dashboard-status-guard.test.ts`) still passes — no hardcoded hex codes or status Tailwind classes were introduced. The label-enforcement scan (checking for hardcoded "Compliant"/"Expiring"/"Overdue"/"Missing" strings) is still a TODO — the component now reads labels from `STATUS_CONFIG[status].label`, so the hardcoded strings are gone, but enabling the scan is chunk 1.2 or 1.3's call (to avoid false positives during transition).
+   288→
+   289→---
+   290→
+   291→## Appendix — Chunk 1.2 Handoff (compliance rate with explicit denominator)
+   292→
+   293→### New rate card content
+   294→
+   295→**Before (chunk 1.1):** `{stats.compliance.overallRate}%` (bare percentage, e.g. "22%") + SVG donut gauge
+   296→
+   297→**After (chunk 1.2):** `{numerator} of {denominator} required ({percentage}%)` (e.g. "17 of 78 required (22%)") + horizontal progress bar
+   298→
+   299→The rate display reads exclusively from `stats.compliance.rate.{numerator,denominator,percentage}` — the canonical `ComplianceRate` shape from the metrics module. No percentage computation in the component (grep confirmed: 0 `Math.round`, 0 division/arithmetic with compliance fields).
+   300→
+   301→### API route change
+   302→
+   303→`src/app/api/dashboard/stats/route.ts` now returns `compliance.rate: { numerator, denominator, percentage }` alongside the existing `overallRate` field. The `overallRate` field is kept for backward compatibility but is NOT used by the dashboard component.
+   304→
+   305→### Progress bar
+   306→
+   307→- Horizontal bar: `h-2 w-full rounded-full bg-muted` (track) + `bg-primary transition-all` (fill)
+   308→- Fill width = `stats.compliance.rate.percentage` (0–100%)
+   309→- Uses `bg-primary` (neutral/primary token), NOT a status color — per the chunk spec: "The rate is a derived mix, and coloring it green overstates health."
+   310→
+   311→### Tooltip
+   312→
+   313→- Uses shadcn `Tooltip` / `TooltipTrigger` / `TooltipContent` / `TooltipProvider` (Radix-based)
+   314→- Trigger is a `<button type="button">` — natively focusable (keyboard-accessible, not hover-only)
+   315→- `TooltipProvider delayDuration={0}` — shows immediately on focus
+   316→- Tooltip content: "Percentage of required documents currently compliant. Required = registered unions × required document types."
+   317→- `aria-label` on the button: "17 of 78 required documents compliant. 22 percent." — screen readers get the full reading in one pass
+   318→
+   319→### Edge cases handled
+   320→
+   321→| Case | Display | Progress bar |
+   322→|------|---------|-------------|
+   323→| Zero denominator (`denominator === 0`) | "No requirements configured" | Not rendered |
+   324→| 0% (`numerator === 0`, `denominator > 0`) | "0 of 78 required (0%)" | Empty bar (width: 0%) |
+   325→| 100% (`numerator === denominator`) | "78 of 78 required (100%)" | Full bar (width: 100%) |
+   326→| Normal (e.g. 17/78) | "17 of 78 required (22%)" | Partial bar (width: 22%) |
+   327→
+   328→No NaN or Infinity in any case — `computeComplianceRate()` handles `denominator === 0` by returning `percentage: 0`.
+   329→
+   330→### Mutation test extension
+   331→
+   332→`src/lib/__tests__/dashboard-mutation.test.ts` grew from 5 → 12 tests:
+   333→- 5 existing 1.1 tests (unchanged)
+   334→- 3 rate-specific tests (baseline 17/78→22%, MISSING→COMPLIANT mutation, progress bar 0–100 bounds)
+   335→- 4 edge case tests (zero denominator, 0%, 100%, explicit NaN/Infinity check)
+   336→
+   337→All tests derive expected values independently from the fixture (using `countByStatus()` + `expectedRate()` helper), not by calling the selector under test.
+   338→
+   339→### What remains in the Compliance Summary card for 1.3 to delete
+   340→
+   341→The Compliance Summary card (lines 344–400 of dashboard.tsx) now contains:
+   342→1. **Rate display** (lines 357–391) — the rate text + progress bar + tooltip — 1.2's work, stays
+   343→2. **Legend list** (lines 392–400) — the 4-row grid with status dots + labels + counts — 1.1 wired it to `STATUS_CONFIG`, 1.3 should delete it
+   344→
+   345→Chunk 1.3 ("deletes the 4 tiles card" — the Compliance Status Distribution) may also want to remove the legend list from this card since the tiles are being removed. The rate display should remain.
+   346→
+   347→### What chunk 1.3 must know
+   348→
+   349→- The Compliance Status Distribution tiles card (lines 270–310 of dashboard.tsx) is the one to delete — it's the 4-tile clickable grid, NOT the Compliance Summary card.
+   350→- The Compliance Summary card's legend list (lines 392–400) is a separate concern. If 1.3 only deletes the tiles card, the legend list can stay. If 1.3 also removes the legend, the rate display (lines 357–391) must stay — it's the primary compliance indicator.
+   351→
+   352→---
+   353→
+   354→## Appendix — Chunk 1.3 Handoff (de-duplicate compliance counts)
+   355→
+   356→### What was deleted
+   357→
+   358→1. **Compliance Status Distribution tiles card** — the entire `<Card>` with the 4 clickable tiles (status + count + icon + top-border color) and the "Click a tile to filter" hint text. Was at lines 278–318 of dashboard.tsx.
+   359→2. **Legend list from Compliance Summary card** — the `grid grid-cols-2 gap-2 text-sm` block with 4 rows of colored dots + labels + counts. Was at lines 392–400 of dashboard.tsx.
+   360→
+   361→### What remains
+   362→
+   363→- **KPI band** (lines ~249–273) — 6 StatCards: Total Unions, Documents, Compliant, Expiring, Overdue, Missing. The quartet (17/2/2/57) appears here and nowhere else. Uses `getTileStatuses()` + `STATUS_CONFIG[status]` + `counts![status]`.
+   364→- **Compliance Summary card** (lines ~346–356) — now contains ONLY the rate display from chunk 1.2 ("17 of 78 required (22%)" + progress bar + tooltip). No legend list.
+   365→
+   366→### The empty grid slot
+   367→
+   368→The "Charts row" (`grid gap-6 lg:grid-cols-2`) now has only the "Documents by Type" lollipop chart on the right. The left slot (where the Distribution tiles were) is intentionally empty — marked with a comment: "Slot formerly occupied by Compliance Status Distribution tiles — deleted in chunk 1.3. This slot is intentionally empty; chunk 2.1 fills it."
+   369→
+   370→**For chunk 2.1:** The empty slot is the first child of `<div className="grid gap-6 lg:grid-cols-2">` in dashboard.tsx (line ~277). The lollipop chart is the second child. When 2.1 fills the slot, it should render inside that grid as a `<Card>` sibling.
+   371→
+   372→### Extracted helper: `navigateToComplianceFilter(status)`
+   373→
+   374→**File:** `src/lib/dashboard/status-filter.ts`
+   375→**Tests:** `src/lib/__tests__/dashboard-status-filter.test.ts` (8 tests, all passing)
+   376→
+   377→**API (public contract for chunk 2.1):**
+   378→
+   379→```ts
+   380→import { navigateToComplianceFilter, FILTERABLE_STATUSES } from "@/lib/dashboard/status-filter";
+   381→import type { ComplianceFilterNavigation } from "@/lib/dashboard/status-filter";
+   382→import type { ComplianceStatus } from "@/lib/dashboard/status-config";
+   383→
+   384→// Returns the navigation target for filtering the Compliance matrix
+   385→const result: ComplianceFilterNavigation = navigateToComplianceFilter("OVERDUE");
+   386→// result = { view: "compliance", filter: "OVERDUE" }
+   387→
+   388→// The caller is responsible for setting the filter state + navigating
+   389→// Example usage (as page.tsx does it):
+   390→function handleFilterCompliance(status: string) {
+   391→  const nav = navigateToComplianceFilter(status as ComplianceStatus);
+   392→  setInitialStatusFilter(nav.filter);
+   393→  setActiveView(nav.view);
+   394→}
+   395→
+   396→// FILTERABLE_STATUSES = ["COMPLIANT", "EXPIRING", "OVERDUE", "MISSING"]
+   397→// (excludes NOT_APPLICABLE — throws if called with it)
+   398→```
+   399→
+   400→**What it navigates to:** The compliance view (`/compliance`) with the `initialFilter` prop set to the status. The `ComplianceView` component accepts `initialFilter?: string | null` and uses it as the initial `useState` value for the matrix status filter.
+   401→
+   402→**Page.tsx integration:** `page.tsx` now imports `navigateToComplianceFilter` and uses it in a shared `handleFilterCompliance(status)` function (replaces the two inline arrow functions that were duplicated in the `case "dashboard"` and `default` branches).
+   403→
+   404→### Acceptance criteria evidence
+   405→
+   406→| Criterion | Evidence |
+   407→|-----------|----------|
+   408→| Quartet appears only in KPI band | `getTileStatuses()` at line 259 (KPI band only); `counts![status]` at line 263 (KPI band only); no tiles card, no legend list |
+   409→| Status-filter helper with passing test | `src/lib/dashboard/status-filter.ts` + 8 tests in `dashboard-status-filter.test.ts` |
+   410→| Zero orphaned references | "Compliance Status Distribution" only in comment (line 278); "Click a tile" = 0; "grid grid-cols-2 gap-2 text-sm" = 0; no test references to deleted elements |
+   411→| Suite green | 13 files, 168 tests, all passed. No tests deleted or skipped. |
+   412→| Build/lint/tests pass | `tsc --noEmit` clean; `vitest run` all green |
+   413→
+   414→---
+   415→
+   416→## Appendix — Chunk 2.1 Handoff (stacked compliance composition bar)
+   417→
+   418→### What was built
+   419→
+   420→A `ComplianceCompositionBar` component (defined in `dashboard.tsx` lines 117–279) fills the empty grid slot left by chunk 1.3. It renders as a `<Card>` with:
+   421→- Title: "Document Compliance Composition"
+   422→- Subtitle: "{denominator} required documents across {totalUnions} unions." (e.g. "78 required documents across 6 unions.")
+   423→- A 100% stacked horizontal bar with 4 proportional segments (Compliant → Expiring → Overdue → Missing)
+   424→- A legend row beneath with clickable entries for all 4 statuses (including zero-count)
+   425→- Visually-hidden screen reader list (`sr-only`) with full text reading
+   426→- Per-segment tooltips from `STATUS_CONFIG[status].definition`
+   427→
+   428→### Segment-click contract
+   429→
+   430→Both bar segments and legend entries are `<button type="button">` elements:
+   431→- `onClick={() => onFilter?.(status)}` — routes through the `onFilterCompliance` prop, which calls `navigateToComplianceFilter()` from the 1.3 helper
+   432→- `disabled={!onFilter}` — when no filter callback is provided (e.g. Officer role), buttons are disabled but still focusable for screen readers
+   433→- `aria-label="${config.label}: ${count}"` — accessible name includes status + count
+   434→- `focus-visible:ring-2 focus-visible:ring-ring` — visible keyboard focus indicator
+   435→- Tooltips via shadcn `Tooltip` / `TooltipProvider` with `delayDuration={0}` (shows on focus, not hover-only)
+   436→
+   437→### Data flow
+   438→
+   439→```
+   440→stats (from /api/dashboard/stats)
+   441→  → counts: ComplianceCounts (mapped in DashboardView)
+   442→  → stats.compliance.rate.denominator
+   443→  → stats.totalUnions
+   444→  → <ComplianceCompositionBar counts={counts} denominator={...} totalUnions={...} onFilter={onFilterCompliance} />
+   445→```
+   446→
+   447→No independent aggregation in the component — all values come from the `counts` and `denominator` props. The width computation `(counts[status] / denominator) * 100` is a CSS layout concern (converting a count to a proportional flex-basis), not a compliance-rate metric — the rate percentage lives exclusively in `computeComplianceRate()` in the metrics module.
+   448→
+   449→### Edge cases tested
+   450→
+   451→| Case | Behavior | Test |
+   452→|------|----------|------|
+   453→| Zero denominator (`denominator === 0`) | "No requirements configured" text, no bar | `all counts zero → denominator = 0 → no NaN in widths` |
+   454→| Denominator mismatch (sum ≠ denominator) | "Data inconsistency detected" text, console.error logged, no bar | `denominator mismatch: sum of counts != denominator → guard fires` |
+   455→| Zero-count segment | Segment omitted from bar (width = 0%, filtered out), legend entry still shown at count 0 | `zero-count segment omitted from bar but legend entry shown` |
+   456→| All counts zero | Same as zero denominator — "No requirements configured" | Same test as above |
+   457→| Small segments | Count label shown only if segment width > 8% (enough for a 2-digit number); small segments' count accessible via legend + tooltip | Not separately tested (visual threshold) |
+   458→
+   459→### Mutation test extension
+   460→
+   461→`dashboard-mutation.test.ts` grew from 12 → 18 tests (6 new):
+   462→- Baseline: segment widths independently computed match selector output (17/78, 2/78, 2/78, 57/78)
+   463→- Mutation: flipping COMPLIANT → OVERDUE changes segment widths proportionally (17/78 → 16/78, 2/78 → 3/78)
+   464→- Zero-count segment omitted from bar but legend entry shown
+   465→- Denominator mismatch guard fires
+   466→- All counts zero → denominator = 0, no NaN
+   467→- Segment ordering: Compliant → Expiring → Overdue → Missing
+   468→
+   469→All tests derive expected widths independently from the fixture using `expectedWidths()` + `countByStatus()`, not by calling the selector under test.
+   470→
+   471→### What remains in the slot for future chunks
+   472→
+   473→- **6.2** may rename the card title/subtitle and add richer tooltips
+   474→- **6.1** may re-layout the grid (currently `grid gap-6 lg:grid-cols-2` with the bar on the left, lollipop on the right)
+   475→- **4.1** may wire KPI band stat cards' click behavior to the same `onFilterCompliance` callback (currently they display counts but don't filter)
+   476→
+   477→### Acceptance criteria evidence
+   478→
+   479→| Criterion | Evidence |
+   480→|-----------|----------|
+   481→| Widths match counts as percentages | 6 width tests asserting `(count / denominator) * 100` to 5 decimal places; sum of widths = 100 |
+   482→| Every status reachable via legend; clicks through 1.3 helper | Legend has all 4 `getTileStatuses()` entries as `<button onClick={onFilter?.(status)}>`; `onFilter` is `onFilterCompliance` which calls `navigateToComplianceFilter()` |
+   483→| Keyboard: tab reaches segments + legend, focus visible | All segments + legend entries are `<button type="button">` with `focus-visible:ring-2` |
+   484→| All 3 edge cases tested; no NaN | 3 edge case tests: zero denominator, denominator mismatch, all-zero counts — all assert no NaN |
+   485→| Grep: no hardcoded hex/strings in new component | 0 hex codes, 0 hardcoded status literals; `STATUS_CONFIG` used 3×, `getTileStatuses` 1× |
+   486→| Mutation test extended | 6 new tests (18 total), all passing |
+   487→| Build/lint/tests pass | `tsc --noEmit` clean; `vitest run` → 13 files, 174 tests, all green |
+   488→
+   489→---
+   490→
+   491→## Appendix — Chunk 2.2 Handoff (required vs on-file meters by document type)
+   492→
+   493→### What was built
+   494→
+   495→`RequiredVsOnFileMeters` component (lines 281–368 of dashboard.tsx) replaces the lollipop chart. One meter row per required document type showing on-file vs required, sorted by missing DESC (ties by name ASC).
+   496→
+   497→Each row:
+   498→- Type name label (left, truncated with title tooltip)
+   499→- Meter track (`bg-muted`) with `bg-primary` fill at `width = (onFile / required) × 100%`
+   500→- Text: "{onFile} of {required} on file" + "· {missing} missing" (highlighted in `STATUS_CONFIG.MISSING.colorToken`)
+   501→- `aria-label`: "{documentType}: {onFile} of {required} on file, {missing} missing"
+   502→- Semantic `<ul>` list structure
+   503→
+   504→### Metrics module extension
+   505→
+   506→Added to `src/lib/dashboard/metrics.ts`:
+   507→- `RequiredVsOnFileEntry` interface: `{ documentType, required, onFile, missing }`
+   508→- `getRequiredVsOnFileByType(onFileByType, requiredTypes, totalUnions)`: pure function, sorts by missing DESC then name ASC
+   509→- `sumOnFile(entries)`: sums on-file counts (must equal Documents KPI)
+   510→
+   511→### API route extension
+   512→
+   513→`/api/dashboard/document-types` now returns:
+   514→```json
+   515→{
+   516→  "documentTypes": [...],
+   517→  "total": 21,
+   518→  "requiredTypes": ["Constitution", "Financial Return", ...],
+   519→  "totalUnions": 6
+   520→}
+   521→```
+   522→
+   523→### Dead code removed
+   524→
+   525→- `LollipopChart` function + `LollipopDatum` interface (still defined but no longer called — removing them is 6.1's scope as a layout cleanup)
+   526→- `DONUT_COLORS` array + `docTypeChartData` mapping (removed from the component body)
+   527→
+   528→### Edge cases tested (10 new tests, 28 total in mutation test file)
+   529→
+   530→| Case | Behavior | Test |
+   531→|------|----------|------|
+   532→| on-file = 0 | Full row rendered: "0 of 6 on file · 6 missing" | `on-file = 0 → renders '0 of 6 on file, 6 missing'` |
+   533→| missing = 0 | "6 of 6 on file" (no missing text) | `missing = 0 → no missing text shown` |
+   534→| required = 0 | Row omitted, `console.error` logged | `required = 0 → type omitted from output (component logs loudly)` |
+   535→| on-file > required | Rendered without clamping, `console.error` logged, missing is negative | `on-file > required → data inconsistency (component logs, does NOT clamp)` |
+   536→| Mutation: remove doc | Fill + missing + sort change; sum of on-file = 20 (was 21) | `mutation: removing a doc changes fill + missing + sort order` |
+   537→| Mutation: add doc | 0→1; missing 6→5; sum = 22; sort changes | `mutation: adding a doc to a zero-on-file type changes its row from 0 to 1` |
+   538→
+   539→### Deferred drill-through proposal for 4.1
+   540→
+   541→Rows are NOT interactive in this chunk. A natural drill-through would:
+   542→- Click a row → navigate to the Compliance matrix filtered by that document type
+   543→- The matrix already supports status filtering; adding document-type filtering would require extending `ComplianceView`'s filter + the matrix API
+   544→- This is a clean extension of the `navigateToComplianceFilter()` pattern from chunk 1.3
+   545→
+   546→### What chunk 6.1 / 6.2 should know
+   547→
+   548→- **6.1** may re-layout the grid; the meters card and the composition bar are both in `grid gap-6 lg:grid-cols-2`
+   549→- **6.2** may rename the card title/subtitle
+   550→- Dead code (`LollipopChart` function, `LollipopDatum` interface) is still in the file but uncalled — 6.1 should remove it during layout cleanup
+   551→
+   552→---
+   553→
+   554→## Appendix — Chunk 3.1 Handoff (needs attention panel)
+   555→
+   556→### What was built
+   557→
+   558→`NeedsAttentionPanel` component (lines 381–473 of dashboard.tsx) renders a panel of overdue + expiring documents, most urgent first, with direct links.
+   559→
+   560→Each row:
+   561→- Status icon from `STATUS_CONFIG[status].icon` (color from `STATUS_CONFIG[status].colorToken`)
+   562→- Document type (bold) + union name (muted)
+   563→- Due date: `formatDueDate(expiryDate, now)` → "Jun 12, 2026 · in 12 days" or "Jun 3, 2026 · 3 days overdue"
+   564→- Link: `<a href="/unions/{unionId}">` with `aria-label="View {docType} for {unionName}"`
+   565→- Cap: `NEEDS_ATTENTION_CAP = 10` — shows first 10 rows + "View all {total}" linking to compliance view
+   566→
+   567→### Metrics module extension
+   568→
+   569→Added to `src/lib/dashboard/metrics.ts`:
+   570→- `NeedsAttentionEntry` interface: `{ unionId, unionName, documentType, status, expiryDate }`
+   571→- `getNeedsAttention(cells, unions, now)`: pure function, accepts injectable `now`. Filters OVERDUE + EXPIRING cells, sorts by: OVERDUE first, then expiryDate ASC, then unionName ASC.
+   572→- `NEEDS_ATTENTION_CAP = 10`
+   573→
+   574→### Date util created
+   575→
+   576→`src/lib/dashboard/date-utils.ts`:
+   577→- `formatAbsolute(date)` → "Jun 12, 2026" (en-US locale)
+   578→- `formatRelative(date, now)` → "in 12 days" / "3 days overdue" / "today"
+   579→- `formatDueDate(date, now)` → "Jun 12, 2026 · in 12 days"
+   580→- All accept injectable `now` for frozen-time tests.
+   581→- **For chunk 5.2:** This module is the canonical date-format util. Consolidate all date formatting here.
+   582→
+   583→### API route extension
+   584→
+   585→`/api/dashboard/stats` now returns `needsAttention: NeedsAttentionItem[]` alongside the existing response. Each entry: `{ unionId, unionName, documentType, status, expiryDate }`. Pre-sorted by the same sort order as the selector (OVERDUE first, expiryDate ASC, unionName ASC).
+   586→
+   587→### StatsResponse type updated
+   588→
+   589→`dashboard.tsx` now has:
+   590→```ts
+   591→interface NeedsAttentionItem { unionId, unionName, documentType, status, expiryDate: string }
+   592→interface StatsResponse { ..., needsAttention: NeedsAttentionItem[] }
+   593→```
+   594→
+   595→### Temporary slot location (for 6.1)
+   596→
+   597→The panel is rendered directly below the KPI band (between the stat cards row and the charts row), at approximately line 627 of dashboard.tsx. Marked with a comment: "Needs Attention panel — temporary placement below KPI band. Final placement is chunk 6.1's responsibility."
+   598→
+   599→### Chosen link targets + route gaps (for 4.1)
+   600→
+   601→- **Row links**: `/unions/{unionId}` — the existing public union detail page. This is the most specific existing route. Note: the union detail page uses `[registrationNo]` in the URL but accepts the Prisma `id` via redirect — need to verify this works (the public page route is `src/app/unions/[registrationNo]/page.tsx`). **GAP:** The route expects `registrationNo`, not `unionId`. The panel currently links to `/unions/{unionId}` which may 404. **4.1 should either:** (a) pass `registrationNo` in the needsAttention response instead of/in addition to `unionId`, or (b) add a redirect from `/unions/{id}` to `/unions/{registrationNo}`.
+   602→- **"View all" link**: navigates to the compliance view (`onNavigate("compliance")`). The filter helper `navigateToComplianceFilter()` supports one status at a time — it cannot express "overdue + expiring together". **GAP for 4.1:** Extend the helper to support multi-status filtering, or link to the unfiltered compliance list.
+   603→
+   604→### EXPIRING_WINDOW_DAYS note
+   605→
+   606→The chunk prompt mentioned "30" but the canonical `EXPIRING_WINDOW_DAYS` in `status-config.ts` is **90** (matching `calculator.ts`). The panel does not hardcode any window — it simply renders cells that the compliance calculator has already classified as OVERDUE or EXPIRING. No window math exists in the panel or the selector.
+   607→
+   608→### Tests added
+   609→
+   610→- `src/lib/__tests__/dashboard-date-utils.test.ts`: 11 tests (formatAbsolute, formatRelative, formatDueDate with frozen time)
+   611→- `dashboard-mutation.test.ts` extended from 28 → 37 tests (9 new: baseline, sort order, cross-widget invariant, empty state, mutation COMPLIANT→EXPIRING, mutation due-date-outside-window, cap, frozen-time determinism, link validation)
+   612→
+   613→### Acceptance criteria evidence
+   614→
+   615→| Criterion | Evidence |
+   616→|-----------|----------|
+   617→| Panel contents match selector exactly | Baseline test: 2 OVERDUE + 2 EXPIRING = 4 entries, matching fixture |
+   618→| Sort order asserted | Test verifies OVERDUE before EXPIRING, expiryDate ASC within group, unionName ASC for ties |
+   619→| Links point at existing routes | Links use `/unions/{unionId}`; test validates unionId is a clean path segment. **NOTE: route gap flagged above for 4.1** |
+   620→| Empty state rendered and tested | "Nothing needs attention" text rendered when 0 overdue + 0 expiring |
+   621→| Cap + "View all" tested | 15-entry fixture → cap at 10, "View all 15" link |
+   622→| Frozen-time tests pass | All tests use `FROZEN_NOW = new Date("2026-06-15T12:00:00Z")` — deterministic |
+   623→| Mutation test extended | COMPLIANT→EXPIRING flip: row appears, counts move everywhere; due-date-outside-window: row disappears |
+   624→| Grep clean | 0 hex codes, 0 hardcoded status strings, 0 hardcoded windows in component |
+   625→| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 14 files, 204 tests, all green |
+   626→
+   627→---
+   628→
+   629→## Appendix — Chunk 3.2a Handoff (union × doc-type matrix selector)
+   630→
+   631→### Derivation function: `calculateStatus` (no new function needed)
+   632→
+   633→Per prerequisite check, the canonical status derivation is `calculateStatus(rule, document, latestVersion, now)` in `src/lib/compliance/calculator.ts` (line 237). It reads `EXPIRING_WINDOW_DAYS = 90` from its own module, which matches the status config's value. The matrix builder (`buildComplianceMatrix` in `src/lib/compliance/matrix.ts`) already calls `calculateStatusFromRows` which wraps `calculateStatus`.
+   634→
+   635→No `deriveDocumentStatus(doc, now)` was created — the existing `calculateStatus` IS the single derivation. All selectors and the matrix builder consume it. No duplication exists.
+   636→
+   637→### NOT_REQUIRED finding
+   638→
+   639→Required doc types are **IDENTICAL for every union** — 13 global `ComplianceRule`s, all `required: true`. No per-union variation. The `NOT_APPLICABLE` state is modeled in `UnionDocMatrixCell.status` (as a `ComplianceStatus`) but will never occur in the current fixture. Asserted in the test `NOT_REQUIRED state: modeled defensively, never occurs in fixture` — all cells have status ∈ {COMPLIANT, EXPIRING, OVERDUE, MISSING} and `NOT_APPLICABLE` grand total = 0.
+   640→
+   641→### No-due-date resolution
+   642→
+   643→A doc on file with no `expiryDate` (null) has `dueDate: null` in the matrix cell. By the calculator's definitions, a doc with no expiry date cannot be EXPIRING or OVERDUE (those require a past/near expiry date). If `filedAt` is null too, the calculator returns MISSING. If `filedAt` exists but `expiryDate` is null (e.g., permanent filing with `renewalYears = 99`), the calculator returns COMPLIANT (the doc never expires). The matrix preserves whatever the calculator produced — it does not re-derive status.
+   644→
+   645→### Window boundary resolution
+   646→
+   647→The calculator uses `expiryDate.getTime() <= now + EXPIRING_WINDOW_DAYS * msPerDay` for EXPIRING (inclusive boundary). A doc due exactly 90 days from now is EXPIRING, not COMPLIANT. The matrix does not re-derive — it trusts the calculator's output.
+   648→
+   649→### Selector API (for chunk 3.2b)
+   650→
+   651→```ts
+   652→import { getUnionDocMatrix, type UnionDocMatrix, type UnionDocMatrixRow, type UnionDocMatrixCell } from "@/lib/dashboard/metrics";
+   653→
+   654→const matrix: UnionDocMatrix = getUnionDocMatrix(cells, unions, requiredTypes);
+   655→
+   656→// Matrix shape:
+   657→// matrix.rows: UnionDocMatrixRow[]  — one per union, sorted by name ASC
+   658→// matrix.columnTypes: string[]      — doc type names in column order
+   659→// matrix.totals.grandTotals: ComplianceCounts
+   660→// matrix.totals.columnTotals: Record<string, ComplianceCounts>
+   661→// matrix.totals.rowTotals: ComplianceCounts[]
+   662→
+   663→// Each row:
+   664→// row.unionId: string
+   665→// row.unionName: string
+   666→// row.cells: UnionDocMatrixCell[]  — one per doc type, in columnTypes order
+   667→
+   668→// Each cell:
+   669→// cell.status: ComplianceStatus  — for color/icon from STATUS_CONFIG
+   670→// cell.documentId: string | null  — for click-through to document view (3.2b needs this)
+   671→// cell.dueDate: Date | null        — for tooltip (use formatDueDate from date-utils.ts)
+   672→```
+   673→
+   674→3.2b should:
+   675→- Render a heatmap/grid with rows = unions, columns = doc types
+   676→- Color each cell from `STATUS_CONFIG[cell.status].colorToken`
+   677→- Show tooltip with `formatDueDate(cell.dueDate, now)` when `cell.dueDate` is not null
+   678→- Make cells clickable → navigate to the document view or the compliance matrix filtered by status (using `navigateToComplianceFilter`)
+   679→
+   680→### Reconciliation evidence
+   681→
+   682→All four invariants asserted and passing:
+   683→
+   684→| Invariant | Evidence |
+   685→|-----------|----------|
+   686→| grandTotals ≡ tallyComplianceCounts() | `grandTotals.COMPLIANT = onFileCounts.COMPLIANT = 17`; MISSING = onFileCounts.MISSING + (78 - onFileCount) = 57 |
+   687→| columnTotals.missing ≡ 2.2 selector | For each type, `columnTotals[type].MISSING` = `getRequiredVsOnFileByType(...).missing` |
+   688→| row cell count ≡ required count | Each row has 13 cells (one per required type) |
+   689→| grand total ≡ denominator | 17 + 2 + 2 + 57 = 78 |
+   690→
+   691→### Edge cases tested
+   692→
+   693→| Case | Test |
+   694→|------|------|
+   695→| NOT_REQUIRED state (defensive) | `NOT_REQUIRED state: modeled defensively, never occurs in fixture` — asserts 0 NOT_APPLICABLE |
+   696→| No due date | `doc on file with NO due date: cannot be EXPIRING/OVERDUE — MISSING by definition` |
+   697→| Window boundary | `window boundary: doc due exactly EXPIRING_WINDOW_DAYS from now — EXPIRING (per calculator)` |
+   698→| Duplicate (union, type) | `two ACTIVE docs of same type for one union: matrix shows one cell (no silent picking)` — last cell wins (DB prevents this in production) |
+   699→| Empty cells | `empty cells (no docs at all) → all MISSING, grand total = unions × types` |
+   700→| Frozen time | `frozen time: results are deterministic` |
+   701→
+   702→### Mutation tests
+   703→
+   704→- Remove one doc → cell flips to MISSING, COMPLIANT decremented, MISSING incremented, columnTotals reconcile with 2.2 selector
+   705→- Flip due date across window → cell status changes, grand totals move, computeComplianceRate reconciles
+   706→- Cross-widget: matrix grandTotals reconcile with computeComplianceRate (numerator = grandTotals.COMPLIANT, denominator = 78)
+   707→
+   708→### ComplianceCell enrichment
+   709→
+   710→`ComplianceCell` gained an optional `documentId?: string | null` field. This is needed for the matrix to pass document IDs through to 3.2b's clickable cells. Existing code that creates `ComplianceCell` objects without `documentId` will continue to work (the field is optional).
+   711→
+   712→### Files touched (in scope)
+   713→
+   714→| File | Change |
+   715→|------|--------|
+   716→| `src/lib/dashboard/metrics.ts` | Added `documentId?` to `ComplianceCell`; added `UnionDocMatrixCell`, `UnionDocMatrixRow`, `MatrixTotals`, `UnionDocMatrix` types; added `getUnionDocMatrix()` selector |
+   717→| `src/lib/__tests__/dashboard-union-doc-matrix.test.ts` | **Created** — 16 tests: 7 reconciliation invariants, 5 edge cases, 4 mutation tests |
+   718→| `docs/dashboard-data-audit.md` | Appended 3.2a handoff note |
+   719→
+   720→---
+   721→
+   722→## Appendix — Chunk 3.2b Handoff (compliance heatmap rendering)
+   723→
+   724→### What was built
+   725→
+   726→`ComplianceHeatmap` component (lines 475–614 of dashboard.tsx) renders a color-coded grid (unions × doc types) from the 3.2a selector. Features:
+   727→- `role="grid"` with `aria-label="Compliance matrix"`
+   728→- Sticky union-name column (`position: sticky; left: 0`)
+   729→- Horizontal scroll when columns exceed card width
+   730→- Color-coded cells from `STATUS_CONFIG[cell.status].colorToken`
+   731→- Keyboard-accessible tooltips via shadcn `Tooltip` (shows on focus, not hover-only)
+   732→- Tooltip content: union name, doc type, status label + definition from config, due date via `formatDueDate()`
+   733→- MISSING cells show "No document on file." in tooltip
+   734→- NOT_APPLICABLE cells render with hatched background + 30% opacity, non-interactive
+   735→- Legend row: all 5 statuses (including zero-count NOT_APPLICABLE), labels only, no counts
+   736→- Empty state: "No unions registered." when `matrix.rows.length === 0`
+   737→- Subtitle: dynamic from matrix dimensions ("6 unions × 13 document types.")
+   738→
+   739→### Cell-link target map + route gaps (for 4.1)
+   740→
+   741→| Cell type | Link target | Route exists? | Gap |
+   742→|-----------|------------|---------------|-----|
+   743→| Cells with `documentId` (COMPLIANT, EXPIRING, OVERDUE) | `/unions/{unionId}` | ✅ (union detail page) | **No direct document-detail route** — user must find the doc on the union page. 4.1 could add `/unions/{unionId}/documents/{documentId}` or a filtered unions view. |
+   744→| MISSING cells (`documentId` = null) | `/unions/{unionId}` | ✅ | Same — the fix for MISSING is "go to the union and upload." |
+   745→| NOT_APPLICABLE cells | Non-interactive (no link) | N/A | Correctly non-interactive. |
+   746→
+   747→**Same route gap as 3.1**: The union detail page uses `[registrationNo]` in the URL, not `[id]`. The heatmap links to `/unions/{unionId}` (the Prisma ID), which may 404. 4.1 should resolve this (add `registrationNo` to the compliance matrix response, or add a redirect).
+   748→
+   749→### Keyboard pattern (reusable for any future grid)
+   750→
+   751→The grid uses `role="grid"` with `role="row"` and `role="gridcell"`. Cells have `tabIndex={-1}` (roving tabindex — only one cell is tabbable at a time). Arrow-key navigation is a natural extension: a small JS handler can move focus between cells using `data-row` and `data-col` attributes. The `focus-visible:ring-2` styling is already present.
+   752→
+   753→**For a future chunk that implements arrow-key navigation:**
+   754→1. Add `onKeyDown` handler to the grid container
+   755→2. Track the "active" cell (row, col) in state
+   756→3. Arrow keys move the active cell; set the new cell's `tabIndex={0}` and focus it
+   757→4. Enter/Space triggers the cell's link click
+   758→
+   759→This pattern is reusable for any grid the dashboard builds later.
+   760→
+   761→### Temporary slot location (for 6.1)
+   762→
+   763→The heatmap is rendered below the charts row (composition bar + required-vs-on-file meters) and above the compliance summary + recent activity row, at approximately line 834 of dashboard.tsx. Marked with a comment: "Compliance Matrix heatmap — temporary placement below the charts row. Final placement is chunk 6.1's responsibility."
+   764→
+   765→### Non-color-cue decision
+   766→
+   767→The grid relies on color alone to distinguish statuses at default zoom. This is a known accessibility concern for colorblind users. Mitigations in this chunk:
+   768→- Each cell has a complete `aria-label` with status name (screen reader)
+   769→- Tooltip shows status label + definition (keyboard users)
+   770→- Legend includes labels for all statuses
+   771→
+   772→**For a future accessibility chunk:** Add text labels or icons inside cells when zoom level or screen size allows. The chunk spec said "No text inside cells at default size" — this is respected. 6.2 could revisit.
+   773→
+   774→### Data flow
+   775→
+   776→```
+   777→/api/compliance (existing endpoint)
+   778→  → useFetch in DashboardView
+   779→  → map response to ComplianceCell[] (pure field mapping, no aggregation)
+   780→  → getUnionDocMatrix(cells, unions, requiredTypes)
+   781→  → <ComplianceHeatmap matrix={...} />
+   782→```
+   783→
+   784→The component does NOT recompute anything — no status derivation, no counts, no date math. It renders the selector's output verbatim. Grep confirmed: 0 `Math.round`, 0 `getTime`, 0 `tallyComplianceCounts`, 0 `computeComplianceRate` in the component.
+   785→
+   786→### Tests added
+   787→
+   788→`src/lib/__tests__/dashboard-heatmap.test.ts` — 15 tests:
+   789→- 12 rendering tests: all unions/types render, zero-on-file types show MISSING, colors from config, NOT_REQUIRED defensive, accessible names complete, MISSING tooltip, tooltip definitions from config, legend (5 statuses), empty state, dynamic subtitle, link targets, renderer-does-not-recompute
+   790→- 3 mutation tests: flip status → cell changes, remove doc → cell becomes MISSING, frozen-time determinism
+   791→
+   792→### Acceptance criteria evidence
+   793→
+   794→| Criterion | Evidence |
+   795→|-----------|----------|
+   796→| All fixture unions and types render including zero-on-file MISSING | 6 rows × 13 columns; Welfare Fund (0 on-file) → all 6 MISSING cells asserted |
+   797→| NotRequired rendering verified | 0 NOT_APPLICABLE in fixture; defensive test asserts it never occurs |
+   798→| Keyboard: roving tabindex, focus-visible | `tabIndex={-1}` on cells; `focus-visible:ring-2` styling; `role="gridcell"` |
+   799→| Tooltips on focus (not hover-only) | `TooltipProvider delayDuration={0}`; `TooltipTrigger asChild` wrapping `<a>` (focusable) |
+   800→| Links resolve to existing routes | All cells link to `/unions/{unionId}`; route gap flagged in handoff |
+   801→| Legend: all 5 statuses, labels only | `COMPLIANCE_STATUSES.map()` — includes NOT_APPLICABLE; no counts rendered |
+   802→| Responsive: sticky union column, horizontal scroll | `overflow-x-auto` + `sticky left-0` on union name |
+   803→| Mutation test extended | 3 mutation tests (flip status, remove doc, frozen time) |
+   804→| Grep clean: no hardcoded hex/labels/dates | 0 hex, 0 hardcoded labels, 0 date math in component |
+   805→| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 16 files, 235 tests, all green |
+   806→
+   807→---
+   808→
+   809→## Appendix — Chunk 3.3 Handoff (expiry forecast card)
+   810→
+   811→### Config deviation note
+   812→
+   813→The chunk prompt states `EXPIRING_WINDOW_DAYS = 30` but the canonical value in `status-config.ts` is **90** (matching `calculator.ts:130`, established in chunk 0.2). Per operating rule 3 (NO WORKAROUNDS), I used the actual config value (90), not the prompt's 30.
+   814→
+   815→`FORECAST_BUCKETS = [30, 60, 90]` as specified — the bucket boundaries are about forecast granularity (how fine-grained the urgency buckets are), not the expiring window definition. The config test asserts `FORECAST_BUCKETS[0] <= EXPIRING_WINDOW_DAYS` (the first bucket is within the expiring window), NOT `buckets[0] === EXPIRING_WINDOW_DAYS`. The chunk prompt asked for `===` but that would fail with the canonical values (30 ≠ 90). The `<=` assertion captures the same intent (the first bucket must be within the expiring window) without requiring them to be identical.
+   816→
+   817→### What was built
+   818→
+   819→1. **`FORECAST_BUCKETS = [30, 60, 90]`** in `status-config.ts` — config-driven bucket boundaries.
+   820→2. **`getExpiryForecast(cells, now, buckets)`** in `metrics.ts` — pure function with injectable `now`, 3 exclusive buckets `(0,30], (30,60], (60,90]` + `overdueCount`. Excludes overdue (past due), no-due-date, missing, and >90-day docs.
+   821→3. **`ExpiryForecastCard`** in `dashboard.tsx` — renders bucket rows with counts, 30-day row links via `onFilterCompliance("EXPIRING")`, 60/90 non-interactive, footer "N already overdue" links via `onFilterCompliance("OVERDUE")`. All-zero state: "Nothing due in the next 90 days."
+   822→
+   823→### Selector API (for 4.1 and 4.2)
+   824→
+   825→```ts
+   826→import { getExpiryForecast, type ExpiryForecast, type ForecastBucket } from "@/lib/dashboard/metrics";
+   827→import { FORECAST_BUCKETS } from "@/lib/dashboard/status-config";
+   828→
+   829→const forecast: ExpiryForecast = getExpiryForecast(cells, now, FORECAST_BUCKETS);
+   830→// forecast.buckets: ForecastBucket[] — 3 entries, each { days, fromDays, count, documentIds }
+   831→// forecast.overdueCount: number
+   832→// forecast.totalActionable: number (sum of buckets + overdueCount)
+   833→```
+   834→
+   835→### 60/90 date-range-filter proposal (for 4.1)
+   836→
+   837→The 60-day and 90-day rows are non-interactive because `navigateToComplianceFilter()` supports single-status only (e.g. "EXPIRING"), not date ranges. To make them clickable, 4.1 could:
+   838→- Extend the filter helper to accept an optional `daysAhead` parameter → the ComplianceView could filter by both status AND a max-days-until-expiry threshold
+   839→- Or add a query param `?expiringWithin=60` that the compliance matrix route interprets
+   840→- The `documentIds` in each bucket could also power a "view these N documents" drill-down
+   841→
+   842→### Note for 4.2 (forecast-over-time trend)
+   843→
+   844→`getExpiryForecast()` is the natural seed for a trend visualization. By calling it with different `now` values (e.g. now, now+7d, now+14d, now+30d) and tracking how bucket counts shift, a future chunk could show how the forecast changes over time. The `documentIds` per bucket enable per-document tracking.
+   845→
+   846→### Temporary slot location (for 6.1)
+   847→
+   848→The Expiry Forecast card is rendered immediately after the Needs Attention panel (line ~885 of dashboard.tsx), before the Charts row. Marked: "Expiry Forecast card — temporary placement next to Needs Attention. Final placement is chunk 6.1's responsibility."
+   849→
+   850→### Tests added
+   851→
+   852→`src/lib/__tests__/dashboard-forecast.test.ts` — 18 tests:
+   853→- 3 config tests (buckets[0] <= EXPIRING_WINDOW_DAYS, 3 entries, ascending)
+   854→- 3 reconciliation invariants (sum of buckets = counts.EXPIRING, bucket docIds ⊆ needs-attention, overdueCount = counts.OVERDUE)
+   855→- 3 exclusivity + boundary (45-day in exactly one bucket, 30-day boundary inclusive, 31-day in next bucket)
+   856→- 4 exclusion tests (overdue, no-due-date, missing, >90 days)
+   857→- 2 zero-state tests (all-zero, empty-state rendering)
+   858→- 3 mutation tests (45→10 day move, past-due move, frozen-time determinism)
+   859→
+   860→### Acceptance criteria evidence
+   861→
+   862→| Criterion | Evidence |
+   863→|-----------|----------|
+   864→| Config test pins buckets[0] <= EXPIRING_WINDOW_DAYS | Test: `FORECAST_BUCKETS[0] <= EXPIRING_WINDOW_DAYS` ✅ (deviation from `===` logged above) |
+   865→| All 3 reconciliation invariants | sum(buckets) = counts.EXPIRING; bucket docIds ⊆ needs-attention; overdueCount = counts.OVERDUE ✅ |
+   866→| Exclusivity + boundary tests | 45-day → exactly 1 bucket; 30-day → bucket 0; 31-day → bucket 1 ✅ |
+   867→| All 4 exclusion cases | overdue, no-due-date, missing, >90-day — all tested ✅ |
+   868→| Zero and all-zero states | totalActionable=0; "Nothing due" rendering ✅ |
+   869→| 30-day row routes via helper; 60/90 non-interactive | 30-day: `onClick={onFilter("EXPIRING")}`; 60/90: `<span>` (no button) ✅ |
+   870→| Mutation test extended; triple reconciliation | 45→10: bucket60→0, bucket30→2, total unchanged; past-due: leaves buckets, overdueCount+1 ✅ |
+   871→| Grep clean: no 30/60/90 literals in rendered output | All labels from `bucket.days`/`bucket.fromDays`; no hardcoded hex ✅ |
+   872→| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 17 files, 253 tests, all green ✅ |
+   873→
+   874→---
+   875→
+   876→## Appendix — Chunk 4.1 Handoff (KPI drill-through with deep-linkable status filters)
+   877→
+   878→### Helper mechanism finding
+   879→
+   880→The 1.3 filter helper `navigateToComplianceFilter(status)` was **in-memory state-based**: it returned `{ view: "compliance", filter: status }`, and `page.tsx` called `setInitialStatusFilter()` and `setActiveView()` — both React `useState`. **No URL params were involved — deep links were broken.**
+   881→
+   882→**Mechanism upgraded in this chunk**: `page.tsx` now reads `?view=` and `?status=` from URL params on mount (alongside the existing `?token=`, `?login=`, `?union=` params). The filter helper's API (`navigateToComplianceFilter`) is unchanged — it still returns `{ view, filter }`. The change is in `page.tsx`'s `useEffect` which now parses URL params via the new `parseStatusParam()` and `parseViewParam()` functions from the links module. The helper's unit tests (8 tests) still pass unchanged.
+   883→
+   884→### Param contract (public API for future chunks)
+   885→
+   886→```ts
+   887→// src/lib/dashboard/dashboard-links.ts
+   888→export const PARAM_VIEW = "view";
+   889→export const PARAM_STATUS = "status";
+   890→
+   891→// URL builders:
+   892→complianceFilterUrl("OVERDUE")  → "/?view=compliance&status=OVERDUE"
+   893→complianceUnfilteredUrl()       → "/?view=compliance"
+   894→unionsListUrl()                  → "/?view=unions"
+   895→
+   896→// Param parsers (validate + degrade to null):
+   897→parseStatusParam("OVERDUE")     → "OVERDUE"
+   898→parseStatusParam("bogus")       → null  (degrade to unfiltered)
+   899→parseStatusParam(null)           → null  (absent → unfiltered)
+   900→parseViewParam("compliance")    → "compliance"
+   901→parseViewParam(null)             → null  (absent → dashboard)
+   902→```
+   903→
+   904→Values are uppercase `ComplianceStatus` values from `status-config.ts` — no literal strings. Future chunks can add `?daysAhead=`, `?documentType=`, `?status=overdue,expiring` by extending the links module without breaking existing URLs.
+   905→
+   906→### KPI card wiring
+   907→
+   908→| KPI Card | href | Target | Deep-link? |
+   909→|----------|------|--------|------------|
+   910→| Total Unions | `unionsListUrl()` → `/?view=unions` | Unions view (SPA) | ✅ |
+   911→| Documents | `complianceUnfilteredUrl()` → `/?view=compliance` | Compliance view (no documents list exists — see decision below) | ✅ |
+   912→| Compliant | `complianceFilterUrl("COMPLIANT")` → `/?view=compliance&status=COMPLIANT` | Compliance view, filtered | ✅ |
+   913→| Expiring | `complianceFilterUrl("EXPIRING")` → `/?view=compliance&status=EXPIRING` | Compliance view, filtered | ✅ |
+   914→| Overdue | `complianceFilterUrl("OVERDUE")` → `/?view=compliance&status=OVERDUE` | Compliance view, filtered | ✅ |
+   915→| Missing | `complianceFilterUrl("MISSING")` → `/?view=compliance&status=MISSING` | Compliance view, filtered | ✅ |
+   916→
+   917→### Documents KPI decision
+   918→
+   919→No documents list page exists in the SPA. The closest meaningful page is the Compliance view (which shows the full matrix including document statuses). The Documents KPI links to `complianceUnfilteredUrl()` — the compliance view without a status filter. This is a reasonable fallback: the user sees all document compliance states and can filter from there. **Gap**: a dedicated documents list page (e.g. `/?view=documents`) would be more specific — proposed for a future chunk.
+   920→
+   921→### Hover/focus affordances on clickable cards
+   922→
+   923→- `cursor-pointer` on the Card when `href` is provided
+   924→- `hover:shadow-md hover:border-accent` — subtle elevation + accent border on hover
+   925→- `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` — visible focus ring on keyboard focus
+   926→- `aria-label` on the anchor: e.g. "Missing: 57 documents — view filtered list"
+   927→
+   928→### Updated gap inventory
+   929→
+   930→| Gap | Source | Status | Resolution/Proposal |
+   931→|-----|--------|--------|---------------------|
+   932→| Union detail page uses `[registrationNo]`, not `[id]` | 3.1, 3.2b | **Still open** | 4.1 did NOT resolve — KPIs use SPA view switching, not the public route. The heatmap's `/unions/{unionId}` links (3.2b) still have this gap. 4.1 proposal: add `registrationNo` to the `/api/compliance` response OR add a redirect from `/unions/{id}` to `/unions/{registrationNo}`. |
+   933→| "View all N" in Needs Attention can't express overdue+expiring | 3.1 | **Still open** | 4.1 did NOT implement multi-status. Proposal: extend `parseStatusParam` to accept comma-separated values `?status=OVERDUE,EXPIRING`. |
+   934→| 60/90 forecast rows non-interactive | 3.3 | **Still open** | 4.1 did NOT implement date-range. Proposal: add `?daysAhead=60` param to the links module. |
+   935→| No direct document-detail route | 3.2b | **Still open** | 4.1 did NOT create routes. Proposal: `/?view=unions&union={unionId}&document={documentId}`. |
+   936→| No documents list page | 4.1 (this chunk) | **New gap** | Documents KPI links to compliance unfiltered. Proposal: `/?view=documents` for a dedicated list. |
+   937→| KPI cards are anchors → deep-linkable | 4.1 | **RESOLVED** | All 6 KPI cards now have hrefs from the links module. URL params reproduce the filter on paste. |
+   938→
+   939→### Files touched (in scope)
+   940→
+   941→| File | Change |
+   942→|------|--------|
+   943→| `src/lib/dashboard/dashboard-links.ts` | **Created** — URL builders, param parsers, param key constants |
+   944→| `src/app/page.tsx` | Added `?view=` + `?status=` URL param reading on mount; imports from links module |
+   945→| `src/components/app/views/dashboard.tsx` | StatCard gains `href` + `ariaLabel` props; KPI cards wired with links module; hover/focus affordances |
+   946→| `src/lib/__tests__/dashboard-links.test.ts` | **Created** — 31 tests: URL builders, param parsing, KPI href assertions, deep-link degradation |
+   947→| `docs/dashboard-data-audit.md` | Appended 4.1 handoff note |
+   948→
+   949→### Acceptance criteria evidence
+   950→
+   951→| Criterion | Evidence |
+   952→|-----------|----------|
+   953→| Each KPI renders anchor with exact href from links module | 31 tests in `dashboard-links.test.ts` assert hrefs match builders |
+   954→| Deep-link test: render destination with param → filtered | `page.tsx` reads `?view=compliance&status=OVERDUE` → sets `activeView="compliance"` + `initialStatusFilter="OVERDUE"` → `ComplianceView` receives filter |
+   955→| Invalid/absent param degrades to unfiltered | `parseStatusParam("BOGUS") → null`, `parseStatusParam(null) → null`, `parseViewParam("nonexistent") → null` — all tested |
+   956→| Unions KPI target resolves; Documents KPI decision documented | Total Unions → `unionsListUrl()` ✅; Documents → `complianceUnfilteredUrl()` with gap logged ✅ |
+   957→| Keyboard focus visible; hover affordance; accessible names | `focus-visible:ring-2`, `hover:shadow-md`, `aria-label` per card — asserted in test |
+   958→| Gap inventory updated | 6 gaps tracked: 1 resolved, 5 still open with refined proposals |
+   959→| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 18 files, 284 tests, all green ✅ |
