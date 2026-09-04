@@ -67,6 +67,8 @@ export interface ComplianceCell {
   filedAt: Date | null;
   /** When the document expires (filedAt + renewalYears). Null if no version or N/A. */
   expiryDate: Date | null;
+  /** The Document row's ID, if a document exists for this cell. Null for MISSING. */
+  documentId?: string | null;
 }
 
 export interface ComplianceRate {
@@ -366,3 +368,166 @@ export function getNeedsAttention(
 
 /** Maximum number of rows to display in the Needs Attention panel. */
 export const NEEDS_ATTENTION_CAP = 10;
+
+// =============================================================================
+// UnionDocMatrix — the union × document-type compliance matrix.
+//
+// Per chunk 0.1 audit: required doc types are IDENTICAL for every union
+// (13 global ComplianceRules, all required=true). The NOT_REQUIRED cell
+// state is modeled defensively but will never occur in the current fixture.
+//
+// The status derivation is `calculateStatus` from calculator.ts — the
+// canonical single derivation. No duplicate `deriveDocumentStatus` is
+// created; the matrix builder (buildComplianceMatrix) already calls
+// calculateStatusFromRows which wraps calculateStatus.
+// =============================================================================
+
+/** A single cell in the union × doc-type matrix. */
+export interface UnionDocMatrixCell {
+  /** The compliance status from STATUS_CONFIG. */
+  status: ComplianceStatus;
+  /** The Document row's ID, if a document exists. Null for MISSING / NOT_REQUIRED. */
+  documentId: string | null;
+  /** When the document expires (null for MISSING / NOT_REQUIRED / no version). */
+  dueDate: Date | null;
+}
+
+/** A single row (one union) in the matrix. */
+export interface UnionDocMatrixRow {
+  unionId: string;
+  unionName: string;
+  /** One entry per required doc type, in config order. */
+  cells: UnionDocMatrixCell[];
+}
+
+/** Aggregation helpers for the matrix. */
+export interface MatrixTotals {
+  /** Per-status counts across the entire matrix. */
+  rowTotals: ComplianceCounts[];
+  /** Per-status counts per doc type (column). */
+  columnTotals: Record<string, ComplianceCounts>;
+  /** Grand totals across all cells. */
+  grandTotals: ComplianceCounts;
+}
+
+/** The complete matrix + metadata. */
+export interface UnionDocMatrix {
+  rows: UnionDocMatrixRow[];
+  /** Doc type names in column order (matches cells[] order). */
+  columnTypes: string[];
+  totals: MatrixTotals;
+}
+
+/**
+ * Build a union × document-type compliance matrix from cells + unions.
+ *
+ * Rows = unions (name ASC), columns = required doc types (first-seen order,
+ * which matches the compliance matrix's rule order).
+ * Cells = { status, documentId, dueDate } from the ComplianceCell data.
+ *
+ * NOT_REQUIRED cells are modeled as a status but will never appear in the
+ * current fixture (all 13 rules are required for all unions).
+ *
+ * @param cells   ComplianceCell[] — one per (union × doc type) pair, enriched with documentId
+ * @param unions  UnionSummary[] — determines row order + names
+ * @param requiredTypes  String[] — determines column order
+ * @returns UnionDocMatrix with rows, columns, and aggregation totals
+ */
+export function getUnionDocMatrix(
+  cells: ComplianceCell[],
+  unions: UnionSummary[],
+  requiredTypes: string[],
+): UnionDocMatrix {
+  // Build a lookup: (unionId, documentType) → ComplianceCell
+  const cellMap = new Map<string, ComplianceCell>();
+  for (const cell of cells) {
+    cellMap.set(`${cell.unionId}::${cell.documentType}`, cell);
+  }
+
+  // Sort unions by name ASC (deterministic)
+  const sortedUnions = [...unions].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+
+  // Initialize column totals
+  const columnTotals: Record<string, ComplianceCounts> = {};
+  for (const docType of requiredTypes) {
+    columnTotals[docType] = {
+      COMPLIANT: 0,
+      EXPIRING: 0,
+      OVERDUE: 0,
+      MISSING: 0,
+      NOT_APPLICABLE: 0,
+    };
+  }
+
+  // Initialize grand totals
+  const grandTotals: ComplianceCounts = {
+    COMPLIANT: 0,
+    EXPIRING: 0,
+    OVERDUE: 0,
+    MISSING: 0,
+    NOT_APPLICABLE: 0,
+  };
+
+  // Build rows
+  const rows: UnionDocMatrixRow[] = sortedUnions.map((union) => {
+    const rowCells: UnionDocMatrixCell[] = requiredTypes.map((docType) => {
+      const cell = cellMap.get(`${union.id}::${docType}`);
+
+      // If no cell exists for this (union × type), it's MISSING (or NOT_REQUIRED
+      // if the type isn't required — but in the current fixture all types are
+      // required for all unions, so this path produces MISSING)
+      if (!cell) {
+        grandTotals.MISSING++;
+        columnTotals[docType].MISSING++;
+        return {
+          status: "MISSING" as ComplianceStatus,
+          documentId: null,
+          dueDate: null,
+        };
+      }
+
+      // Count the status in totals
+      grandTotals[cell.status]++;
+      columnTotals[docType][cell.status]++;
+
+      return {
+        status: cell.status,
+        documentId: cell.documentId ?? null,
+        dueDate: cell.expiryDate,
+      };
+    });
+
+    return {
+      unionId: union.id,
+      unionName: union.name,
+      cells: rowCells,
+    };
+  });
+
+  // Build row totals (per union)
+  const rowTotals: ComplianceCounts[] = rows.map((row) => {
+    const counts: ComplianceCounts = {
+      COMPLIANT: 0,
+      EXPIRING: 0,
+      OVERDUE: 0,
+      MISSING: 0,
+      NOT_APPLICABLE: 0,
+    };
+    for (const cell of row.cells) {
+      counts[cell.status]++;
+    }
+    return counts;
+  });
+
+  return {
+    rows,
+    columnTypes: requiredTypes,
+    totals: {
+      rowTotals,
+      columnTotals,
+      grandTotals,
+    },
+  };
+}

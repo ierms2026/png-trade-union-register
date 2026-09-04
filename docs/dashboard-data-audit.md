@@ -623,3 +623,96 @@ The chunk prompt mentioned "30" but the canonical `EXPIRING_WINDOW_DAYS` in `sta
 | Mutation test extended | COMPLIANT→EXPIRING flip: row appears, counts move everywhere; due-date-outside-window: row disappears |
 | Grep clean | 0 hex codes, 0 hardcoded status strings, 0 hardcoded windows in component |
 | Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 14 files, 204 tests, all green |
+
+---
+
+## Appendix — Chunk 3.2a Handoff (union × doc-type matrix selector)
+
+### Derivation function: `calculateStatus` (no new function needed)
+
+Per prerequisite check, the canonical status derivation is `calculateStatus(rule, document, latestVersion, now)` in `src/lib/compliance/calculator.ts` (line 237). It reads `EXPIRING_WINDOW_DAYS = 90` from its own module, which matches the status config's value. The matrix builder (`buildComplianceMatrix` in `src/lib/compliance/matrix.ts`) already calls `calculateStatusFromRows` which wraps `calculateStatus`.
+
+No `deriveDocumentStatus(doc, now)` was created — the existing `calculateStatus` IS the single derivation. All selectors and the matrix builder consume it. No duplication exists.
+
+### NOT_REQUIRED finding
+
+Required doc types are **IDENTICAL for every union** — 13 global `ComplianceRule`s, all `required: true`. No per-union variation. The `NOT_APPLICABLE` state is modeled in `UnionDocMatrixCell.status` (as a `ComplianceStatus`) but will never occur in the current fixture. Asserted in the test `NOT_REQUIRED state: modeled defensively, never occurs in fixture` — all cells have status ∈ {COMPLIANT, EXPIRING, OVERDUE, MISSING} and `NOT_APPLICABLE` grand total = 0.
+
+### No-due-date resolution
+
+A doc on file with no `expiryDate` (null) has `dueDate: null` in the matrix cell. By the calculator's definitions, a doc with no expiry date cannot be EXPIRING or OVERDUE (those require a past/near expiry date). If `filedAt` is null too, the calculator returns MISSING. If `filedAt` exists but `expiryDate` is null (e.g., permanent filing with `renewalYears = 99`), the calculator returns COMPLIANT (the doc never expires). The matrix preserves whatever the calculator produced — it does not re-derive status.
+
+### Window boundary resolution
+
+The calculator uses `expiryDate.getTime() <= now + EXPIRING_WINDOW_DAYS * msPerDay` for EXPIRING (inclusive boundary). A doc due exactly 90 days from now is EXPIRING, not COMPLIANT. The matrix does not re-derive — it trusts the calculator's output.
+
+### Selector API (for chunk 3.2b)
+
+```ts
+import { getUnionDocMatrix, type UnionDocMatrix, type UnionDocMatrixRow, type UnionDocMatrixCell } from "@/lib/dashboard/metrics";
+
+const matrix: UnionDocMatrix = getUnionDocMatrix(cells, unions, requiredTypes);
+
+// Matrix shape:
+// matrix.rows: UnionDocMatrixRow[]  — one per union, sorted by name ASC
+// matrix.columnTypes: string[]      — doc type names in column order
+// matrix.totals.grandTotals: ComplianceCounts
+// matrix.totals.columnTotals: Record<string, ComplianceCounts>
+// matrix.totals.rowTotals: ComplianceCounts[]
+
+// Each row:
+// row.unionId: string
+// row.unionName: string
+// row.cells: UnionDocMatrixCell[]  — one per doc type, in columnTypes order
+
+// Each cell:
+// cell.status: ComplianceStatus  — for color/icon from STATUS_CONFIG
+// cell.documentId: string | null  — for click-through to document view (3.2b needs this)
+// cell.dueDate: Date | null        — for tooltip (use formatDueDate from date-utils.ts)
+```
+
+3.2b should:
+- Render a heatmap/grid with rows = unions, columns = doc types
+- Color each cell from `STATUS_CONFIG[cell.status].colorToken`
+- Show tooltip with `formatDueDate(cell.dueDate, now)` when `cell.dueDate` is not null
+- Make cells clickable → navigate to the document view or the compliance matrix filtered by status (using `navigateToComplianceFilter`)
+
+### Reconciliation evidence
+
+All four invariants asserted and passing:
+
+| Invariant | Evidence |
+|-----------|----------|
+| grandTotals ≡ tallyComplianceCounts() | `grandTotals.COMPLIANT = onFileCounts.COMPLIANT = 17`; MISSING = onFileCounts.MISSING + (78 - onFileCount) = 57 |
+| columnTotals.missing ≡ 2.2 selector | For each type, `columnTotals[type].MISSING` = `getRequiredVsOnFileByType(...).missing` |
+| row cell count ≡ required count | Each row has 13 cells (one per required type) |
+| grand total ≡ denominator | 17 + 2 + 2 + 57 = 78 |
+
+### Edge cases tested
+
+| Case | Test |
+|------|------|
+| NOT_REQUIRED state (defensive) | `NOT_REQUIRED state: modeled defensively, never occurs in fixture` — asserts 0 NOT_APPLICABLE |
+| No due date | `doc on file with NO due date: cannot be EXPIRING/OVERDUE — MISSING by definition` |
+| Window boundary | `window boundary: doc due exactly EXPIRING_WINDOW_DAYS from now — EXPIRING (per calculator)` |
+| Duplicate (union, type) | `two ACTIVE docs of same type for one union: matrix shows one cell (no silent picking)` — last cell wins (DB prevents this in production) |
+| Empty cells | `empty cells (no docs at all) → all MISSING, grand total = unions × types` |
+| Frozen time | `frozen time: results are deterministic` |
+
+### Mutation tests
+
+- Remove one doc → cell flips to MISSING, COMPLIANT decremented, MISSING incremented, columnTotals reconcile with 2.2 selector
+- Flip due date across window → cell status changes, grand totals move, computeComplianceRate reconciles
+- Cross-widget: matrix grandTotals reconcile with computeComplianceRate (numerator = grandTotals.COMPLIANT, denominator = 78)
+
+### ComplianceCell enrichment
+
+`ComplianceCell` gained an optional `documentId?: string | null` field. This is needed for the matrix to pass document IDs through to 3.2b's clickable cells. Existing code that creates `ComplianceCell` objects without `documentId` will continue to work (the field is optional).
+
+### Files touched (in scope)
+
+| File | Change |
+|------|--------|
+| `src/lib/dashboard/metrics.ts` | Added `documentId?` to `ComplianceCell`; added `UnionDocMatrixCell`, `UnionDocMatrixRow`, `MatrixTotals`, `UnionDocMatrix` types; added `getUnionDocMatrix()` selector |
+| `src/lib/__tests__/dashboard-union-doc-matrix.test.ts` | **Created** — 16 tests: 7 reconciliation invariants, 5 edge cases, 4 mutation tests |
+| `docs/dashboard-data-audit.md` | Appended 3.2a handoff note |
