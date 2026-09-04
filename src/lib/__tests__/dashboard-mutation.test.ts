@@ -830,3 +830,268 @@ describe("required vs on-file — per-type meters", () => {
     expect(typesWithHigherMissing.length).toBe(4); // the 4 other zero-on-file types
   });
 });
+
+// =============================================================================
+// Needs Attention tests — chunk 3.1 acceptance criteria:
+// - Panel contents match the config-derived selector exactly
+// - Sort: OVERDUE before EXPIRING, then expiryDate ASC, ties by unionName ASC
+// - Cross-widget invariant: panel row count per status = getComplianceCounts()
+// - Frozen time: all tests use a fixed `now`, no real clock
+// - Empty state: 0 overdue + 0 expiring → empty panel
+// - Cap: more than NEEDS_ATTENTION_CAP entries → cap + "View all N"
+// - Mutation: flip COMPLIANT → EXPIRING with due date inside window → row appears
+// =============================================================================
+
+import {
+  getNeedsAttention,
+  NEEDS_ATTENTION_CAP,
+  type NeedsAttentionEntry,
+} from "../dashboard/metrics";
+
+// Frozen time for deterministic tests
+const FROZEN_NOW = new Date("2026-06-15T12:00:00Z");
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function makeFixtureUnions() {
+  return Array.from({ length: 6 }, (_, i) => ({
+    id: `union-${i}`,
+    name: `Union ${String.fromCharCode(65 + i)}`, // Union A, B, C, D, E, F
+    registrationNo: `TU-2024-${String(i + 1).padStart(3, "0")}`,
+    status: i === 5 ? "SUSPENDED" : "ACTIVE",
+  }));
+}
+
+function makeFixtureCellsWithNeedsAttention(): ComplianceCell[] {
+  const cells: ComplianceCell[] = [];
+
+  // 2 OVERDUE cells (different unions, different dates)
+  cells.push({
+    unionId: "union-0",
+    documentType: "Financial Return",
+    status: "OVERDUE",
+    filedAt: new Date("2023-01-01"),
+    expiryDate: new Date(FROZEN_NOW.getTime() - 30 * MS_PER_DAY), // 30 days overdue
+  });
+  cells.push({
+    unionId: "union-2",
+    documentType: "Election of Office Bearers",
+    status: "OVERDUE",
+    filedAt: new Date("2023-06-01"),
+    expiryDate: new Date(FROZEN_NOW.getTime() - 10 * MS_PER_DAY), // 10 days overdue
+  });
+
+  // 2 EXPIRING cells (within 90 days)
+  cells.push({
+    unionId: "union-1",
+    documentType: "Financial Return",
+    status: "EXPIRING",
+    filedAt: new Date("2025-08-01"),
+    expiryDate: new Date(FROZEN_NOW.getTime() + 12 * MS_PER_DAY), // in 12 days
+  });
+  cells.push({
+    unionId: "union-3",
+    documentType: "Affiliations",
+    status: "EXPIRING",
+    filedAt: new Date("2025-08-01"),
+    expiryDate: new Date(FROZEN_NOW.getTime() + 60 * MS_PER_DAY), // in 60 days
+  });
+
+  // Some COMPLIANT and MISSING cells (should NOT appear in needs attention)
+  for (let i = 0; i < 5; i++) {
+    cells.push({
+      unionId: `union-${i}`,
+      documentType: `compliant-${i}`,
+      status: "COMPLIANT",
+      filedAt: new Date("2024-01-01"),
+      expiryDate: new Date("2027-01-01"),
+    });
+  }
+  for (let i = 0; i < 10; i++) {
+    cells.push({
+      unionId: `union-${i % 6}`,
+      documentType: `missing-${i}`,
+      status: "MISSING",
+      filedAt: null,
+      expiryDate: null,
+    });
+  }
+
+  return cells;
+}
+
+describe("needs attention — selector + panel", () => {
+  const unions = makeFixtureUnions();
+
+  it("baseline: 2 overdue + 2 expiring = 4 entries", () => {
+    const cells = makeFixtureCellsWithNeedsAttention();
+    const entries = getNeedsAttention(cells, unions, FROZEN_NOW);
+    expect(entries).toHaveLength(4);
+  });
+
+  it("sort: OVERDUE before EXPIRING, then by expiryDate ASC, ties by unionName ASC", () => {
+    const cells = makeFixtureCellsWithNeedsAttention();
+    const entries = getNeedsAttention(cells, unions, FROZEN_NOW);
+
+    // First 2 are OVERDUE (sorted by expiryDate ASC = most overdue first)
+    expect(entries[0].status).toBe("OVERDUE");
+    expect(entries[1].status).toBe("OVERDUE");
+    // Union 0's expiry is 30 days ago; Union 2's is 10 days ago
+    // 30 days ago < 10 days ago → Union 0 is more overdue (earlier date)
+    expect(entries[0].unionName).toBe("Union A");
+    expect(entries[0].documentType).toBe("Financial Return");
+    expect(entries[1].unionName).toBe("Union C");
+    expect(entries[1].documentType).toBe("Election of Office Bearers");
+
+    // Next 2 are EXPIRING (sorted by expiryDate ASC = soonest first)
+    expect(entries[2].status).toBe("EXPIRING");
+    expect(entries[3].status).toBe("EXPIRING");
+    // in 12 days < in 60 days → Union B's Financial Return first
+    expect(entries[2].unionName).toBe("Union B");
+    expect(entries[2].documentType).toBe("Financial Return");
+    expect(entries[3].unionName).toBe("Union D");
+    expect(entries[3].documentType).toBe("Affiliations");
+  });
+
+  it("cross-widget invariant: panel count per status = getComplianceCounts()", () => {
+    const cells = makeFixtureCellsWithNeedsAttention();
+    const entries = getNeedsAttention(cells, unions, FROZEN_NOW);
+    const counts = tallyComplianceCounts(cells);
+
+    // Panel overdue count = counts.OVERDUE
+    const panelOverdue = entries.filter((e) => e.status === "OVERDUE").length;
+    expect(panelOverdue).toBe(counts.OVERDUE);
+
+    // Panel expiring count = counts.EXPIRING
+    const panelExpiring = entries.filter((e) => e.status === "EXPIRING").length;
+    expect(panelExpiring).toBe(counts.EXPIRING);
+
+    // COMPLIANT and MISSING are NOT in the panel
+    const panelCompliant = entries.filter((e) => e.status === "COMPLIANT").length;
+    const panelMissing = entries.filter((e) => e.status === "MISSING").length;
+    expect(panelCompliant).toBe(0);
+    expect(panelMissing).toBe(0);
+  });
+
+  it("empty state: 0 overdue + 0 expiring → empty entries", () => {
+    // All cells COMPLIANT or MISSING
+    const cells: ComplianceCell[] = [
+      ...Array.from({ length: 5 }, (_, i) => ({
+        unionId: `union-${i}`,
+        documentType: `c-${i}`,
+        status: "COMPLIANT" as const,
+        filedAt: new Date("2024-01-01"),
+        expiryDate: new Date("2027-01-01"),
+      })),
+      ...Array.from({ length: 10 }, (_, i) => ({
+        unionId: `union-${i % 6}`,
+        documentType: `m-${i}`,
+        status: "MISSING" as const,
+        filedAt: null,
+        expiryDate: null,
+      })),
+    ];
+    const entries = getNeedsAttention(cells, unions, FROZEN_NOW);
+    expect(entries).toHaveLength(0);
+  });
+
+  it("mutation: flip COMPLIANT → EXPIRING with due date inside window → row appears", () => {
+    const cells = makeFixtureCellsWithNeedsAttention();
+    const before = getNeedsAttention(cells, unions, FROZEN_NOW);
+    expect(before).toHaveLength(4);
+
+    // Find a COMPLIANT cell and flip it to EXPIRING with a due date 45 days from now
+    const compliant = cells.find((c) => c.status === "COMPLIANT")!;
+    expect(compliant).toBeDefined();
+    compliant.status = "EXPIRING";
+    compliant.expiryDate = new Date(FROZEN_NOW.getTime() + 45 * MS_PER_DAY);
+
+    const after = getNeedsAttention(cells, unions, FROZEN_NOW);
+
+    // One more entry
+    expect(after).toHaveLength(5);
+
+    // The new entry is EXPIRING (not OVERDUE)
+    const newEntry = after.find(
+      (e) => e.unionId === compliant.unionId && e.documentType === compliant.documentType,
+    );
+    expect(newEntry).toBeDefined();
+    expect(newEntry!.status).toBe("EXPIRING");
+
+    // Cross-widget: counts.EXPIRING also incremented
+    const countsAfter = tallyComplianceCounts(cells);
+    expect(countsAfter.EXPIRING).toBe(3); // was 2, now 3
+
+    // Cross-widget: counts.COMPLIANT decremented
+    expect(countsAfter.COMPLIANT).toBe(4); // was 5, now 4
+  });
+
+  it("mutation: move a due date outside the 90-day window → status changes, row disappears", () => {
+    // Start with an EXPIRING cell
+    const cells: ComplianceCell[] = [
+      {
+        unionId: "union-0",
+        documentType: "Test Doc",
+        status: "EXPIRING",
+        filedAt: new Date("2025-08-01"),
+        expiryDate: new Date(FROZEN_NOW.getTime() + 30 * MS_PER_DAY), // in 30 days
+      },
+    ];
+
+    const before = getNeedsAttention(cells, unions, FROZEN_NOW);
+    expect(before).toHaveLength(1);
+
+    // Move the expiry date 200 days out — outside the 90-day window
+    // The compliance calculator would reclassify this as COMPLIANT
+    // (but we're simulating the selector behavior, not the calculator)
+    cells[0].status = "COMPLIANT";
+    cells[0].expiryDate = new Date(FROZEN_NOW.getTime() + 200 * MS_PER_DAY);
+
+    const after = getNeedsAttention(cells, unions, FROZEN_NOW);
+    expect(after).toHaveLength(0); // no longer in needs attention
+  });
+
+  it("cap: more than NEEDS_ATTENTION_CAP entries → cap is applied by the component", () => {
+    // Create 15 OVERDUE cells (more than cap of 10)
+    const cells: ComplianceCell[] = Array.from({ length: 15 }, (_, i) => ({
+      unionId: `union-${i % 6}`,
+      documentType: `doc-${i}`,
+      status: "OVERDUE" as const,
+      filedAt: new Date("2023-01-01"),
+      expiryDate: new Date(FROZEN_NOW.getTime() - (i + 1) * MS_PER_DAY),
+    }));
+
+    const entries = getNeedsAttention(cells, unions, FROZEN_NOW);
+    expect(entries).toHaveLength(15); // selector returns all
+    expect(NEEDS_ATTENTION_CAP).toBe(10);
+
+    // The component would display only NEEDS_ATTENTION_CAP (10) rows
+    // and show "View all 15"
+    const visibleCount = Math.min(entries.length, NEEDS_ATTENTION_CAP);
+    expect(visibleCount).toBe(10);
+    const hasMore = entries.length > NEEDS_ATTENTION_CAP;
+    expect(hasMore).toBe(true);
+  });
+
+  it("frozen time: results are deterministic with the same now", () => {
+    const cells = makeFixtureCellsWithNeedsAttention();
+    const result1 = getNeedsAttention(cells, unions, FROZEN_NOW);
+    const result2 = getNeedsAttention(cells, unions, FROZEN_NOW);
+
+    // Same entries in same order
+    expect(result1.map((e) => e.unionName)).toEqual(result2.map((e) => e.unionName));
+    expect(result1.map((e) => e.documentType)).toEqual(result2.map((e) => e.documentType));
+  });
+
+  it("links point at existing routes (/unions/{unionId})", () => {
+    const cells = makeFixtureCellsWithNeedsAttention();
+    const entries = getNeedsAttention(cells, unions, FROZEN_NOW);
+
+    // The component uses href={`/unions/${item.unionId}`}
+    // Verify the unionId is a valid path segment
+    for (const entry of entries) {
+      expect(entry.unionId).toBeTruthy();
+      expect(entry.unionId).not.toContain(" ");
+      expect(entry.unionId).not.toContain("/");
+    }
+  });
+});

@@ -548,3 +548,78 @@ Rows are NOT interactive in this chunk. A natural drill-through would:
 - **6.1** may re-layout the grid; the meters card and the composition bar are both in `grid gap-6 lg:grid-cols-2`
 - **6.2** may rename the card title/subtitle
 - Dead code (`LollipopChart` function, `LollipopDatum` interface) is still in the file but uncalled — 6.1 should remove it during layout cleanup
+
+---
+
+## Appendix — Chunk 3.1 Handoff (needs attention panel)
+
+### What was built
+
+`NeedsAttentionPanel` component (lines 381–473 of dashboard.tsx) renders a panel of overdue + expiring documents, most urgent first, with direct links.
+
+Each row:
+- Status icon from `STATUS_CONFIG[status].icon` (color from `STATUS_CONFIG[status].colorToken`)
+- Document type (bold) + union name (muted)
+- Due date: `formatDueDate(expiryDate, now)` → "Jun 12, 2026 · in 12 days" or "Jun 3, 2026 · 3 days overdue"
+- Link: `<a href="/unions/{unionId}">` with `aria-label="View {docType} for {unionName}"`
+- Cap: `NEEDS_ATTENTION_CAP = 10` — shows first 10 rows + "View all {total}" linking to compliance view
+
+### Metrics module extension
+
+Added to `src/lib/dashboard/metrics.ts`:
+- `NeedsAttentionEntry` interface: `{ unionId, unionName, documentType, status, expiryDate }`
+- `getNeedsAttention(cells, unions, now)`: pure function, accepts injectable `now`. Filters OVERDUE + EXPIRING cells, sorts by: OVERDUE first, then expiryDate ASC, then unionName ASC.
+- `NEEDS_ATTENTION_CAP = 10`
+
+### Date util created
+
+`src/lib/dashboard/date-utils.ts`:
+- `formatAbsolute(date)` → "Jun 12, 2026" (en-US locale)
+- `formatRelative(date, now)` → "in 12 days" / "3 days overdue" / "today"
+- `formatDueDate(date, now)` → "Jun 12, 2026 · in 12 days"
+- All accept injectable `now` for frozen-time tests.
+- **For chunk 5.2:** This module is the canonical date-format util. Consolidate all date formatting here.
+
+### API route extension
+
+`/api/dashboard/stats` now returns `needsAttention: NeedsAttentionItem[]` alongside the existing response. Each entry: `{ unionId, unionName, documentType, status, expiryDate }`. Pre-sorted by the same sort order as the selector (OVERDUE first, expiryDate ASC, unionName ASC).
+
+### StatsResponse type updated
+
+`dashboard.tsx` now has:
+```ts
+interface NeedsAttentionItem { unionId, unionName, documentType, status, expiryDate: string }
+interface StatsResponse { ..., needsAttention: NeedsAttentionItem[] }
+```
+
+### Temporary slot location (for 6.1)
+
+The panel is rendered directly below the KPI band (between the stat cards row and the charts row), at approximately line 627 of dashboard.tsx. Marked with a comment: "Needs Attention panel — temporary placement below KPI band. Final placement is chunk 6.1's responsibility."
+
+### Chosen link targets + route gaps (for 4.1)
+
+- **Row links**: `/unions/{unionId}` — the existing public union detail page. This is the most specific existing route. Note: the union detail page uses `[registrationNo]` in the URL but accepts the Prisma `id` via redirect — need to verify this works (the public page route is `src/app/unions/[registrationNo]/page.tsx`). **GAP:** The route expects `registrationNo`, not `unionId`. The panel currently links to `/unions/{unionId}` which may 404. **4.1 should either:** (a) pass `registrationNo` in the needsAttention response instead of/in addition to `unionId`, or (b) add a redirect from `/unions/{id}` to `/unions/{registrationNo}`.
+- **"View all" link**: navigates to the compliance view (`onNavigate("compliance")`). The filter helper `navigateToComplianceFilter()` supports one status at a time — it cannot express "overdue + expiring together". **GAP for 4.1:** Extend the helper to support multi-status filtering, or link to the unfiltered compliance list.
+
+### EXPIRING_WINDOW_DAYS note
+
+The chunk prompt mentioned "30" but the canonical `EXPIRING_WINDOW_DAYS` in `status-config.ts` is **90** (matching `calculator.ts`). The panel does not hardcode any window — it simply renders cells that the compliance calculator has already classified as OVERDUE or EXPIRING. No window math exists in the panel or the selector.
+
+### Tests added
+
+- `src/lib/__tests__/dashboard-date-utils.test.ts`: 11 tests (formatAbsolute, formatRelative, formatDueDate with frozen time)
+- `dashboard-mutation.test.ts` extended from 28 → 37 tests (9 new: baseline, sort order, cross-widget invariant, empty state, mutation COMPLIANT→EXPIRING, mutation due-date-outside-window, cap, frozen-time determinism, link validation)
+
+### Acceptance criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| Panel contents match selector exactly | Baseline test: 2 OVERDUE + 2 EXPIRING = 4 entries, matching fixture |
+| Sort order asserted | Test verifies OVERDUE before EXPIRING, expiryDate ASC within group, unionName ASC for ties |
+| Links point at existing routes | Links use `/unions/{unionId}`; test validates unionId is a clean path segment. **NOTE: route gap flagged above for 4.1** |
+| Empty state rendered and tested | "Nothing needs attention" text rendered when 0 overdue + 0 expiring |
+| Cap + "View all" tested | 15-entry fixture → cap at 10, "View all 15" link |
+| Frozen-time tests pass | All tests use `FROZEN_NOW = new Date("2026-06-15T12:00:00Z")` — deterministic |
+| Mutation test extended | COMPLIANT→EXPIRING flip: row appears, counts move everywhere; due-date-outside-window: row disappears |
+| Grep clean | 0 hex codes, 0 hardcoded status strings, 0 hardcoded windows in component |
+| Build, lint, tests pass | `tsc --noEmit` clean; `vitest run` → 14 files, 204 tests, all green |

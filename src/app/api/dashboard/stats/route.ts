@@ -86,6 +86,34 @@ export async function GET() {
   const applicable = compliant + expiring + overdue + missing;
   const overallRate = applicable === 0 ? 0 : Math.round((compliant / applicable) * 100);
 
+  // --- 3. Build needs-attention entries (overdue + expiring) -----------
+  // Extract from the matrix cells that have status OVERDUE or EXPIRING,
+  // with union name + expiry date for the Needs Attention panel.
+  const needsAttention = matrix.unions.flatMap((row) =>
+    row.scores
+      .filter((cell) => cell.status === "OVERDUE" || cell.status === "EXPIRING")
+      .filter((cell) => cell.expiresAt !== null)
+      .map((cell) => ({
+        unionId: row.unionId,
+        unionName: row.unionName,
+        documentType: cell.documentType,
+        status: cell.status,
+        expiryDate: cell.expiresAt,
+      }))
+  );
+
+  // Sort: OVERDUE before EXPIRING, then by expiryDate ASC, then unionName ASC
+  needsAttention.sort((a, b) => {
+    const aPriority = a.status === "OVERDUE" ? 0 : 1;
+    const bPriority = b.status === "OVERDUE" ? 0 : 1;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    if (a.expiryDate && b.expiryDate) {
+      const dateDiff = new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
+      if (dateDiff !== 0) return dateDiff;
+    }
+    return a.unionName.localeCompare(b.unionName);
+  });
+
   return NextResponse.json({
     totalUnions,
     activeCount,
@@ -102,5 +130,6 @@ export async function GET() {
         percentage: overallRate,
       },
     },
+    needsAttention,
   });
 }
