@@ -9,12 +9,29 @@ import { StatsSkeleton, ActivitySkeleton, CardListSkeleton } from "@/components/
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { type LucideIcon } from "lucide-react";
-import { STATUS_CONFIG, getTileStatuses, COMPLIANCE_STATUSES, EXPIRING_WINDOW_DAYS, FORECAST_BUCKETS, type ComplianceStatus } from "@/lib/dashboard/status-config";
+import { STATUS_CONFIG, getTileStatuses, COMPLIANCE_STATUSES, EXPIRING_WINDOW_DAYS, FORECAST_BUCKETS, TREND_WINDOW_DAYS, DASHBOARD_KPI_DEFINITIONS, type ComplianceStatus } from "@/lib/dashboard/status-config";
 import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP, getUnionDocMatrix, type UnionDocMatrix, type ComplianceCell, type UnionSummary, getExpiryForecast, type ExpiryForecast, type ForecastBucket } from "@/lib/dashboard/metrics";
-import { formatDueDate, formatAbsolute } from "@/lib/dashboard/date-utils";
+import { formatDueDate, formatAbsolute, formatEventRelative } from "@/lib/dashboard/date-utils";
 import { complianceFilterUrl, complianceUnfilteredUrl, unionsListUrl } from "@/lib/dashboard/dashboard-links";
+import {
+  hasSufficientHistory,
+  sliceTrendToWindow,
+  buildChartSeriesWithGaps,
+  buildSparklinePoints,
+  extractSparklineSeries,
+  type ComplianceTrendPoint,
+  type TrendChartDatum,
+} from "@/lib/dashboard/snapshot";
+import {
+  getActivitySummary,
+  RECENT_ACTIVITY_ROW_CAP,
+  type ActivityEvent,
+  type StateChangingEvent,
+  type SessionSummary,
+} from "@/lib/dashboard/activity";
+import { type EventSeverity } from "@/lib/dashboard/activity-config";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -56,15 +73,11 @@ interface StatsResponse {
   needsAttention: NeedsAttentionItem[];
 }
 
-interface ActivityEntry {
-  id: string;
-  actorName: string;
-  action: string;
-  entityType: string;
-  entityId: string | null;
-  severity: string;
-  createdAt: string;
-}
+// ActivityEntry mirrors ActivityEvent from the selector module (chunk 5.1).
+// The selector's `getActivitySummary` accepts ActivityEvent[] — the activity
+// API's response shape matches. We keep this local alias for readability
+// at the useFetch call site; the structural identity is verified by TS.
+type ActivityEntry = ActivityEvent;
 
 interface StatCardProps {
   label: string;
@@ -75,14 +88,67 @@ interface StatCardProps {
   href?: string;
   /** Accessible name for the link, e.g. "Missing: 57 documents — view filtered list". */
   ariaLabel?: string;
+  /**
+   * Optional decorative sparkline rendered at the bottom of the card body.
+   * 4.2b: when provided, the sparkline is aria-hidden (the card's value
+   * is the accessible number; the sparkline is decorative context).
+   * Hidden by the caller when `hasSufficientHistory()` is false.
+   */
+  sparkline?: React.ReactNode;
+  /**
+   * 6.2: optional definition text for the card's label tooltip. When
+   * provided, the label becomes a focusable Tooltip trigger (hover +
+   * keyboard focus, never hover-only). The definition comes from
+   * STATUS_CONFIG[status].definition (for status KPIs) or
+   * DASHBOARD_KPI_DEFINITIONS[label] (for Total Unions / Documents).
+   * The RateKpiCard has its own 1.2 tooltip — it does NOT use this prop.
+   */
+  definition?: string;
 }
 
-function StatCard({ label, value, icon: Icon, color, href, ariaLabel }: StatCardProps) {
+function StatCard({ label, value, icon: Icon, color, href, ariaLabel, sparkline, definition }: StatCardProps) {
   const cardContent = (
     <Card className={href ? "cursor-pointer transition-all hover:shadow-md hover:border-accent focus-within:ring-2 focus-within:ring-ring" : ""}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardDescription className="text-xs">{label}</CardDescription>
+          {/* 6.2: label becomes a focusable Tooltip trigger when `definition`
+              is provided. The span uses tabIndex={0} + role="button" rather
+              than a real <button> because the StatCard's outer element may
+              be an <a> (drill-through), and nesting <button> in <a> is
+              invalid HTML. The span is keyboard-accessible via tabIndex +
+              onKeyDown (Enter/Space → preventDefault to avoid triggering
+              the parent <a>'s drill-through; the tooltip opens on focus). */}
+          {definition ? (
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${label} — definition`}
+                    onKeyDown={(e) => {
+                      // Prevent Enter/Space on the label from triggering the
+                      // parent <a>'s drill-through. The tooltip opens on
+                      // focus; keyboard users can press Tab to reach the
+                      // card body's drill-through link separately.
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }
+                    }}
+                    className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-help"
+                  >
+                    <CardDescription className="text-xs underline decoration-dotted underline-offset-2">{label}</CardDescription>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="text-xs">{definition}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <CardDescription className="text-xs">{label}</CardDescription>
+          )}
           <div className={`rounded-md p-1.5 ${color}`}>
             <Icon className="h-3.5 w-3.5" />
           </div>
@@ -90,6 +156,9 @@ function StatCard({ label, value, icon: Icon, color, href, ariaLabel }: StatCard
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
+        {sparkline ? (
+          <div className="mt-2" aria-hidden="true">{sparkline}</div>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -106,6 +175,442 @@ function StatCard({ label, value, icon: Icon, color, href, ariaLabel }: StatCard
     );
   }
   return cardContent;
+}
+
+// =============================================================================
+// RateKpiCard — chunk 6.1. The promoted compliance-rate KPI card.
+//
+// This is the 1.2 rate card content MOVED VERBATIM into a KPI-band-sized
+// card. Per 6.1 spec: "Move the rate presentation VERBATIM into a new KPI
+// card: numerator/denominator/percentage text, progress bar, tooltip (still
+// keyboard-accessible), accessible single-pass reading, and its sparkline.
+// Nothing reworded, restyled beyond KPI-card sizing, or dropped."
+//
+// CONTENT (carried from 1.2 handoff, unchanged):
+//   - "N of D required (P%)" text — reads from stats.compliance.rate
+//   - Horizontal progress bar (h-2, bg-primary token, NOT a status color)
+//   - Keyboard-accessible tooltip (button trigger, delayDuration=0)
+//   - aria-label for single-pass screen-reader reading
+//   - Zero-denominator edge case: "No requirements configured" (bar not rendered)
+//
+// SPARKLINE (carried from 4.2b handoff, unchanged):
+//   - 280×32 polyline of rateSparklineValues
+//   - stroke="var(--status-compliant)", aria-hidden via parent wrapper
+//   - Hidden when hasSufficientHistory() is false (rateSparklineValues is [])
+//
+// SIZING:
+//   - Card body uses the SAME compact sizing as StatCard: small label, big
+//     value, sparkline below. The rate's "value" is the percentage (the
+//     single most-scannable number); the numerator/denominator live in the
+//     accessible label + tooltip + (visually) the smaller secondary text.
+//   - The progress bar replaces StatCard's plain "value" line — it's the
+//     visual representation of the same number.
+//
+// DRILL-THROUGH: this card is NOT a link (the rate is a derived metric, not
+//   a filterable list). StatCard's `href`/`ariaLabel` link mechanism is
+//   intentionally NOT used here.
+// =============================================================================
+
+interface RateKpiCardProps {
+  /** The canonical compliance rate from stats.compliance.rate. */
+  numerator: number;
+  denominator: number;
+  percentage: number;
+  /** Sparkline values (already window-sliced + series-extracted). Empty when hasSufficientHistory is false. */
+  sparklineValues: (number | null)[];
+}
+
+function RateKpiCard({ numerator, denominator, percentage, sparklineValues }: RateKpiCardProps) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardDescription className="text-xs">Compliance Rate</CardDescription>
+          {/* No icon-color badge — the rate is a derived metric, not a status.
+              Keeping the header structurally identical to StatCard for visual
+              rhythm; the right-side slot is intentionally empty. */}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {denominator === 0 ? (
+          // 1.2 edge case: zero denominator → "No requirements configured",
+          // bar not rendered. Per 1.2 handoff edge-case table.
+          <p className="text-xl font-bold text-muted-foreground">No requirements configured</p>
+        ) : (
+          <>
+            {/* 1.2: tooltip + keyboard-accessible trigger + aria-label for
+                single-pass screen-reader reading. UNCHANGED from the
+                retired Compliance Summary card. */}
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded text-left"
+                    aria-label={`${numerator} of ${denominator} required documents compliant. ${percentage} percent.`}
+                  >
+                    <p className="text-xl font-bold">
+                      {percentage}%
+                    </p>
+                    <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+                      {numerator} of {denominator} required
+                    </p>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="max-w-xs text-xs">
+                    Percentage of required documents currently compliant. Required = registered unions × required document types.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {/* 1.2: horizontal progress bar, bg-primary token (NOT a status
+                color — per 1.2 handoff: "The rate is a derived mix, and
+                coloring it green overstates health."). UNCHANGED. */}
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-2 rounded-full bg-primary transition-all"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            {/* 4.2b: rate sparkline. Decorative, aria-hidden via parent
+                wrapper. Hidden when sparklineValues is empty (caller passes
+                [] when hasSufficientHistory is false). UNCHANGED from the
+                retired Compliance Summary card. */}
+            {sparklineValues.length > 0 ? (
+              <div className="mt-2" aria-hidden="true">
+                <Sparkline
+                  values={sparklineValues}
+                  width={240}
+                  height={20}
+                  stroke="var(--status-compliant)"
+                  strokeWidth={1.5}
+                />
+              </div>
+            ) : null}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================================
+// Sparkline — chunk 4.2b. Decorative shape-only polyline for KPI cards.
+//
+// Auto-scaled; no axes, no numbers (the card's value IS the number). Hidden
+// by the caller when hasSufficientHistory() is false. Marked aria-hidden
+// (the adjacent card value is the accessible number — the sparkline is
+// decorative context). Full history remains accessible via the TrendChart's
+// visually-hidden data table.
+//
+// GEOMETRY: delegated to `buildSparklinePoints` in snapshot.ts (pure). This
+// component just renders the SVG shell with the polyline.
+//
+// GAP HANDLING: null values in the series are skipped by `buildSparklinePoints`
+// — the polyline jumps from the previous non-null point to the next, leaving
+// a visual gap (consistent with the main chart's connectNulls={false}).
+// =============================================================================
+
+interface SparklineProps {
+  /** Numeric series (with nulls for gaps). Built via `extractSparklineSeries`. */
+  values: (number | null)[];
+  /** Pixel width of the sparkline SVG. Defaults to 100. */
+  width?: number;
+  /** Pixel height of the sparkline SVG. Defaults to 24. */
+  height?: number;
+  /** Stroke color (CSS var token). Defaults to currentColor. */
+  stroke?: string;
+  /** Stroke width. Defaults to 1.5. */
+  strokeWidth?: number;
+}
+
+function Sparkline({
+  values,
+  width = 100,
+  height = 24,
+  stroke = "currentColor",
+  strokeWidth = 1.5,
+}: SparklineProps) {
+  const points = buildSparklinePoints(values, width, height);
+  if (!points) return null;
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      fill="none"
+      // aria-hidden is set by the parent StatCard wrapper. We don't repeat
+      // it here because the sparkline may also be used in non-StatCard
+      // contexts where the parent SHOULD set aria-hidden — the convention
+      // is "decorative sparkline = parent marks aria-hidden".
+      role="presentation"
+      focusable={false}
+    >
+      <polyline
+        points={points}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// =============================================================================
+// TrendChart — chunk 4.2b. Compliance-rate line chart card.
+//
+// TITLE: "Compliance Trend" (6.2 may rename — see handoff).
+// WINDOW: most recent TREND_WINDOW_DAYS (default 365) of available history,
+//   derived from point dates via `sliceTrendToWindow` — never hardcoded.
+// RENDERING RULES:
+//   - Line breaks at gaps (missing days). `buildChartSeriesWithGaps` inserts
+//     explicit null-percentage rows for missing intermediate dates; recharts
+//     with connectNulls={false} (default) renders the break.
+//   - Y-axis fixed 0–100% with gridlines at 0/25/50/75/100 (honesty > drama).
+//   - X-axis labels via the shared date util (formatAbsolute, abbreviated).
+//   - Hover tooltips per point: "12 Jun 2026 · 17 of 78 (22%)" — same phrasing
+//     as the 1.2 rate card.
+//   - Denominator changes across the window (required types or unions
+//     changed): the jump is HONEST — rendered as-is. Tooltips self-explain
+//     via numerator/denominator. No visual annotation added (see handoff
+//     for the decision + counter-proposal).
+// INSUFFICIENT HISTORY: hasSufficientHistory() false (0 or 1 points) →
+//   placeholder "Trend will appear as daily snapshots are collected."
+//   Never an error look, never a fake line. Exactly 2 points → render the
+//   chart (degenerate but honest).
+// ACCESSIBILITY:
+//   - SVG wrapped in a container with role="img" + concise aria-label
+//     ("Compliance rate trend, last N days").
+//   - Visually-hidden HTML table (date, counts, rate) carries the full
+//     series for screen readers — the guaranteed accessible path. Hover
+//     tooltips are a mouse bonus, not the accessible path.
+//   - Per-point keyboard focus NOT provided (see handoff for the decision
+//     + counter-proposal — recharts does not expose per-point focus
+//     natively; a custom wrapper would have to inject it).
+// =============================================================================
+
+interface TrendChartProps {
+  /** Full trend points (as returned by /api/dashboard/trend). The chart will
+   * slice to the window itself via sliceTrendToWindow. */
+  points: ComplianceTrendPoint[];
+  /** Loading state — when true, render a skeleton placeholder. */
+  loading?: boolean;
+  /** Error message — when present, render an error state with retry. */
+  error?: string | null;
+  /** Retry callback for the error state's retry button. */
+  onRetry?: () => void;
+}
+
+function TrendChart({ points, loading, error, onRetry }: TrendChartProps) {
+  // --- 1. Slice to the configured window (most recent N days of history) ---
+  // Per 4.2b spec: "Window: most recent TREND_WINDOW_DAYS of available
+  // history — derived from point dates, never hardcoded." The window is
+  // measured from the LAST point's date, NOT from `new Date()` — so a
+  // pipeline that's been down for a week still shows the last year of
+  // valid data, not "no recent data".
+  const windowedPoints = sliceTrendToWindow(points, TREND_WINDOW_DAYS);
+
+  // --- 2. Build the chart data array with explicit gap markers ---
+  // `buildChartSeriesWithGaps` inserts null-percentage rows for missing
+  // intermediate dates. With connectNulls={false} (default), recharts
+  // renders a LINE BREAK at those rows — no interpolation, no synthetic
+  // connecting segments.
+  const chartData: TrendChartDatum[] = buildChartSeriesWithGaps(windowedPoints);
+
+  // --- 3. Decide: placeholder or chart? ---
+  // hasSufficientHistory() === false (0 or 1 points) → placeholder.
+  // Exactly 2 points → render (degenerate but honest — one line segment).
+  const sufficient = hasSufficientHistory(windowedPoints, 2);
+  const windowDays = TREND_WINDOW_DAYS;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Compliance Trend</CardTitle>
+        <CardDescription>
+          Daily compliance rate over the last {windowDays} days of collected history.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="h-[240px] animate-pulse rounded-md bg-muted" />
+        ) : error ? (
+          <ErrorState description={error} onRetry={onRetry} />
+        ) : !sufficient ? (
+          // --- PLACEHOLDER: 0 or 1 points ---
+          // First-class state, not an error. The pipeline is fresh; the
+          // chart will populate as daily snapshots are collected (the
+          // /api/cron/compliance-snapshot route fires daily at 7:55 UTC).
+          // Worded per 4.2b spec ("Trend will appear as daily snapshots
+          // are collected.") — 6.2 may adjust the wording.
+          <div className="flex h-[240px] flex-col items-center justify-center text-center">
+            <div className="rounded-md bg-muted/50 px-4 py-3">
+              <p className="text-sm font-medium text-muted-foreground">
+                Trend will appear as daily snapshots are collected.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {windowedPoints.length === 0
+                  ? "No snapshots captured yet."
+                  : "1 snapshot captured — need at least 2 to draw a trend."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          // --- CHART (2+ points) ---
+          <>
+            {/* Accessible label + visually-hidden table for screen readers.
+                The SVG below has role="img" with this concise aria-label.
+                The table carries the FULL series (every stored point in
+                the window) so screen-reader users get the same information
+                as sighted users — hover tooltips are NOT the accessible
+                path. */}
+            <div
+              role="img"
+              aria-label={`Compliance rate trend, last ${windowedPoints.length} snapshots across ${windowDays} days.`}
+            >
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart
+                  data={chartData}
+                  margin={{ left: 4, right: 16, top: 10, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="hsl(var(--border))"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 11 }}
+                    // Abbreviated date format for the x-axis (compact).
+                    // Uses the shared date util — no hardcoded format.
+                    tickFormatter={(value: string) => {
+                      // Parse the YYYY-MM-DD as UTC (matches snapshot date semantics).
+                      const d = new Date(value + "T12:00:00Z");
+                      return formatAbsolute(d);
+                    }}
+                    // Show ~6 ticks to avoid crowding. Recharts auto-selects.
+                    minTickGap={30}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 25, 50, 75, 100]}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(value: number) => `${value}%`}
+                    width={36}
+                  />
+                  <RechartsTooltip
+                    // Custom tooltip content — see TrendTooltip below.
+                    content={<TrendTooltip />}
+                    cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="percentage"
+                    stroke="var(--status-compliant)"
+                    strokeWidth={2}
+                    dot={{ r: 2, fill: "var(--status-compliant)" }}
+                    activeDot={{ r: 4 }}
+                    name="Compliance rate"
+                    // connectNulls={false} is the DEFAULT — we make it
+                    // explicit so a future change to `true` doesn't
+                    // silently start interpolating across gaps.
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Visually-hidden table — the accessible path for screen
+                readers. Per 4.2b spec: "a visually-hidden data table
+                (date, counts, rate) carrying the full series for screen
+                readers." */}
+            <TrendAccessibleTable points={windowedPoints} />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- Custom tooltip: "12 Jun 2026 · 17 of 78 (22%)" — same phrasing as 1.2.
+function TrendTooltip({ active, payload }: {
+  active?: boolean;
+  payload?: Array<{ payload?: TrendChartDatum }>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const datum = payload[0]?.payload;
+  if (!datum) return null;
+
+  // Gap rows render a "No data" tooltip — no fabricated number.
+  if (datum.isGap || !datum.point) {
+    return (
+      <div className="rounded-md border bg-background p-2 text-xs shadow-sm">
+        <p className="font-medium">{datum.date}</p>
+        <p className="text-muted-foreground">No data (no snapshot for this date)</p>
+      </div>
+    );
+  }
+
+  const p = datum.point;
+  // The percentage is pre-computed in the metrics module (1.2 invariant).
+  // We just render it. If null (zero denominator), show "—" instead of NaN.
+  const pctLabel = p.percentage === null ? "—" : `${p.percentage}%`;
+  return (
+    <div className="rounded-md border bg-background p-2 text-xs shadow-sm">
+      <p className="font-medium">
+        {/* "12 Jun 2026 · 17 of 78 (22%)" — matches 1.2 phrasing via formatAbsolute */}
+        {formatAbsolute(new Date(datum.date + "T12:00:00Z"))} · {p.rateNumerator} of {p.rateDenominator} ({pctLabel})
+      </p>
+      <p className="text-muted-foreground">
+        Compliant {p.compliant} · Expiring {p.expiring} · Overdue {p.overdue} · Missing {p.missing}
+      </p>
+    </div>
+  );
+}
+
+// --- Visually-hidden table: full series for screen readers.
+function TrendAccessibleTable({ points }: { points: ComplianceTrendPoint[] }) {
+  return (
+    <table
+      className="sr-only"
+      aria-label="Compliance trend data, full series"
+    >
+      <thead>
+        <tr>
+          <th scope="col">Date</th>
+          <th scope="col">Compliant</th>
+          <th scope="col">Expiring</th>
+          <th scope="col">Overdue</th>
+          <th scope="col">Missing</th>
+          <th scope="col">Rate numerator</th>
+          <th scope="col">Rate denominator</th>
+          <th scope="col">Rate percentage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {points.map((p) => (
+          <tr key={p.date}>
+            <td>{formatAbsolute(new Date(p.date + "T12:00:00Z"))}</td>
+            <td>{p.compliant}</td>
+            <td>{p.expiring}</td>
+            <td>{p.overdue}</td>
+            <td>{p.missing}</td>
+            <td>{p.rateNumerator}</td>
+            <td>{p.rateDenominator}</td>
+            <td>{p.percentage === null ? "Not applicable" : `${p.percentage}%`}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 interface LollipopDatum {
@@ -447,10 +952,33 @@ function NeedsAttentionPanel({
                     className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Icon
-                        className="h-4 w-4 shrink-0"
-                        style={{ color: config.colorToken }}
-                      />
+                      {/* 6.2: status icon wrapped in a focusable tooltip
+                          showing the status definition. The span uses
+                          tabIndex={0} so keyboard users can focus the icon
+                          to read the definition. The aria-label gives
+                          screen-reader users the status name in one pass. */}
+                      <TooltipProvider delayDuration={0}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              tabIndex={0}
+                              role="img"
+                              aria-label={`${config.label}: ${config.definition}`}
+                              className="shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-help"
+                            >
+                              <Icon
+                                className="h-4 w-4"
+                                style={{ color: config.colorToken }}
+                              />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p className="text-xs">
+                              <span className="font-medium">{config.label}</span>: {config.definition}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <div className="min-w-0">
                         <p className="truncate font-medium">{item.documentType}</p>
                         <p className="truncate text-xs text-muted-foreground">{item.unionName}</p>
@@ -614,17 +1142,42 @@ function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
           </div>
         </div>
 
-        {/* Legend — all statuses including zero-count, labels only */}
+        {/* Legend — all statuses including zero-count, labels only.
+            6.2: each legend entry is a focus-accessible tooltip trigger
+            showing the status definition (matches the composition bar
+            legend pattern). The span uses tabIndex={0} + role="img" so
+            keyboard users can focus each legend entry to read the
+            definition; aria-label gives screen-reader users the status
+            name + definition in one pass. */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {COMPLIANCE_STATUSES.map((status) => (
-            <div key={status} className="flex items-center gap-1.5">
-              <span
-                className="h-3 w-3 shrink-0 rounded-sm"
-                style={{ backgroundColor: STATUS_CONFIG[status].colorToken }}
-              />
-              <span className="text-xs text-muted-foreground">{STATUS_CONFIG[status].label}</span>
-            </div>
-          ))}
+          {COMPLIANCE_STATUSES.map((status) => {
+            const config = STATUS_CONFIG[status];
+            return (
+              <TooltipProvider key={status} delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      tabIndex={0}
+                      role="img"
+                      aria-label={`${config.label}: ${config.definition}`}
+                      className="flex items-center gap-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-help"
+                    >
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-sm"
+                        style={{ backgroundColor: config.colorToken }}
+                      />
+                      <span className="text-xs text-muted-foreground">{config.label}</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-xs">
+                      <span className="font-medium">{config.label}</span>: {config.definition}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -716,11 +1269,15 @@ function ExpiryForecastCard({ forecast, onFilter }: ExpiryForecastCardProps) {
   );
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-  INFO: "bg-primary/10 text-primary",
-  WARNING: "bg-accent/20 text-accent-foreground",
-  CRITICAL: "bg-destructive/10 text-destructive",
-};
+// SEVERITY_COLORS removed in 5.2 — the panel now uses SEVERITY_BADGE_VARIANT
+// (event-type-based severity, attached by the selector via eventSeverity).
+// The AuditLog's server-set INFO/WARNING/CRITICAL severity is no longer
+// rendered in the panel. If a future chunk wants to display the raw
+// AuditLog severity somewhere else (e.g. the Audit page), define a fresh
+// map there — don't resurrect this one (it mapped to non-token colors
+// like `bg-destructive/10` which is a different system from the
+// design-token-based SEVERITY_BADGE_VARIANT).
+
 
 const ACTION_LABELS: Record<string, string> = {
   user_login: "signed in",
@@ -811,6 +1368,40 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
     documentTypes: string[];
   }>("/api/compliance");
 
+  // --- Fetch the compliance trend for the TrendChart + KPI sparklines (4.2b) ---
+  // The /api/dashboard/trend endpoint returns the historical daily snapshot
+  // points. Empty array = fresh deployment (no cron run yet) — the
+  // TrendChart's placeholder handles this. Trend fetch is independent of the
+  // stats fetch so a slow trend endpoint doesn't block the KPI band.
+  const {
+    data: trendData,
+    loading: trendLoading,
+    error: trendError,
+    refetch: refetchTrend,
+  } = useFetch<{ points: ComplianceTrendPoint[] }>("/api/dashboard/trend");
+
+  // --- Windowed trend for the chart + sparklines ---
+  // Both the TrendChart and the three sparklines consume the SAME windowed
+  // slice. Computed once here, passed to each renderer.
+  // The window is sliced via `sliceTrendToWindow` (pure function in
+  // snapshot.ts) — the chart does NOT re-slice internally. The sparklines
+  // extract their relevant numeric series via `extractSparklineSeries`.
+  const windowedTrend = trendData?.points
+    ? sliceTrendToWindow(trendData.points, TREND_WINDOW_DAYS)
+    : [];
+  const trendSufficient = hasSufficientHistory(windowedTrend, 2);
+  // Sparkline series — extracted here so the SAME windowed data feeds both
+  // the chart and the sparklines (no double-slicing).
+  const compliantSparklineValues = trendSufficient
+    ? extractSparklineSeries(windowedTrend, "compliant")
+    : [];
+  const missingSparklineValues = trendSufficient
+    ? extractSparklineSeries(windowedTrend, "missing")
+    : [];
+  const rateSparklineValues = trendSufficient
+    ? extractSparklineSeries(windowedTrend, "rate")
+    : [];
+
   // --- Canonical compliance counts from the stats response ---
   // Maps the API's lowercase keys to the canonical ComplianceCounts shape
   // (uppercase, matching STATUS_CONFIG). This is a field mapping, not
@@ -834,9 +1425,10 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
         </p>
       </div>
 
+      {/* === Row 1: Quick Actions (unchanged, full width) === */}
       {/* Quick Actions — role-gated per NAV_ITEMS in app-shell.tsx */}
       {onNavigate && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div data-testid="quick-actions" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {(user.role === "REGISTRAR" || user.role === "INSPECTOR") && (
             <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("unions")}>
               <Plus className="h-5 w-5 text-primary" />
@@ -864,13 +1456,23 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
         </div>
       )}
 
-      {/* Stat cards */}
+      {/* === Row 2: KPI band (7 cards) ===
+          6.1: rate promoted here as the 3rd card. auto-fit so the 7 cards
+          wrap responsively (never shrink below 140px wide — readability
+          floor). DOM order = reading order: Total Unions · Documents ·
+          Compliance Rate · Compliant · Expiring · Overdue · Missing. */}
       {statsLoading ? (
         <StatsSkeleton />
       ) : statsError ? (
         <ErrorState description={statsError} onRetry={refetchStats} />
       ) : stats ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <div
+          data-testid="kpi-band"
+          className="grid gap-4"
+          style={{
+            gridTemplateColumns: `repeat(auto-fit, minmax(140px, 1fr))`,
+          }}
+        >
           <StatCard
             label="Total Unions"
             value={stats.totalUnions}
@@ -878,6 +1480,7 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
             color="bg-primary/10 text-primary"
             href={unionsListUrl()}
             ariaLabel={`Total Unions: ${stats.totalUnions} — view unions list`}
+            definition={DASHBOARD_KPI_DEFINITIONS["Total Unions"]}
           />
           <StatCard
             label="Documents"
@@ -886,89 +1489,102 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
             color="bg-primary/10 text-primary"
             href={complianceUnfilteredUrl()}
             ariaLabel={`Documents: ${stats.activeCount} — view compliance overview`}
+            definition={DASHBOARD_KPI_DEFINITIONS["Documents"]}
           />
-          {getTileStatuses().map((status) => (
-            <StatCard
-              key={status}
-              label={STATUS_CONFIG[status].label}
-              value={counts![status]}
-              icon={STATUS_CONFIG[status].icon}
-              color={
-                status === "COMPLIANT" ? "bg-chart-3/20 text-chart-3" :
-                status === "EXPIRING" ? "bg-accent/20 text-accent-foreground" :
-                status === "OVERDUE" ? "bg-destructive/10 text-destructive" :
-                "bg-muted text-muted-foreground"
-              }
-              href={complianceFilterUrl(status)}
-              ariaLabel={`${STATUS_CONFIG[status].label}: ${counts![status]} documents — view filtered list`}
-            />
-          ))}
+          {/* 6.1: Rate promoted to KPI band. All 1.2 content (tooltip, bar,
+              a11y reading) + 4.2b sparkline moved VERBATIM via RateKpiCard. */}
+          <RateKpiCard
+            numerator={stats.compliance.rate.numerator}
+            denominator={stats.compliance.rate.denominator}
+            percentage={stats.compliance.rate.percentage}
+            sparklineValues={rateSparklineValues}
+          />
+          {getTileStatuses().map((status) => {
+            // 4.2b: sparkline insertion for the COMPLIANT and MISSING cards
+            // only (per the 4.2b decision set — see handoff). EXPIRING and
+            // OVERDUE do NOT get sparklines. The sparkline is rendered ONLY
+            // when hasSufficientHistory() is true; otherwise the card
+            // shows just the value (no decorative line, no error).
+            const sparklineValues =
+              status === "COMPLIANT" ? compliantSparklineValues
+              : status === "MISSING" ? missingSparklineValues
+              : null;
+            const sparkline = sparklineValues && sparklineValues.length > 0
+              ? (
+                <Sparkline
+                  values={sparklineValues}
+                  width={100}
+                  height={24}
+                  // Use the same color token as the card's icon for visual
+                  // cohesion. The icon color is set via the `color` prop
+                  // above (e.g. "bg-chart-3/20 text-chart-3"); the sparkline
+                  // stroke uses just the text-* token via currentColor.
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                />
+              )
+              : undefined;
+            return (
+              <StatCard
+                key={status}
+                label={STATUS_CONFIG[status].label}
+                value={counts![status]}
+                icon={STATUS_CONFIG[status].icon}
+                color={
+                  status === "COMPLIANT" ? "bg-chart-3/20 text-chart-3" :
+                  status === "EXPIRING" ? "bg-accent/20 text-accent-foreground" :
+                  status === "OVERDUE" ? "bg-destructive/10 text-destructive" :
+                  "bg-muted text-muted-foreground"
+                }
+                href={complianceFilterUrl(status)}
+                ariaLabel={`${STATUS_CONFIG[status].label}: ${counts![status]} documents — view filtered list`}
+                sparkline={sparkline}
+                definition={STATUS_CONFIG[status].definition}
+              />
+            );
+          })}
         </div>
       ) : null}
 
-      {/* Needs Attention panel — temporary placement below KPI band.
-          Final placement is chunk 6.1's responsibility. */}
-      {stats && (
-        <NeedsAttentionPanel
-          items={stats.needsAttention || []}
-          total={stats.needsAttention?.length || 0}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* Expiry Forecast card — temporary placement next to Needs Attention.
-          Final placement is chunk 6.1's responsibility. */}
-      {!complianceMatrixLoading && complianceMatrixData && (() => {
-        const cells: ComplianceCell[] = complianceMatrixData.unions.flatMap((row) =>
-          row.scores.map((score) => ({
-            unionId: row.unionId,
-            documentType: score.documentType,
-            status: score.status,
-            filedAt: null,
-            expiryDate: score.expiresAt ? new Date(score.expiresAt) : null,
-            documentId: score.documentId,
-          })),
-        );
-        const forecast = getExpiryForecast(cells, new Date(), FORECAST_BUCKETS);
-        return <ExpiryForecastCard forecast={forecast} onFilter={onFilterCompliance} />;
-      })()}
-
-      {/* Charts row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Compliance composition bar — fills the slot vacated by the deleted
-            Compliance Status Distribution tiles (chunk 1.3). */}
-        {stats && counts && (
-          <ComplianceCompositionBar
-            counts={counts}
-            denominator={stats.compliance.rate.denominator}
-            totalUnions={stats.totalUnions}
-            onFilter={onFilterCompliance}
-          />
+      {/* === Row 3: Needs Attention (wider) | Composition Bar ===
+          6.1 final layout. Two-column at >=1024px (Tailwind `lg:`); stacks
+          vertically below, with Needs Attention first (actionability first
+          per chunk spec). DOM order = reading order. The breakpoint value
+          (1024) is the canonical DASHBOARD_BREAKPOINT_PX in status-config.ts. */}
+      <div className="grid gap-6 lg:grid-cols-5 items-start">
+        {/* Needs Attention panel — wider (3/5 of the row at desktop). */}
+        {stats && (
+          <div data-testid="needs-attention" className="lg:col-span-3">
+            <NeedsAttentionPanel
+              items={stats.needsAttention || []}
+              total={stats.needsAttention?.length || 0}
+              onNavigate={onNavigate}
+            />
+          </div>
         )}
 
-        {/* Required vs On-File meters — replaces the lollipop chart (chunk 2.2) */}
-        {docTypesLoading ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Required vs On-File by Type</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[240px] animate-pulse rounded-md bg-muted" />
-            </CardContent>
-          </Card>
-        ) : docTypesError ? (
-          <ErrorState description={docTypesError} onRetry={refetchDocTypes} />
-        ) : docTypesData && docTypesData.requiredTypes && docTypesData.requiredTypes.length > 0 ? (
-          <RequiredVsOnFileMeters
-            onFileByType={docTypesData.documentTypes}
-            requiredTypes={docTypesData.requiredTypes}
-            totalUnions={docTypesData.totalUnions}
-          />
-        ) : null}
+        {/* Compliance Composition Bar — narrower (2/5 of the row at desktop).
+            Fills the slot vacated by the deleted Compliance Status Distribution
+            tiles (chunk 1.3). */}
+        {stats && counts && (
+          <div data-testid="composition-bar" className="lg:col-span-2">
+            <ComplianceCompositionBar
+              counts={counts}
+              denominator={stats.compliance.rate.denominator}
+              totalUnions={stats.totalUnions}
+              onFilter={onFilterCompliance}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Compliance Matrix heatmap — temporary placement below the charts row.
-          Final placement is chunk 6.1's responsibility. */}
+      {/* === Row 4: Compliance Heatmap (full width) ===
+          6.1 final layout. The heatmap is a wide table; at narrow widths it
+          scrolls internally (3.2b's `overflow-x-auto` wrapper INSIDE
+          ComplianceHeatmap + sticky union column keep the row labels visible).
+          The page must NEVER scroll horizontally at any breakpoint — the
+          internal scroll does the work; this outer wrapper is just the
+          testid anchor + full-width slot. */}
       {!complianceMatrixLoading && complianceMatrixData && (() => {
         // Map the /api/compliance response to ComplianceCell[] for the selector.
         // This is a pure field mapping — no aggregation or status derivation here.
@@ -989,111 +1605,331 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           status: u.status as "ACTIVE" | "SUSPENDED" | "DEREGISTERED",
         }));
         const matrix = getUnionDocMatrix(cells, unions, complianceMatrixData.documentTypes);
-        return <ComplianceHeatmap matrix={matrix} />;
+        return (
+          <div data-testid="heatmap">
+            <ComplianceHeatmap matrix={matrix} />
+          </div>
+        );
       })()}
 
-      {/* Compliance summary + Recent activity */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Compliance summary */}
-        {stats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Compliance Summary</CardTitle>
-              <CardDescription>Live compliance status across all unions.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-md bg-muted/50 p-4">
-                <p className="text-sm text-muted-foreground">Overall Compliance Rate</p>
-                {stats.compliance.rate.denominator === 0 ? (
-                  <p className="mt-1 text-xl font-bold text-muted-foreground">No requirements configured</p>
-                ) : (
-                  <>
-                    <TooltipProvider delayDuration={0}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded text-left"
-                            aria-label={`${stats.compliance.rate.numerator} of ${stats.compliance.rate.denominator} required documents compliant. ${stats.compliance.rate.percentage} percent.`}
-                          >
-                            <p className="text-xl font-bold">
-                              {stats.compliance.rate.numerator} of {stats.compliance.rate.denominator} required ({stats.compliance.rate.percentage}%)
-                            </p>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          <p className="max-w-xs text-xs">
-                            Percentage of required documents currently compliant. Required = registered unions × required document types.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-2 rounded-full bg-primary transition-all"
-                        style={{ width: `${stats.compliance.rate.percentage}%` }}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      {/* === Row 5: Required vs On-File Meters (wider) | Expiry Forecast ===
+          6.1 final layout. Meters are wider because they list per-type rows;
+          Expiry Forecast is a tighter card with 3 bucket rows. */}
+      <div className="grid gap-6 lg:grid-cols-5 items-start">
+        {/* Required vs On-File meters — wider (3/5). Replaces the lollipop
+            chart (chunk 2.2). */}
+        <div data-testid="required-vs-on-file" className="lg:col-span-3">
+          {docTypesLoading ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Required vs On-File by Type</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[240px] animate-pulse rounded-md bg-muted" />
+              </CardContent>
+            </Card>
+          ) : docTypesError ? (
+            <ErrorState description={docTypesError} onRetry={refetchDocTypes} />
+          ) : docTypesData && docTypesData.requiredTypes && docTypesData.requiredTypes.length > 0 ? (
+            <RequiredVsOnFileMeters
+              onFileByType={docTypesData.documentTypes}
+              requiredTypes={docTypesData.requiredTypes}
+              totalUnions={docTypesData.totalUnions}
+            />
+          ) : null}
+        </div>
 
-        {/* Recent activity */}
-        {activityLoading ? (
-          <ActivitySkeleton />
-        ) : activityError ? (
-          <ErrorState description={activityError} onRetry={refetchActivity} />
-        ) : activityData && activityData.activity.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Activity className="h-5 w-5" />
-                Recent Activity
-              </CardTitle>
-              <CardDescription>Latest actions across the system.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-              {activityData.activity.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-3 text-sm">
-                  <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                    {entry.actorName.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">
-                      <span className="font-medium">{entry.actorName}</span>{" "}
-                      <span className="text-muted-foreground">
-                        {ACTION_LABELS[entry.action] ?? entry.action}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(entry.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] ${SEVERITY_COLORS[entry.severity] ?? ""}`}
-                  >
-                    {entry.severity}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ) : activityData ? (
-          <Card>
-            <CardContent className="py-6">
-              <EmptyState
-                icon={Activity}
-                title="No recent activity"
-                description="System actions will appear here as users interact with the registry."
-              />
-            </CardContent>
-          </Card>
-        ) : null}
+        {/* Expiry Forecast card — narrower (2/5). 3.3 handoff: temporary
+            placement next to Needs Attention; 6.1 moves it here, paired with
+            the meters (both are forward-looking compliance views). */}
+        {!complianceMatrixLoading && complianceMatrixData && (() => {
+          const cells: ComplianceCell[] = complianceMatrixData.unions.flatMap((row) =>
+            row.scores.map((score) => ({
+              unionId: row.unionId,
+              documentType: score.documentType,
+              status: score.status,
+              filedAt: null,
+              expiryDate: score.expiresAt ? new Date(score.expiresAt) : null,
+              documentId: score.documentId,
+            })),
+          );
+          const forecast = getExpiryForecast(cells, new Date(), FORECAST_BUCKETS);
+          return (
+            <div data-testid="expiry-forecast" className="lg:col-span-2">
+              <ExpiryForecastCard forecast={forecast} onFilter={onFilterCompliance} />
+            </div>
+          );
+        })()}
       </div>
+
+      {/* === Row 6: Trend Chart | Recent Activity ===
+          6.1 final layout. Both are tall cards; pairing them keeps the row
+          height balanced. Trend chart is full-featured (chart + accessible
+          table); Recent Activity is the 5.1/5.2 panel (state-changing rows +
+          session summaries + View-all footer). */}
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
+        {/* Trend chart — 4.2b. Was temporarily near Compliance Summary; 6.1
+            moves it to its permanent home. */}
+        <div data-testid="trend-chart">
+          <TrendChart
+            points={trendData?.points ?? []}
+            loading={trendLoading}
+            error={trendError}
+            onRetry={refetchTrend}
+          />
+        </div>
+
+        {/* Recent activity — 5.1 + 5.2. Was bottom-right of the Compliance
+            Summary row; 6.1 moves it to its permanent home, paired with the
+            trend chart. */}
+        <div data-testid="recent-activity">
+          {activityLoading ? (
+            <ActivitySkeleton />
+          ) : activityError ? (
+            <ErrorState description={activityError} onRetry={refetchActivity} />
+          ) : activityData && activityData.activity.length > 0 ? (
+            <RecentActivityPanel
+              events={activityData.activity}
+              canViewAudit={user.role === "REGISTRAR" || user.role === "INSPECTOR"}
+              onNavigateAudit={onNavigate}
+            />
+          ) : activityData ? (
+            <Card>
+              <CardContent className="py-6">
+                <EmptyState
+                  icon={Activity}
+                  title="No recent activity"
+                  description="System actions will appear here as users interact with the registry."
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// RecentActivityPanel — chunks 5.1 + 5.2.
+//
+// Renders the selector's output VERBATIM (per the 3.2b rule: component
+// renders the selector's output, never classifies/groups/sorts on its own).
+//
+// The component performs ZERO:
+//   - event-type string matching (no "user_login", "session" etc. in here)
+//   - sort logic (no .sort calls)
+//   - count arithmetic (no `count++`, no per-user aggregation)
+//   - severity classification (no severityForEvent / EVENT_SEVERITY import)
+//
+// 5.2 ADDITIVE: the panel reads `entry.eventSeverity` (attached by the
+// selector) and looks it up in SEVERITY_BADGE_VARIANT to pick the Badge
+// variant + token color class. The variant map is PRESENTATION (severity →
+// token), not classification (action → severity). The grep guard extends
+// 5.1's: no event-type strings AND no classifier imports.
+//
+// STRUCTURE:
+//   1. Card header (unchanged from previous panel)
+//   2. State-changing rows (existing layout, NEW badge variant by severity,
+//      NEW relative timestamp via <time datetime>)
+//   3. If zero state-changing: honest empty line "No document or task
+//      activity in this window" ABOVE the summaries.
+//   4. Session summary lines (one per user): "user · N sessions · last <relative>"
+//      NO severity badge (they are not events).
+//   5. "View all N" footer (REGISTRAR/INSPECTOR only) → Audit page.
+//
+// CAP: total visible rows capped at RECENT_ACTIVITY_ROW_CAP (state-changing +
+//   summaries combined). Cut cleanly between rows — never truncate mid-line.
+// =============================================================================
+
+/**
+ * Presentation map: EventSeverity → Badge variant + design-token color class.
+ *
+ * This is NOT a classifier. The selector attaches `eventSeverity` to each
+ * state-changing event; the panel looks up the variant here for rendering.
+ * The grep guard forbids `severityForEvent` / `EVENT_SEVERITY` imports —
+ * this map is the ONLY place the component touches severity.
+ *
+ * DESIGN TOKENS (no hex):
+ *   success → --status-compliant (sage green) — beneficial actions
+ *   warn    → --status-expiring  (warm gold)  — upcoming risk (no current event)
+ *   error   → --status-overdue   (rich red)   — failures + negative states
+ *   neutral → --status-missing   (warm grey)  — administrative / other
+ *
+ * The Badge base variant is "outline" (border-based, not solid fill) to
+ * match the existing panel styling — the color class adds the tint.
+ *
+ * TWO BADGE SYSTEMS COEXIST (per 5.2 handoff):
+ *   - Compliance status badges (STATUS_CONFIG in status-config.ts): 5
+ *     compliance states → label + colorToken + icon. Used by Compliance
+ *     cards (Composition Bar, Heatmap, KPI StatCards, Needs Attention,
+ *     Required vs On-File).
+ *   - Event severity badges (this map): 4 event severities → variant +
+ *     token class. Used by Recent Activity panel only.
+ *   The two systems share color tokens (the design system only has 4
+ *     colored tokens) but are semantically distinct. Unification, if ever
+ *     wanted, is a 6.2 discussion — NOT 5.2.
+ */
+const SEVERITY_BADGE_VARIANT: Record<EventSeverity, { variant: "outline"; className: string }> = {
+  success: { variant: "outline", className: "border-status-compliant/30 text-status-compliant bg-status-compliant/10" },
+  warn:    { variant: "outline", className: "border-status-expiring/30 text-status-expiring bg-status-expiring/10" },
+  error:   { variant: "outline", className: "border-status-overdue/30 text-status-overdue bg-status-overdue/10" },
+  neutral: { variant: "outline", className: "border-status-missing/30 text-status-missing bg-status-missing/10" },
+};
+
+interface RecentActivityPanelProps {
+  /** Raw events from /api/dashboard/activity (already capped by endpoint at 20). */
+  events: ActivityEvent[];
+  /** Whether the user can navigate to the Audit page (REGISTRAR/INSPECTOR only). */
+  canViewAudit: boolean;
+  /** SPA navigation callback for the "View all" footer. */
+  onNavigateAudit?: (view: string) => void;
+}
+
+function RecentActivityPanel({
+  events,
+  canViewAudit,
+  onNavigateAudit,
+}: RecentActivityPanelProps) {
+  // --- 1. Compute the summary ONCE via the pure selector -------------------
+  // The component does NOT classify, group, sort, or attach severity. The
+  // selector does all of that; the panel renders the output verbatim.
+  // `now` is injected for the relative-time formatter (5.2).
+  const now = new Date();
+  const summary = getActivitySummary(events, now);
+
+  // --- 2. Apply the cap to the total visible rows -------------------------
+  // stateChanging rows take priority (rendered first); summaries fill the
+  // remaining cap. Cut cleanly between rows.
+  const stateRowsToShow = Math.min(summary.stateChanging.length, RECENT_ACTIVITY_ROW_CAP);
+  const remainingCap = RECENT_ACTIVITY_ROW_CAP - stateRowsToShow;
+  const summariesToShow = Math.min(summary.sessionSummaries.length, Math.max(0, remainingCap));
+  const renderedRowCount = stateRowsToShow + summariesToShow;
+  const hasOverflow = summary.totalCount > renderedRowCount || summary.stateChanging.length + summary.sessionSummaries.length > renderedRowCount;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Activity className="h-5 w-5" />
+          Recent Activity
+        </CardTitle>
+        <CardDescription>Latest actions across the system.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* --- 2a. State-changing rows --- */}
+        {/* 5.2 changes: (i) badge variant by eventSeverity (not the AuditLog
+            server-set severity); (ii) relative timestamp via <time datetime>
+            with a visually-hidden absolute for screen readers. Layout
+            unchanged. */}
+        {summary.stateChanging.slice(0, stateRowsToShow).map((entry) => {
+          const variant = SEVERITY_BADGE_VARIANT[entry.eventSeverity];
+          const date = new Date(entry.createdAt);
+          const absolute = formatAbsolute(date);
+          const relative = formatEventRelative(date, now);
+          return (
+            <div key={entry.id} className="flex items-start gap-3 text-sm">
+              <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                {entry.actorName.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate">
+                  <span className="font-medium">{entry.actorName}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {ACTION_LABELS[entry.action] ?? entry.action}
+                  </span>
+                </p>
+                {/* 5.2: <time datetime={ISO} title={absolute}> + visually-hidden
+                     absolute text for screen readers. The title attribute is a
+                     native tooltip for sighted mouse users; the visually-hidden
+                     text is the accessible path for screen readers (title
+                     alone is not accessible). */}
+                <p className="text-xs text-muted-foreground">
+                  <time dateTime={entry.createdAt} title={absolute}>
+                    {relative}
+                    <span className="sr-only"> ({absolute})</span>
+                  </time>
+                </p>
+              </div>
+              {/* 5.2: badge variant from eventSeverity (NOT the AuditLog
+                   server-set severity). The selector attaches eventSeverity;
+                   this map picks the variant + token color class. */}
+              <Badge
+                variant={variant.variant}
+                className={`text-[10px] ${variant.className}`}
+              >
+                {entry.eventSeverity}
+              </Badge>
+            </div>
+          );
+        })}
+
+        {/* --- 2b. Honest empty line when zero state-changing events --- */}
+        {summary.stateChanging.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            No document or task activity in this window
+          </p>
+        ) : null}
+
+        {/* --- 2c. Session summary lines (one per user) --- */}
+        {/* 5.2: NO severity badge on summaries (they are not events).
+             Relative timestamp via <time datetime> with visually-hidden
+             absolute. Wording ("user · N sessions · last <relative>")
+             unchanged from 5.1 except the timestamp format. */}
+        {summariesToShow > 0 ? (
+          <div className="border-t pt-3 mt-3 space-y-2">
+            {summary.sessionSummaries.slice(0, summariesToShow).map((s) => (
+              <SessionSummaryRow key={s.user} summary={s} now={now} />
+            ))}
+          </div>
+        ) : null}
+
+        {/* --- 2d. "View all N" footer → Audit page --- */}
+        {hasOverflow && canViewAudit && onNavigateAudit ? (
+          <div className="border-t pt-3 mt-3">
+            <button
+              type="button"
+              onClick={() => onNavigateAudit("audit")}
+              className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              aria-label={`View all ${summary.totalCount} activities in the Audit Log`}
+            >
+              View all {summary.totalCount} →
+            </button>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- SessionSummaryRow: renders one session summary line.
+// "registrar@example.com · 4 sessions · last 3 minutes ago" (5.2: relative
+// timestamp via formatEventRelative + <time datetime>). NO severity badge
+// (per 5.2 spec — summaries are not events).
+function SessionSummaryRow({ summary, now }: { summary: SessionSummary; now: Date }) {
+  // Pluralize "session" / "sessions" — trivial, in-component (not selector
+  // logic; this is presentation, not classification).
+  const sessionLabel = summary.count === 1 ? "session" : "sessions";
+  const date = new Date(summary.lastAt);
+  const absolute = formatAbsolute(date);
+  const relative = formatEventRelative(date, now);
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="mt-0 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium">
+        {summary.user.charAt(0).toUpperCase()}
+      </div>
+      <p className="truncate flex-1 min-w-0">
+        <span className="font-medium text-foreground">{summary.user}</span>{" "}
+        <span>·</span>{" "}
+        <span>{summary.count} {sessionLabel}</span>{" "}
+        <span>·</span>{" "}
+        <span>last{" "}
+          <time dateTime={summary.lastAt} title={absolute}>
+            {relative}
+            <span className="sr-only"> ({absolute})</span>
+          </time>
+        </span>
+      </p>
     </div>
   );
 }

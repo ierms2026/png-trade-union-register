@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
   ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck, Home, FileCheck,
+  ChevronDown,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -17,10 +18,21 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 import { useFetch } from "@/components/app/use-fetch";
 import { NotificationsSkeleton } from "@/components/app/skeletons";
 import { ScrollToTop } from "@/components/app/scroll-to-top";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import {
+  NAV_STRUCTURE,
+  getNavForRole,
+  findGroupForRoute,
+  type NavGroup,
+  type NavDestination,
+  type StaffRole,
+} from "@/lib/dashboard/nav-structure";
 
 interface AuthUser {
   id: string; email: string;
@@ -28,66 +40,207 @@ interface AuthUser {
   assignedUnionId: string | null; twoFactorEnabled: boolean;
 }
 interface Notification { id: string; type: string; title: string; body: string; linkUrl: string | null; createdAt: string; }
-interface NavItem { id: string; label: string; icon: typeof LayoutDashboard; roles: Array<"REGISTRAR" | "INSPECTOR" | "OFFICER">; }
 
-const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"] },
-  { id: "unions", label: "Unions", icon: Building2, roles: ["REGISTRAR", "INSPECTOR"] },
-  { id: "my-union", label: "My Union", icon: Building2, roles: ["OFFICER"] },
-  { id: "compliance", label: "Compliance", icon: CheckCircle2, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"] },
-  { id: "configure-rules", label: "Rules", icon: Settings2, roles: ["REGISTRAR"] },
-  { id: "compare", label: "Compare", icon: GitCompare, roles: ["REGISTRAR", "INSPECTOR"] },
-  { id: "tasks", label: "Tasks", icon: ListTodo, roles: ["REGISTRAR", "OFFICER"] },
-  { id: "reviews", label: "Review Queue", icon: FileCheck, roles: ["REGISTRAR"] },
-  { id: "calendar", label: "Calendar", icon: Calendar, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"] },
-  { id: "audit", label: "Audit", icon: ScrollText, roles: ["REGISTRAR", "INSPECTOR"] },
-  { id: "users", label: "Users", icon: Users, roles: ["REGISTRAR"] },
-  { id: "security", label: "Security", icon: Shield, roles: ["REGISTRAR"] },
-  { id: "api-keys", label: "API Keys", icon: Key, roles: ["REGISTRAR"] },
-];
-
-function buildNav(role: AuthUser["role"]): NavItem[] {
-  return NAV_ITEMS.filter((item) => item.roles.includes(role));
-}
+// NavItem is now defined in nav-structure.ts (NavGroup + NavDestination).
+// The local NavItem interface is removed; the nav component uses the
+// config-driven types directly.
 
 interface Crumb { label: string; view?: string }
 
 function buildBreadcrumbs(activeView: string, _role: AuthUser["role"]): Crumb[] {
   if (activeView === "account-security") return [{ label: "Home", view: "dashboard" }, { label: "Account Security" }];
-  const current = NAV_ITEMS.find((n) => n.id === activeView);
-  if (!current) return [{ label: "Home", view: "dashboard" }, { label: activeView }];
+  // 6.3: breadcrumbs use the nav structure. The group label becomes a
+  // crumb for dropdown children (e.g. Compliance > Rules); direct links
+  // + the dashboard have no group crumb.
+  const group = findGroupForRoute(activeView);
+  if (!group) return [{ label: "Home", view: "dashboard" }, { label: activeView }];
+  const dest = group.destinations.find((d) => d.route === activeView)!;
   const trail: Crumb[] = [{ label: "Home", view: "dashboard" }];
-  if (activeView === "configure-rules") trail.push({ label: "Compliance", view: "compliance" });
-  trail.push({ label: current.label });
+  // If the group has 2+ destinations (dropdown), add the group label as a
+  // crumb. Direct links (1 destination) skip the group crumb (the group
+  // label IS the destination label — no need to repeat).
+  if (group.destinations.length > 1) {
+    trail.push({ label: group.label, view: undefined });
+  }
+  trail.push({ label: dest.label });
   return trail;
 }
 
-interface HorizontalNavProps { nav: NavItem[]; activeView: string; onNavigate: (view: string) => void; }
+interface HorizontalNavProps {
+  /** The role-filtered nav structure (from getNavForRole). */
+  nav: NavGroup[];
+  /** The currently-active route (for aria-current + parent highlight). */
+  activeView: string;
+  /** SPA navigation callback. */
+  onNavigate: (view: string) => void;
+}
+
+// =============================================================================
+// HorizontalNav — chunk 6.3. Renders the 5 top-level nav items from
+// NAV_STRUCTURE (via getNavForRole). Groups with 1 destination render as
+// direct links; groups with 2+ destinations render as disclosure dropdowns
+// (Radix Popover).
+//
+// A11Y (disclosure pattern, per 6.3 spec):
+//   - Dropdown trigger: <button> with aria-expanded + aria-controls (Radix
+//     Popover sets these automatically).
+//   - Escape closes AND returns focus to the trigger (Radix Popover default).
+//   - Click-outside closes (Radix Popover default).
+//   - Menu links are normal tab stops once open (Radix Popover doesn't do
+//     arrow-key nav or roving tabindex — Tab moves through the panel's
+//     links normally).
+//   - Visible focus throughout (Radix default + the focus-visible:ring
+//     classes on the trigger + links).
+//   - Arrow-key navigation within the menu: NOT implemented (Radix Popover
+//     is the disclosure pattern, not the menu widget; Tab is the navigation
+//     key, which is the spec's "normal tab stops once open").
+//
+// ACTIVE STATES:
+//   - aria-current="page" on the link matching the current route.
+//   - When a child of a group is active, the parent group is visually
+//     highlighted (border-accent text-primary) BUT aria-current stays on
+//     the child only (per spec).
+//   - For direct links (1-destination groups), the group IS the destination;
+//     aria-current goes on the group's button.
+//
+// FIT: the nav fits its container at 1280px with no horizontal scroll.
+// The `overflow-x-auto` is REMOVED (replaced with `flex-wrap` as a
+// graceful fallback for narrow widths — at 1280px the 5 top-level items
+// fit on one row; below that they wrap to a second row rather than
+// scrolling).
+// =============================================================================
 
 function HorizontalNav({ nav, activeView, onNavigate }: HorizontalNavProps) {
   return (
-    <nav className="flex items-center gap-1 overflow-x-auto px-4 lg:px-6">
-      {nav.map((item) => {
-        const Icon = item.icon;
-        const active = activeView === item.id;
+    <nav className="flex items-center flex-wrap gap-1 px-4 lg:px-6">
+      {nav.map((group) => {
+        // A group is a "direct link" if it has exactly 1 destination.
+        // Otherwise it's a dropdown.
+        const isDirectLink = group.destinations.length === 1;
+        // Check if any child of this group is the active route (for parent
+        // highlight). aria-current stays on the child only.
+        const hasActiveChild = group.destinations.some((d) => d.route === activeView);
+
+        if (isDirectLink) {
+          const dest = group.destinations[0];
+          const Icon = dest.icon;
+          const active = activeView === dest.route;
+          return (
+            <button
+              key={group.label}
+              onClick={() => onNavigate(dest.route)}
+              title={dest.label}
+              aria-current={active ? "page" : undefined}
+              className={`flex flex-shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                active
+                  ? "border-accent text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{dest.label}</span>
+            </button>
+          );
+        }
+
+        // Dropdown group: Radix Popover (disclosure pattern).
         return (
-          <button key={item.id} onClick={() => onNavigate(item.id)} title={item.label}
-            className={`flex flex-shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-              active ? "border-accent text-primary" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            }`}>
-            <Icon className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">{item.label}</span>
-          </button>
+          <NavDropdown
+            key={group.label}
+            group={group}
+            activeView={activeView}
+            onNavigate={onNavigate}
+            hasActiveChild={hasActiveChild}
+          />
         );
       })}
     </nav>
   );
 }
 
+// =============================================================================
+// NavDropdown — a single disclosure-pattern dropdown for a NavGroup with
+// 2+ destinations. Uses Radix Popover (the disclosure primitive, not the
+// menu widget). The trigger is a <button>; the panel is a container with
+// the destination links as normal tab stops.
+// =============================================================================
+
+interface NavDropdownProps {
+  group: NavGroup;
+  activeView: string;
+  onNavigate: (view: string) => void;
+  /** Whether any child of this group is the active route (for parent highlight). */
+  hasActiveChild: boolean;
+}
+
+function NavDropdown({ group, activeView, onNavigate, hasActiveChild }: NavDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const GroupIcon = group.icon;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={group.label}
+          // Radix Popover sets aria-expanded + aria-controls automatically
+          // on the trigger. The `data-state` attribute reflects open/closed.
+          className={`flex flex-shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+            hasActiveChild
+              ? "border-accent text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+          }`}
+        >
+          <GroupIcon className="h-4 w-4 flex-shrink-0" />
+          <span className="hidden sm:inline">{group.label}</span>
+          <ChevronDown
+            className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-56 p-1"
+      >
+        <nav aria-label={group.label}>
+          <ul className="space-y-0.5">
+            {group.destinations.map((dest) => {
+              const Icon = dest.icon;
+              const active = activeView === dest.route;
+              return (
+                <li key={dest.route}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onNavigate(dest.route);
+                      setOpen(false); // close the dropdown on navigation
+                    }}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+                      active
+                        ? "bg-accent/10 text-primary font-medium"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span>{dest.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view: string) => void; children: ReactNode; }
 
 export function AppShell({ user, activeView, onNavigate, children }: AppShellProps) {
-  const nav = buildNav(user.role);
+  const nav = getNavForRole(user.role);
   const crumbs = buildBreadcrumbs(activeView, user.role);
   const { data: notifData, loading: notifLoading, refetch: refetchNotifs } = useFetch<{ notifications: Notification[]; unreadCount: number; }>("/api/notifications");
   const notifications = notifData?.notifications ?? [];

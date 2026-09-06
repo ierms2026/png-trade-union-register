@@ -58,6 +58,41 @@ export const EXPIRING_WINDOW_DAYS = 90;
 export const FORECAST_BUCKETS = [30, 60, 90] as const;
 
 /**
+ * Trend window for the Compliance Trend chart (chunk 4.2b).
+ *
+ * The chart renders the most recent N days of available history — derived
+ * from point dates, never hardcoded. If fewer than N days of history
+ * exist, the chart renders what's available (no padding, no synthesis —
+ * per 4.2a's gap semantics).
+ *
+ * Default 365: ~one year of daily snapshots. A longer window would
+ * compress the x-axis too much for daily labels; a shorter window would
+ * miss year-over-year context. 6.2 may tune this for the final layout.
+ *
+ * This constant lives HERE (beside FORECAST_BUCKETS) so all dashboard
+ * chart windows have a single config home — a future "config audit" can
+ * find every window constant by grepping this file.
+ */
+export const TREND_WINDOW_DAYS = 365;
+
+/**
+ * Responsive breakpoint for the dashboard's final layout (chunk 6.1).
+ *
+ * Below this width, the two-column rows (Needs-Attention + Composition,
+ * Required-vs-On-File + Expiry-Forecast, Trend + Recent-Activity) stack
+ * vertically in DOM order. The KPI band wraps via auto-fit (independent
+ * of this breakpoint).
+ *
+ * Value: 1024 (the chunk spec's "~1024px"). Single home for the dashboard
+ * breakpoint so 6.2 / 6.3 can find it via grep.
+ *
+ * The Tailwind `lg:` prefix corresponds to 1024px by default — this constant
+ * is for documentation + tests, not for Tailwind class generation (the
+ * layout uses `lg:grid-cols-2` which already matches).
+ */
+export const DASHBOARD_BREAKPOINT_PX = 1024;
+
+/**
  * Sentinel value for rules that effectively never expire (one-time filings
  * like a Constitution). Set renewalYears to this in the seed to mark a rule
  * as "no renewal required." Matches calculator.ts:145.
@@ -99,14 +134,27 @@ export interface StatusConfig {
 /**
  * The canonical status configuration. Every dashboard component that
  * renders a status label, color, or icon MUST read from this object.
+ *
+ * DEFINITION TEMPLATES (chunk 6.2):
+ *   Definitions are templates that interpolate threshold constants (e.g.
+ *   `${EXPIRING_WINDOW_DAYS}`). This makes a future constant change
+ *   propagate to the definition text automatically — or fail the
+ *   `dashboard-status-config.test.ts` template-interpolation test loudly
+ *   if someone hardcodes a number instead.
+ *
+ *   The grep invariant: NO status-definition prose in components. Every
+ *   tooltip surfaces `STATUS_CONFIG[status].definition` (or
+ *   `DASHBOARD_KPI_DEFINITIONS[key]` for the non-status KPIs).
  */
 export const STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
   COMPLIANT: {
     label: "Compliant",
     colorToken: "var(--status-compliant)",
     icon: CheckCircle2,
-    definition:
-      "Document filed, approved by Registrar, and renewal date is more than 90 days away.",
+    // Template: interpolates EXPIRING_WINDOW_DAYS so a constant change
+    // propagates to the definition text. Aligns with the calculator's
+    // derivation (reviewStatus === "APPROVED" + expiryDate > now + window).
+    definition: `Document filed, approved by Registrar, with renewal date more than ${EXPIRING_WINDOW_DAYS} days away.`,
   },
   EXPIRING: {
     label: "Expiring",
@@ -133,6 +181,45 @@ export const STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
     icon: Ban,
     definition: "Document type is not required for this union (rule.required = false).",
   },
+};
+
+// =============================================================================
+// KPI definitions — for the non-status KPI cards (Total Unions, Documents,
+// Compliance Rate). The status KPIs (Compliant, Expiring, Overdue, Missing)
+// use STATUS_CONFIG above; these are for the cards that don't map to a
+// ComplianceStatus.
+//
+// Per chunk 6.2 spec: "Documents card (definition = the 1.1 DECISION text,
+// e.g. 'Active documents on file; superseded uploads excluded' — this
+// definition has governed the numbers since 1.1; today it finally reaches
+// users); Total Unions ('Registered unions'); the rate card's existing 1.2
+// tooltip (verify intact)."
+//
+// The 1.2 rate card tooltip is hardcoded in the RateKpiCard component
+// (lines 198-220 of dashboard.tsx) — it's the existing tooltip, verified
+// intact. It does NOT live here because it's a single-purpose tooltip on a
+// single card, not a config-driven definition. If 6.3+ wants to surface it
+// elsewhere, lift it here then.
+// =============================================================================
+
+/**
+ * Definitions for the non-status KPI cards. Keys correspond to the card's
+ * `label` text (not the underlying data field) so the tooltip can look up
+ * the definition by the same string the user sees.
+ *
+ * "Total Unions" — counts all unions in the registry regardless of status
+ *   (ACTIVE/SUSPENDED/DEREGISTERED). The dashboard's stats API returns
+ *   `totalUnions` from `db.union.count({})` — no status filter.
+ *
+ * "Documents" — the 1.1 DECISION: "active" documents = non-disposed
+ *   (`disposedAt: null`). The 0.1 audit found a 23-vs-21 discrepancy
+ *   (disposed vs non-disposed); 1.1 decided active-only. This definition
+ *   text has governed the number since 1.1; today (6.2) it finally reaches
+ *   users via the tooltip.
+ */
+export const DASHBOARD_KPI_DEFINITIONS: Readonly<Record<string, string>> = {
+  "Total Unions": "Registered unions in the registry, across all statuses (Active, Suspended, Deregistered).",
+  "Documents": "Active documents on file; superseded uploads and disposed documents excluded.",
 };
 
 // ---------------------------------------------------------------------------

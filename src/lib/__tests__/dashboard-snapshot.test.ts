@@ -20,6 +20,7 @@ import {
   buildDashboardMetrics,
   getComplianceCounts,
   tallyComplianceCounts,
+  computePercentage,
   type ComplianceCell,
 } from "../dashboard/metrics";
 import { EXPIRING_WINDOW_DAYS } from "../dashboard/status-config";
@@ -605,7 +606,8 @@ describe("compliance snapshot — chunk 4.2a", () => {
       expect(hasGapEntry).toBe(false);
     });
 
-    it("point shape: { date, compliant, expiring, overdue, missing, rateNumerator, rateDenominator }", async () => {
+    it("point shape: { date, compliant, expiring, overdue, missing, rateNumerator, rateDenominator, percentage }", async () => {
+      // 4.2b ADDITIVE: percentage field added (computed in metrics module).
       await testDb.complianceSnapshot.create({
         data: {
           date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2,
@@ -615,18 +617,19 @@ describe("compliance snapshot — chunk 4.2a", () => {
       const trend = await getComplianceTrend(FROZEN_NOW);
       const point = trend[0];
       expect(point).toBeDefined();
-      // Shape check: exactly these 7 keys, no more, no less.
+      // Shape check: exactly these 8 keys, no more, no less.
       // (rateNumerator and rateDenominator — NOT rate.numerator — to match
-      // the ComplianceTrendPoint type exported from snapshot.ts.)
+      // the ComplianceTrendPoint type exported from snapshot.ts. percentage
+      // is the 4.2b additive extension — see handoff.)
       const expectedKeys = [
         "date", "compliant", "expiring", "overdue", "missing",
-        "rateNumerator", "rateDenominator",
+        "rateNumerator", "rateDenominator", "percentage",
       ].sort();
       const actualKeys = Object.keys(point as ComplianceTrendPoint).sort();
       expect(actualKeys).toEqual(expectedKeys);
     });
 
-    it("round-trip: ensureSnapshotForToday → getComplianceTrend returns the same counts", async () => {
+    it("round-trip: ensureSnapshotForToday → getComplianceTrend returns the same counts + percentage", async () => {
       await ensureSnapshotForToday(FROZEN_NOW);
       const trend = await getComplianceTrend(FROZEN_NOW);
       expect(trend).toHaveLength(1);
@@ -638,6 +641,79 @@ describe("compliance snapshot — chunk 4.2a", () => {
       expect(point.missing).toBe(2);
       expect(point.rateNumerator).toBe(2);
       expect(point.rateDenominator).toBe(6);
+      // 4.2b ADDITIVE: percentage is computed in the metrics module via
+      // computePercentage(2, 6) = 33 (rounded from 33.33...).
+      expect(point.percentage).toBe(33);
+    });
+
+    // 4.2b ADDITIVE: percentage-per-point tests (computed in metrics module).
+    it("percentage === computePercentage(rateNumerator, rateDenominator) for every point", async () => {
+      // Seed three points with different numerators/denominators.
+      await testDb.complianceSnapshot.create({
+        data: {
+          date: "2026-06-13", compliant: 5, expiring: 0, overdue: 0, missing: 5,
+          rateNumerator: 5, rateDenominator: 10, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
+        },
+      });
+      await testDb.complianceSnapshot.create({
+        data: {
+          date: "2026-06-14", compliant: 7, expiring: 1, overdue: 1, missing: 1,
+          rateNumerator: 7, rateDenominator: 10, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
+        },
+      });
+      await testDb.complianceSnapshot.create({
+        data: {
+          date: "2026-06-15", compliant: 9, expiring: 1, overdue: 0, missing: 0,
+          rateNumerator: 9, rateDenominator: 10, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
+        },
+      });
+
+      const trend = await getComplianceTrend(FROZEN_NOW);
+      // Every point's percentage must match the metrics module's computePercentage.
+      for (const p of trend) {
+        expect(p.percentage).toBe(computePercentage(p.rateNumerator, p.rateDenominator));
+      }
+      // Spot-check specific values: 5/10=50, 7/10=70, 9/10=90.
+      expect(trend[0].percentage).toBe(50);
+      expect(trend[1].percentage).toBe(70);
+      expect(trend[2].percentage).toBe(90);
+    });
+
+    it("zero-denominator points yield percentage: null (NOT 0, NOT NaN) — chart handles via connectNulls={false}", async () => {
+      // A zero-denominator day means no applicable requirements existed that
+      // day (e.g. all unions deregistered, or no rules configured yet). The
+      // percentage is MEANINGLESS — null signals "skip this point on the line",
+      // distinct from 0 which would mean "0% compliant". See computePercentage
+      // docstring for the rationale.
+      await testDb.complianceSnapshot.create({
+        data: {
+          date: "2026-06-13", compliant: 0, expiring: 0, overdue: 0, missing: 0,
+          rateNumerator: 0, rateDenominator: 0, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
+        },
+      });
+
+      const trend = await getComplianceTrend(FROZEN_NOW);
+      expect(trend).toHaveLength(1);
+      expect(trend[0].percentage).toBeNull();
+      // Anti-NaN assertion: null is not NaN. (NaN would propagate through
+      // arithmetic downstream — explicitly assert against it.)
+      expect(Number.isNaN(trend[0].percentage as unknown as number)).toBe(false);
+    });
+
+    it("percentage field is never undefined — always a number or null", async () => {
+      // Defensive: even if the DB row has weird values, the percentage field
+      // MUST be defined (either a number or null). The chart's dataKey
+      // resolves "undefined" to 0 in some chart libraries — we don't want
+      // that to look like "0% compliant".
+      await testDb.complianceSnapshot.create({
+        data: {
+          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2,
+          rateNumerator: 2, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
+        },
+      });
+      const trend = await getComplianceTrend(FROZEN_NOW);
+      expect(trend[0].percentage).not.toBeUndefined();
+      expect(typeof trend[0].percentage === "number" || trend[0].percentage === null).toBe(true);
     });
   });
 
@@ -652,23 +728,23 @@ describe("compliance snapshot — chunk 4.2a", () => {
     it("returns false for a single point (default minPoints=2)", () => {
       const onePoint: ComplianceTrendPoint[] = [{
         date: "2026-06-15", compliant: 1, expiring: 1, overdue: 1, missing: 3,
-        rateNumerator: 1, rateDenominator: 6,
+        rateNumerator: 1, rateDenominator: 6, percentage: 17,
       }];
       expect(hasSufficientHistory(onePoint)).toBe(false);
     });
 
     it("returns true for 2+ points (default minPoints=2)", () => {
       const twoPoints: ComplianceTrendPoint[] = [
-        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, missing: 3, rateNumerator: 1, rateDenominator: 6 },
-        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2, rateNumerator: 2, rateDenominator: 6 },
+        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, missing: 3, rateNumerator: 1, rateDenominator: 6, percentage: 17 },
+        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2, rateNumerator: 2, rateDenominator: 6, percentage: 33 },
       ];
       expect(hasSufficientHistory(twoPoints)).toBe(true);
     });
 
     it("respects a custom minPoints", () => {
       const twoPoints: ComplianceTrendPoint[] = [
-        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, missing: 3, rateNumerator: 1, rateDenominator: 6 },
-        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2, rateNumerator: 2, rateDenominator: 6 },
+        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, missing: 3, rateNumerator: 1, rateDenominator: 6, percentage: 17 },
+        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2, rateNumerator: 2, rateDenominator: 6, percentage: 33 },
       ];
       expect(hasSufficientHistory(twoPoints, 3)).toBe(false);
       expect(hasSufficientHistory(twoPoints, 2)).toBe(true);
@@ -698,6 +774,13 @@ describe("compliance snapshot — chunk 4.2a", () => {
         "parseCapturedWith",
         "formatUtcDate",
         "PastDayImmutabilityError",
+        // 4.2b additive: pure chart-rendering helpers. None of these
+        // fabricate data — they slice existing points, insert explicit
+        // gap markers (NOT data), or scale numbers for sparkline geometry.
+        "sliceTrendToWindow",
+        "buildChartSeriesWithGaps",
+        "buildSparklinePoints",
+        "extractSparklineSeries",
       ];
       const forbiddenPatterns = [/fillGap/i, /interpolat/i, /synthesiz/i, /backfill/i, /seedHistor/i, /fakeHistor/i];
       for (const pattern of forbiddenPatterns) {

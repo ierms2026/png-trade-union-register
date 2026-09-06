@@ -147,6 +147,43 @@ export function computeComplianceRate(cells: ComplianceCell[]): ComplianceRate {
   return { numerator, denominator, percentage };
 }
 
+/**
+ * Compute a percentage from a numerator/denominator pair, returning null
+ * for zero denominators (per chunk 1.2's rule: "no NaN, ever").
+ *
+ * THE standing invariant from chunk 1.2: "percentage arithmetic lives ONLY
+ * in the metrics module — components never compute percentages." This
+ * function is the single entry point for percentage computation when a
+ * caller already has numerator + denominator (e.g. a ComplianceTrendPoint
+ * from the 4.2a snapshot store, or a ComplianceRate numerator/denominator
+ * that hasn't been resolved yet).
+ *
+ * Returns:
+ *   - `null` when denominator === 0 (no applicable cells → no meaningful rate)
+ *   - `Math.round(numerator / denominator × 100)` otherwise (0–100 integer)
+ *
+ * Why `null` instead of `0`:
+ *   `computeComplianceRate` above returns `percentage: 0` for zero
+ *   denominator because that's the right thing for a "live rate card"
+ *   (the user sees "0%" and understands "no one's compliant"). But for
+ *   HISTORICAL points (4.2b trend chart), a zero denominator means
+ *   "this day had no applicable requirements" — which is semantically
+ *   different from "0% compliant". Returning `null` lets the chart
+ *   distinguish the two cases (null → skip the point on the line, vs
+ *   0 → draw the point at y=0).
+ *
+ * The chart component MUST handle null percentage without producing NaN
+ * downstream — see `sliceTrendToWindow` in snapshot.ts which preserves
+ * the null through to the chart data array.
+ */
+export function computePercentage(
+  numerator: number,
+  denominator: number,
+): number | null {
+  if (denominator === 0) return null;
+  return Math.round((numerator / denominator) * 100);
+}
+
 /** Get the compliance counts object from a DashboardMetrics instance. */
 export function getComplianceCounts(metrics: DashboardMetrics): ComplianceCounts {
   return metrics.compliance.counts;

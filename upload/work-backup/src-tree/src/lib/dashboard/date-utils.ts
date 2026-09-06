@@ -2,8 +2,17 @@
 // Date formatting utilities for the dashboard.
 //
 // Pure functions — all accept an injectable `now` so tests can freeze time.
-// Created in chunk 3.1 for the Needs Attention panel. Chunk 5.2 will
-// consolidate all date formatting on this module.
+// Created in chunk 3.1 for the Needs Attention panel. Chunk 5.2 added
+// formatEventRelative for the Recent Activity panel.
+//
+// TWO RELATIVE FUNCTIONS (do not conflate them):
+//   - formatRelative(date, now)       — DUE-DATE semantics (future = "in 12
+//     days", past = "3 days overdue"). Used by formatDueDate for the Needs
+//     Attention panel + Compliance Heatmap.
+//   - formatEventRelative(date, now)  — EVENT-TIMESTAMP semantics (always
+//     past = "just now" / "5 minutes ago" / "3 days ago", with fallback to
+//     absolute at RELATIVE_THRESHOLD_DAYS). Used by the Recent Activity
+//     panel (chunk 5.2).
 // =============================================================================
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -65,4 +74,85 @@ export function formatRelative(date: Date, now: Date = new Date()): string {
  */
 export function formatDueDate(date: Date, now: Date = new Date()): string {
   return `${formatAbsolute(date)} · ${formatRelative(date, now)}`;
+}
+
+// =============================================================================
+// Chunk 5.2 — formatEventRelative: EVENT-TIMESTAMP semantics for the Recent
+// Activity panel. Distinct from formatRelative (which has due-date
+// semantics). Repurposing formatRelative would break existing due-date
+// callers (Needs Attention panel, Compliance Heatmap).
+// =============================================================================
+
+/**
+ * Threshold at which formatEventRelative stops returning relative phrasing
+ * and falls back to the absolute date format. Past this threshold, the
+ * relative phrasing ("42 days ago") becomes harder to scan than the
+ * absolute ("12 Jun 2026").
+ *
+ * Default 7 days. 6.2 may tune. Lives HERE (beside the function that uses
+ * it) so all date-formatting thresholds have a single home — a future
+ * "config audit" can grep this file for every threshold constant.
+ */
+export const RELATIVE_THRESHOLD_DAYS = 7;
+
+/**
+ * Format an event's timestamp as a relative, scannable string.
+ *
+ * EVENT-TIMESTAMP semantics (always past, "ago" form):
+ *   - < 1 minute  → "just now"
+ *   - < 1 hour    → "N minute(s) ago"
+ *   - < 1 day     → "N hour(s) ago"
+ *   - < 7 days    → "N day(s) ago"
+ *   - ≥ 7 days    → formatAbsolute(date) — fallback for scannability
+ *
+ * The 7-day threshold is RELATIVE_THRESHOLD_DAYS (above). Beyond it,
+ * "42 days ago" is harder to read than "12 Jun 2026"; the absolute form
+ * also makes the year visible (the relative form obscures it).
+ *
+ * Future events: events are always in the past (they've already happened).
+ * If a future date is passed (clock skew or test fixture), the function
+ * returns "just now" for differences < 1 minute, and the absolute format
+ * otherwise — never produces negative "ago" strings.
+ *
+ * Pure: no I/O, no Date.now() leaks. Pass `now` in tests to freeze time.
+ *
+ * @param date The event's timestamp (always past in production; defensive
+ *             against future dates).
+ * @param now  Injectable "now" — defaults to new Date().
+ * @returns A scannable relative string, OR the absolute date format when
+ *          the difference exceeds RELATIVE_THRESHOLD_DAYS.
+ */
+export function formatEventRelative(date: Date, now: Date = new Date()): string {
+  const diffMs = now.getTime() - date.getTime(); // positive when date is in the past
+  const absMs = Math.abs(diffMs);
+
+  // < 1 minute → "just now" (handles future < 1 minute too — clock skew defense)
+  if (absMs < 60 * 1000) {
+    return "just now";
+  }
+
+  // Future dates ≥ 1 minute: defensive fallback (events shouldn't be in
+  // the future, but clock skew or test fixtures could produce them).
+  if (diffMs < 0) {
+    return formatAbsolute(date);
+  }
+
+  // Past dates from here on.
+  if (absMs < 60 * 60 * 1000) {
+    // < 1 hour: minutes
+    const minutes = Math.floor(absMs / (60 * 1000));
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+  if (absMs < MS_PER_DAY) {
+    // < 1 day: hours
+    const hours = Math.floor(absMs / (60 * 60 * 1000));
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+  const days = Math.floor(absMs / MS_PER_DAY);
+  if (days < RELATIVE_THRESHOLD_DAYS) {
+    // < 7 days: days
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  }
+  // ≥ 7 days: absolute fallback
+  return formatAbsolute(date);
 }
