@@ -18,6 +18,7 @@ import { AuditView } from "@/components/app/views/audit";
 import { UsersView } from "@/components/app/views/users";
 import { SecurityView } from "@/components/app/views/security";
 import { ApiKeysView } from "@/components/app/views/api-keys";
+import { LegislationView } from "@/components/app/views/legislation";
 import { AccountSecurityView } from "@/components/app/views/account-security";
 import { navigateToComplianceFilter } from "@/lib/dashboard/status-filter";
 import { parseStatusParam, parseViewParam, PARAM_VIEW, PARAM_STATUS } from "@/lib/dashboard/dashboard-links";
@@ -148,6 +149,7 @@ export default function Home() {
       case "users": return <UsersView />;
       case "security": return <SecurityView />;
       case "api-keys": return <ApiKeysView />;
+      case "legislation": return <LegislationView />;
       case "account-security": return <AccountSecurityView user={currentUser} />;
       default: return (
         <DashboardView
