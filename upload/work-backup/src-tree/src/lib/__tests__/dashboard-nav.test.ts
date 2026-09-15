@@ -44,10 +44,9 @@ const appShellSource = readFileSync(APP_SHELL_PATH, "utf-8");
 const pageSource = readFileSync(PAGE_PATH, "utf-8");
 
 // =============================================================================
-// PRE-CHUNK INVENTORY — the 13 routes as they existed before 6.3 (from the
-// pre-chunk NAV_ITEMS[].id strings, recorded in the 6.3 handoff). The
-// deep-link preservation test asserts NAV_STRUCTURE's routes are byte-
-// identical to this list.
+// PRE-CHUNK INVENTORY — the 14 routes (13 original from 6.3 + legislation
+// added post-6.3). The deep-link preservation test asserts NAV_STRUCTURE's
+// routes are byte-identical to this list.
 // =============================================================================
 const PRE_CHUNK_ROUTES = [
   "dashboard",
@@ -63,6 +62,7 @@ const PRE_CHUNK_ROUTES = [
   "users",
   "security",
   "api-keys",
+  "legislation",
 ] as const;
 
 describe("nav-structure — NAV_STRUCTURE config (chunk 6.3)", () => {
@@ -87,9 +87,9 @@ describe("nav-structure — NAV_STRUCTURE config (chunk 6.3)", () => {
     expect(dropdowns.map((g) => g.label)).toEqual(["Unions", "Compliance", "Admin"]);
   });
 
-  it("all 13 destinations are present (the spec said 12; the 13th is my-union — see handoff)", () => {
+  it("all 14 destinations are present (13 original + legislation added post-6.3)", () => {
     const allRoutes = getAllRoutes();
-    expect(allRoutes).toHaveLength(13);
+    expect(allRoutes).toHaveLength(14);
   });
 
   it("every destination has a non-empty label + route + icon + roles array", () => {
@@ -212,26 +212,23 @@ describe("nav-structure — route smoke test (DONE WHEN criterion)", () => {
 });
 
 describe("nav-structure — getNavForRole (role filtering)", () => {
-  it("REGISTRAR sees all 5 groups (12 destinations accessible — my-union is OFFICER-only)", () => {
-    // The 13th destination (my-union) is OFFICER-only, so REGISTRAR sees 12.
-    // Per spec: "Do not delete destinations" — all 13 are in NAV_STRUCTURE,
-    // but role filtering narrows what each role sees.
+  it("REGISTRAR sees all 5 groups (13 destinations accessible — my-union is OFFICER-only)", () => {
     const nav = getNavForRole("REGISTRAR");
     expect(nav).toHaveLength(5);
     const allRoutes = nav.flatMap((g) => g.destinations.map((d) => d.route));
-    expect(allRoutes).toHaveLength(12); // all 13 minus my-union
+    expect(allRoutes).toHaveLength(13); // all 14 minus my-union
     expect(allRoutes).not.toContain("my-union");
   });
 
-  it("INSPECTOR sees Dashboard, Unions (Unions + Compare), Compliance, Admin (Calendar + Audit) — no Tasks (REGISTRAR+OFFICER only), no Users/Security/API Keys", () => {
+  it("INSPECTOR sees Dashboard, Unions (Unions + Compare), Compliance, Tasks, Admin (Calendar + Audit) — Inspectors now have Tasks access", () => {
     const nav = getNavForRole("INSPECTOR");
-    // Inspector can't see Tasks (REGISTRAR + OFFICER only), so 4 groups.
-    expect(nav).toHaveLength(4);
-    expect(nav.map((g) => g.label)).toEqual(["Dashboard", "Unions", "Compliance", "Admin"]);
+    // Inspector now sees 5 groups (Tasks was added to INSPECTOR role gating).
+    expect(nav).toHaveLength(5);
+    expect(nav.map((g) => g.label)).toEqual(["Dashboard", "Unions", "Compliance", "Tasks", "Admin"]);
     // Unions dropdown: Unions + Compare (NOT My Union — OFFICER only)
     const unionsGroup = nav.find((g) => g.label === "Unions")!;
     expect(unionsGroup.destinations.map((d) => d.route)).toEqual(["unions", "compare"]);
-    // Admin dropdown: Calendar + Audit only (NOT Users/Security/API Keys — REGISTRAR only)
+    // Admin dropdown: Calendar + Audit only (NOT Users/Security/API Keys/Legislation — REGISTRAR only)
     const adminGroup = nav.find((g) => g.label === "Admin")!;
     expect(adminGroup.destinations.map((d) => d.route)).toEqual(["calendar", "audit"]);
   });

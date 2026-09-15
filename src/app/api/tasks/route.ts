@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Role, TaskStatus, Severity } from "@prisma/client";
+import { Role, Severity, NotificationType } from "@prisma/client";
 
 // =============================================================================
 // GET /api/tasks  |  POST /api/tasks
@@ -10,16 +10,18 @@ import { Role, TaskStatus, Severity } from "@prisma/client";
 //
 // AUTH MATRIX:
 //   - REGISTRAR: see all tasks, create tasks with any unionId/assigneeId.
+//   - INSPECTOR: see tasks assigned to them (assigneeId = self).
+//                Cannot create tasks (read-only access — Inspectors receive
+//                tasks from the Registrar, they don't create them).
 //   - OFFICER:   see tasks where unionId = their union OR assigneeId = self.
 //                On create, unionId is locked to their union, assigneeId
 //                can only be self or null.
-//   - INSPECTOR: 403 — Inspectors don't use the task system.
 //
-// GET RESPONSE:
-//   { tasks: [...] }
-//
-// POST RESPONSE:
-//   201 with the created task.
+// NOTIFICATIONS:
+//   When a task is assigned (POST with assigneeId, or PATCH changing
+//   assigneeId), a TASK notification is created for the assignee so they
+//   see a bell-icon alert. The dedupKey prevents duplicate notifications
+//   if the same task is re-assigned to the same person.
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -34,24 +36,23 @@ export async function GET(req: NextRequest) {
       { status: 401 },
     );
   }
-  if (user.role === Role.INSPECTOR) {
-    return NextResponse.json(
-      { error: "Inspectors don't have access to tasks." },
-      { status: 403 },
-    );
-  }
 
-  // Officer scoping: tasks where unionId = mine OR assigneeId = mine.
-   
-  const where: any =
-    user.role === Role.OFFICER
-      ? {
-          OR: [
-            ...(user.assignedUnionId ? [{ unionId: user.assignedUnionId }] : []),
-            { assigneeId: user.id },
-          ],
-        }
-      : {};
+  // Role-based scoping:
+  //   REGISTRAR → all tasks
+  //   INSPECTOR → tasks assigned to them only (assigneeId = self)
+  //   OFFICER   → tasks in their union OR assigned to them
+  const where: Record<string, unknown> =
+    user.role === Role.REGISTRAR
+      ? {}
+      : user.role === Role.INSPECTOR
+        ? { assigneeId: user.id }
+        : // OFFICER
+          {
+            OR: [
+              ...(user.assignedUnionId ? [{ unionId: user.assignedUnionId }] : []),
+              { assigneeId: user.id },
+            ],
+          };
 
   const tasks = await db.task.findMany({
     where,
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest) {
 }
 
 // -----------------------------------------------------------------------------
-// POST — create a task
+// POST — create a task (REGISTRAR + OFFICER only; INSPECTOR is read-only)
 // -----------------------------------------------------------------------------
 
 interface CreateTaskBody {
@@ -94,9 +95,11 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
+  // Inspectors are read-only — they can view tasks assigned to them but
+  // cannot create tasks. Only Registrars and Officers can create tasks.
   if (user.role === Role.INSPECTOR) {
     return NextResponse.json(
-      { error: "Inspectors don't have access to tasks." },
+      { error: "Inspectors have read-only access to tasks. Only Registrars can create tasks." },
       { status: 403 },
     );
   }
@@ -119,9 +122,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Officer restrictions: unionId locked, assigneeId = self or null.
-   
-  const data: any = {
+  const data: Record<string, unknown> = {
     title: body.title.trim(),
     description:
       typeof body.description === "string" ? body.description.trim() : null,
@@ -142,21 +143,16 @@ export async function POST(req: NextRequest) {
     // unionId locked to their assigned union (or null if they have none).
     data.unionId = user.assignedUnionId;
     // assigneeId can only be self or null.
-    data.assigneeId =
-      body.assigneeId === user.id || body.assigneeId === null
-        ? body.assigneeId
-        : user.id;
-    // Officers can't assign to someone else.
     if (body.assigneeId && body.assigneeId !== user.id) {
       return NextResponse.json(
         { error: "Officers can only assign tasks to themselves." },
         { status: 403 },
       );
     }
+    data.assigneeId = body.assigneeId === user.id ? body.assigneeId : null;
   } else {
     // Registrar: unionId optional (null for "general" tasks), assigneeId optional.
     if (typeof body.unionId === "string" && body.unionId.length > 0) {
-      // Verify the union exists.
       const unionExists = await db.union.findUnique({
         where: { id: body.unionId },
         select: { id: true },
@@ -191,6 +187,7 @@ export async function POST(req: NextRequest) {
 
   const task = await db.task.create({ data });
 
+  // Audit log
   await db.auditLog.create({
     data: {
       actorId: user.id,
@@ -207,6 +204,27 @@ export async function POST(req: NextRequest) {
       severity: Severity.INFO,
     },
   });
+
+  // --- Notification on assignment ---
+  // If the task is assigned to someone other than the creator, send a
+  // bell-icon notification so the assignee discovers the task.
+  if (task.assigneeId && task.assigneeId !== user.id) {
+    try {
+      await db.notification.create({
+        data: {
+          userId: task.assigneeId,
+          type: NotificationType.TASK,
+          title: `New task assigned: ${task.title}`,
+          body: `Assigned by ${user.email}. Priority: ${task.priority}.`,
+          dedupKey: `task:assigned:${task.id}`,
+          linkUrl: "/?view=tasks",
+        },
+      });
+    } catch {
+      // dedupKey violation = notification already exists for this task+user.
+      // Safe to ignore — the assignee was already notified.
+    }
+  }
 
   const serialized = {
     ...task,

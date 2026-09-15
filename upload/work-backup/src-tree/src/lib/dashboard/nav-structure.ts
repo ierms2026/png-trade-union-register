@@ -182,7 +182,7 @@ export const NAV_STRUCTURE: NavGroup[] = [
         label: "Tasks",
         route: "tasks",
         icon: ListTodo,
-        roles: ["REGISTRAR", "OFFICER"],
+        roles: ["REGISTRAR", "INSPECTOR", "OFFICER"],
       },
     ],
     route: "tasks",
