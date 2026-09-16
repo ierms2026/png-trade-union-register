@@ -1,0 +1,862 @@
+     1→"use client";
+     2→import Link from "next/link";
+     3→
+     4→import { useState, type FormEvent } from "react";
+     5→import {
+     6→  Building2,
+     7→  Upload,
+     8→  FileText,
+     9→  ChevronRight,
+    10→  Loader2,
+    11→  ArrowLeft,
+    12→  History,
+    13→  RotateCcw,
+    14→  Download,
+    15→  Eye,
+    16→  Pencil,
+    17→  Search,
+    18→} from "lucide-react";
+    19→import { toast } from "sonner";
+    20→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+    21→import { Button } from "@/components/ui/button";
+    22→import { Input } from "@/components/ui/input";
+    23→import { Label } from "@/components/ui/label";
+    24→import { Badge } from "@/components/ui/badge";
+    25→import { StatusBadge } from "@/components/app/status-badge";
+    26→import { Textarea } from "@/components/ui/textarea";
+    27→import {
+    28→  Select,
+    29→  SelectContent,
+    30→  SelectItem,
+    31→  SelectTrigger,
+    32→  SelectValue,
+    33→} from "@/components/ui/select";
+    34→import {
+    35→  Dialog,
+    36→  DialogContent,
+    37→  DialogDescription,
+    38→  DialogFooter,
+    39→  DialogHeader,
+    40→  DialogTitle,
+    41→} from "@/components/ui/dialog";
+    42→import { useFetch } from "@/components/app/use-fetch";
+    43→import { CardListSkeleton, TableSkeleton } from "@/components/app/skeletons";
+    44→import { ErrorState } from "@/components/app/error-state";
+    45→import { EmptyState } from "@/components/app/empty-state";
+    46→import { DocumentPreviewModal } from "@/components/app/document-preview-modal";
+    47→
+    48→// =============================================================================
+    49→// Unions view — registry list + detail with document tiles + upload dialog.
+    50→//
+    51→// LIST: shows all unions (Officers see only their assigned union).
+    52→// DETAIL: click a union → shows its documents with latest version info,
+    53→//         + an "Upload" button to add a new version.
+    54→// =============================================================================
+    55→
+    56→interface DocumentVersion {
+    57→  id: string;
+    58→  versionNumber: number;
+    59→  fileName: string;
+    60→  uploadedAt: string;
+    61→  fileSize: number;
+    62→  fileExtension: string | null;
+    63→}
+    64→
+    65→interface UnionDocument {
+    66→  id: string;
+    67→  documentType: string;
+    68→  currentVersionId: string | null;
+    69→  disposedAt: string | null;
+    70→  snoozedUntil: string | null;
+    71→  reviewStatus: "PENDING" | "APPROVED" | "REJECTED";
+    72→  reviewedAt: string | null;
+    73→  rejectionReason: string | null;
+    74→  latestVersion: DocumentVersion | null;
+    75→}
+    76→
+    77→interface Union {
+    78→  id: string;
+    79→  unionName: string;
+    80→  registrationNo: string;
+    81→  fileNumber: string | null;
+    82→  status: string;
+    83→  address: string | null;
+    84→  contactPerson: string | null;
+    85→  contactEmail: string | null;
+    86→  contactPhone: string | null;
+    87→  remarks: string | null;
+    88→  createdAt: string;
+    89→  updatedAt: string;
+    90→  documents: UnionDocument[];
+    91→}
+    92→
+    93→export function UnionsView({ user, initialUnionId }: { user: { role: string; assignedUnionId: string | null }; initialUnionId?: string | null }) {
+    94→  const { data, loading, error, refetch } = useFetch<{ unions: Union[] }>("/api/unions");
+    95→  const [selectedUnionId, setSelectedUnionId] = useState<string | null>(initialUnionId ?? null);
+    96→  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+    97→  const [uploadDocType, setUploadDocType] = useState<string>("");
+    98→  const [editDialogOpen, setEditDialogOpen] = useState(false);
+    99→  const [searchQuery, setSearchQuery] = useState("");
+   100→
+   101→  const selectedUnion = data?.unions.find((u) => u.id === selectedUnionId);
+   102→
+   103→  // Client-side filter — same pattern as the public portal. Instant, no
+   104→  // network round-trip. Filters by union name or registration number.
+   105→  const filteredUnions = (() => {
+   106→    const all = data?.unions ?? [];
+   107→    const q = searchQuery.trim().toLowerCase();
+   108→    if (!q) return all;
+   109→    return all.filter(
+   110→      (u) =>
+   111→        u.unionName.toLowerCase().includes(q) ||
+   112→        u.registrationNo.toLowerCase().includes(q),
+   113→    );
+   114→  })();
+   115→
+   116→  if (loading) return <CardListSkeleton count={6} />;
+   117→  if (error) return <ErrorState description={error} onRetry={refetch} />;
+   118→  if (!data || data.unions.length === 0) {
+   119→    return (
+   120→      <EmptyState
+   121→        icon={Building2}
+   122→        title="No unions registered"
+   123→        description="Once unions are registered, they will appear here."
+   124→      />
+   125→    );
+   126→  }
+   127→
+   128→  // --- Union detail view ---
+   129→  if (selectedUnion) {
+   130→    return (
+   131→      <div className="space-y-6">
+   132→        <Button variant="ghost" size="sm" onClick={() => setSelectedUnionId(null)}>
+   133→          <ArrowLeft className="mr-2 h-4 w-4" />
+   134→          Back to unions
+   135→        </Button>
+   136→
+   137→        <Card>
+   138→          <CardHeader>
+   139→            <div className="flex items-start justify-between">
+   140→              <div>
+   141→                <CardTitle className="text-xl">{selectedUnion.unionName}</CardTitle>
+   142→                <CardDescription className="mt-1 flex items-center gap-2">
+   143→                  <span>Reg. No: {selectedUnion.registrationNo}</span>
+   144→                  <Badge variant={selectedUnion.status === "ACTIVE" ? "default" : "secondary"}>
+   145→                    {selectedUnion.status}
+   146→                  </Badge>
+   147→                </CardDescription>
+   148→              </div>
+   149→              <div className="flex gap-2">
+   150→                <Button
+   151→                  size="sm"
+   152→                  variant="outline"
+   153→                  onClick={() => setEditDialogOpen(true)}
+   154→                >
+   155→                  <Pencil className="mr-2 h-4 w-4" />
+   156→                  Edit
+   157→                </Button>
+   158→                <Button
+   159→                  size="sm"
+   160→                  onClick={() => {
+   161→                    setUploadDialogOpen(true);
+   162→                  }}
+   163→                >
+   164→                  <Upload className="mr-2 h-4 w-4" />
+   165→                  Upload Document
+   166→                </Button>
+   167→              </div>
+   168→            </div>
+   169→          </CardHeader>
+   170→          <CardContent className="space-y-4">
+   171→            {/* Contact info */}
+   172→            <div className="grid gap-4 text-sm md:grid-cols-2">
+   173→              {selectedUnion.fileNumber && (
+   174→                <div>
+   175→                  <p className="text-xs text-muted-foreground">File Number</p>
+   176→                  <p className="font-medium">{selectedUnion.fileNumber}</p>
+   177→                </div>
+   178→              )}
+   179→              {selectedUnion.contactPerson && (
+   180→                <div>
+   181→                  <p className="text-xs text-muted-foreground">Contact Person</p>
+   182→                  <p className="font-medium">{selectedUnion.contactPerson}</p>
+   183→                </div>
+   184→              )}
+   185→              {selectedUnion.contactEmail && (
+   186→                <div>
+   187→                  <p className="text-xs text-muted-foreground">Contact Email</p>
+   188→                  <p className="font-medium">{selectedUnion.contactEmail}</p>
+   189→                </div>
+   190→              )}
+   191→              {selectedUnion.contactPhone && (
+   192→                <div>
+   193→                  <p className="text-xs text-muted-foreground">Contact Phone</p>
+   194→                  <p className="font-medium">{selectedUnion.contactPhone}</p>
+   195→                </div>
+   196→              )}
+   197→              {selectedUnion.address && (
+   198→                <div className="md:col-span-2">
+   199→                  <p className="text-xs text-muted-foreground">Address</p>
+   200→                  <p className="font-medium">{selectedUnion.address}</p>
+   201→                </div>
+   202→              )}
+   203→              {selectedUnion.remarks && (
+   204→                <div className="md:col-span-2">
+   205→                  <p className="text-xs text-muted-foreground">Remarks</p>
+   206→                  <p className="font-medium">{selectedUnion.remarks}</p>
+   207→                </div>
+   208→              )}
+   209→            </div>
+   210→
+   211→            {/* Documents */}
+   212→            <div>
+   213→              <h4 className="mb-3 text-sm font-medium">Documents ({selectedUnion.documents.length})</h4>
+   214→              {selectedUnion.documents.length === 0 ? (
+   215→                <p className="text-sm text-muted-foreground">No documents filed yet.</p>
+   216→              ) : (
+   217→                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+   218→                  {selectedUnion.documents.map((doc) => (
+   219→                    <DocumentTile
+   220→                      key={doc.id}
+   221→                      doc={doc}
+   222→                      unionId={selectedUnion.id}
+   223→                      userRole={user.role}
+   224→                      onUploadVersion={() => {
+   225→                        setUploadDocType(doc.documentType);
+   226→                        setUploadDialogOpen(true);
+   227→                      }}
+   228→                    />
+   229→                  ))}
+   230→                </div>
+   231→              )}
+   232→            </div>
+   233→          </CardContent>
+   234→        </Card>
+   235→
+   236→        {uploadDialogOpen && (
+   237→          <UploadDialog
+   238→            unionId={selectedUnion.id}
+   239→            defaultDocType={uploadDocType}
+   240→            open={uploadDialogOpen}
+   241→            onClose={() => {
+   242→              setUploadDialogOpen(false);
+   243→              setUploadDocType("");
+   244→            }}
+   245→            onUploaded={() => {
+   246→              refetch();
+   247→              setUploadDialogOpen(false);
+   248→              setUploadDocType("");
+   249→            }}
+   250→          />
+   251→        )}
+   252→
+   253→        {editDialogOpen && (
+   254→          <EditUnionDialog
+   255→            union={selectedUnion}
+   256→            userRole={user.role}
+   257→            onClose={() => setEditDialogOpen(false)}
+   258→            onSaved={() => {
+   259→              setEditDialogOpen(false);
+   260→              refetch();
+   261→            }}
+   262→          />
+   263→        )}
+   264→      </div>
+   265→    );
+   266→  }
+   267→
+   268→  // --- Union list view ---
+   269→  return (
+   270→    <div className="space-y-6">
+   271→      <div>
+   272→        <h1 className="text-3xl font-bold tracking-tight">Registered Unions</h1>
+   273→        <p className="text-sm text-muted-foreground">
+   274→          {data.unions.length} registered union{data.unions.length !== 1 ? "s" : ""}.
+   275→        </p>
+   276→      </div>
+   277→
+   278→      {/* Filter box — reactive, no submit button (same pattern as public portal) */}
+   279→      <div className="relative">
+   280→        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+   281→        <Input
+   282→          placeholder="Filter by name or registration number..."
+   283→          value={searchQuery}
+   284→          onChange={(e) => setSearchQuery(e.target.value)}
+   285→          className="pl-9"
+   286→        />
+   287→      </div>
+   288→
+   289→      {filteredUnions.length === 0 && searchQuery.trim() ? (
+   290→        <Card>
+   291→          <CardContent className="py-8 text-center">
+   292→            <p className="text-sm font-medium">No unions match your filter</p>
+   293→            <p className="mt-1 text-xs text-muted-foreground">Try a different search term.</p>
+   294→          </CardContent>
+   295→        </Card>
+   296→      ) : (
+   297→        <Card>
+   298→          <CardContent className="divide-y p-0">
+   299→            <div className="hidden grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid">
+   300→              <span>Union Name</span><span>Reg. No.</span><span className="text-center">Documents</span><span className="text-center">Status</span><span />
+   301→            </div>
+   302→            {filteredUnions.map((u) => (
+   303→              <Link key={u.id} href={`/unions/${u.registrationNo}`} className="grid w-full grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30 border-l-2 border-solid border-l-transparent hover:border-l-accent">
+   304→                <div className="min-w-0">
+   305→                  <p className="truncate font-medium">{u.unionName}</p>
+   306→                  <p className="truncate text-xs text-muted-foreground sm:hidden">{u.registrationNo} · {u.documents.length} doc{u.documents.length !== 1 ? "s" : ""}</p>
+   307→                </div>
+   308→                <span className="hidden truncate text-sm text-muted-foreground sm:inline">{u.registrationNo}</span>
+   309→                <span className="hidden text-center text-sm text-muted-foreground sm:inline">{u.documents.length}</span>
+   310→                <span className="hidden text-center sm:flex sm:justify-center"><StatusBadge status={u.status} /></span>
+   311→                <ChevronRight className="hidden h-4 w-4 justify-self-end text-muted-foreground sm:block" />
+   312→              </Link>
+   313→            ))}
+   314→          </CardContent>
+   315→        </Card>
+   316→      )}
+   317→    </div>
+   318→  );
+   319→}
+   320→
+   321→// -----------------------------------------------------------------------------
+   322→// Document tile
+   323→// -----------------------------------------------------------------------------
+   324→
+   325→function DocumentTile({
+   326→  doc,
+   327→  unionId,
+   328→  userRole,
+   329→  onUploadVersion,
+   330→}: {
+   331→  doc: UnionDocument;
+   332→  unionId: string;
+   333→  userRole: string;
+   334→  onUploadVersion: () => void;
+   335→}) {
+   336→  const [versionsOpen, setVersionsOpen] = useState(false);
+   337→  const [versions, setVersions] = useState<unknown[] | null>(null);
+   338→  const [versionsLoading, setVersionsLoading] = useState(false);
+   339→  const [previewDoc, setPreviewDoc] = useState<{
+   340→    documentType: string;
+   341→    version: number;
+   342→    fileName: string;
+   343→    fileExtension: string | null;
+   344→    downloadUrl: string;
+   345→  } | null>(null);
+   346→
+   347→  const canMutate = userRole !== "INSPECTOR";
+   348→
+   349→  async function loadVersions() {
+   350→    setVersionsLoading(true);
+   351→    try {
+   352→      const res = await fetch(`/api/unions/${unionId}/documents/${doc.id}/versions`, {
+   353→        credentials: "include",
+   354→      });
+   355→      const data = await res.json();
+   356→      if (res.ok) {
+   357→        setVersions(data.versions);
+   358→      } else {
+   359→        toast.error("Failed to load versions.");
+   360→      }
+   361→    } catch {
+   362→      toast.error("Network error.");
+   363→    } finally {
+   364→      setVersionsLoading(false);
+   365→    }
+   366→  }
+   367→
+   368→  async function restoreVersion(versionId: string) {
+   369→    try {
+   370→      const res = await fetch(`/api/unions/${unionId}/documents/${doc.id}/restore`, {
+   371→        method: "POST",
+   372→        headers: { "Content-Type": "application/json" },
+   373→        credentials: "include",
+   374→        body: JSON.stringify({ versionId }),
+   375→      });
+   376→      const data = await res.json();
+   377→      if (!res.ok) {
+   378→        toast.error(data.error || "Restore failed.");
+   379→        return;
+   380→      }
+   381→      toast.success(`Restored from version ${data.restoredFromVersion}. New version: ${data.newVersion.versionNumber}.`);
+   382→      setVersionsOpen(false);
+   383→      // Reload the union list to reflect the new version
+   384→      window.location.reload();
+   385→    } catch {
+   386→      toast.error("Network error.");
+   387→    }
+   388→  }
+   389→
+   390→  return (
+   391→    <div className="rounded-md border p-3">
+   392→      <div className="flex items-start justify-between">
+   393→        <div className="flex items-start gap-2">
+   394→          <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
+   395→          <div>
+   396→            <p className="text-sm font-medium">{doc.documentType}</p>
+   397→            {doc.disposedAt ? (
+   398→              <Badge variant="destructive" className="mt-1 text-xs">Disposed</Badge>
+   399→            ) : doc.latestVersion ? (
+   400→              <div className="mt-1 flex flex-wrap items-center gap-2">
+   401→                <p className="text-xs text-muted-foreground">
+   402→                  v{doc.latestVersion.versionNumber} · {new Date(doc.latestVersion.uploadedAt).toLocaleDateString()}
+   403→                </p>
+   404→                {doc.reviewStatus === "PENDING" && (
+   405→                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200">Pending Review</Badge>
+   406→                )}
+   407→                {doc.reviewStatus === "APPROVED" && (
+   408→                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 border-green-200">Approved</Badge>
+   409→                )}
+   410→                {doc.reviewStatus === "REJECTED" && (
+   411→                  <Badge variant="secondary" className="text-xs bg-red-100 text-red-800 border-red-200 cursor-help" title={doc.rejectionReason ?? "Rejected by Registrar"}>
+   412→                    Rejected
+   413→                  </Badge>
+   414→                )}
+   415→              </div>
+   416→            ) : (
+   417→              <p className="mt-1 text-xs text-muted-foreground">No version uploaded</p>
+   418→            )}
+   419→            {doc.reviewStatus === "REJECTED" && doc.rejectionReason && (
+   420→              <p className="mt-1 text-xs text-red-600">Reason: {doc.rejectionReason}</p>
+   421→            )}
+   422→          </div>
+   423→        </div>
+   424→      </div>
+   425→      <div className="mt-3 flex flex-wrap gap-1">
+   426→        {canMutate && (
+   427→          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onUploadVersion}>
+   428→            <Upload className="mr-1 h-3 w-3" />
+   429→            New version
+   430→          </Button>
+   431→        )}
+   432→        {doc.latestVersion && !doc.disposedAt && (
+   433→          <>
+   434→            <Button
+   435→              size="sm"
+   436→              variant="ghost"
+   437→              className="h-7 text-xs"
+   438→              onClick={() =>
+   439→                setPreviewDoc({
+   440→                  documentType: doc.documentType,
+   441→                  version: doc.latestVersion!.versionNumber,
+   442→                  fileName: doc.latestVersion!.fileName,
+   443→                  fileExtension: doc.latestVersion!.fileExtension,
+   444→                  downloadUrl: `/api/unions/${unionId}/documents/${doc.id}/download`,
+   445→                })
+   446→              }
+   447→            >
+   448→              <Eye className="mr-1 h-3 w-3" />
+   449→              View
+   450→            </Button>
+   451→            <a href={`/api/unions/${unionId}/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
+   452→              <Button size="sm" variant="ghost" className="h-7 text-xs">
+   453→                <Download className="mr-1 h-3 w-3" />
+   454→                Download
+   455→              </Button>
+   456→            </a>
+   457→          </>
+   458→        )}
+   459→        <Button
+   460→          size="sm"
+   461→          variant="ghost"
+   462→          className="h-7 text-xs"
+   463→          onClick={() => {
+   464→            if (!versionsOpen && !versions) loadVersions();
+   465→            setVersionsOpen(!versionsOpen);
+   466→          }}
+   467→        >
+   468→          <History className="mr-1 h-3 w-3" />
+   469→          History
+   470→        </Button>
+   471→      </div>
+   472→
+   473→      {versionsOpen && (
+   474→        <div className="mt-3 border-t pt-2">
+   475→          {versionsLoading ? (
+   476→            <p className="text-xs text-muted-foreground">Loading...</p>
+   477→          ) : versions && versions.length > 0 ? (
+   478→            <div className="space-y-1">
+   479→              {(versions as Array<{
+   480→                id: string;
+   481→                versionNumber: number;
+   482→                fileName: string;
+   483→                uploadedAt: string;
+   484→                isCurrent: boolean;
+   485→              }>).map((v) => (
+   486→                <div
+   487→                  key={v.id}
+   488→                  className="flex items-center justify-between rounded bg-muted/30 p-2 text-xs"
+   489→                >
+   490→                  <div>
+   491→                    <span className="font-medium">v{v.versionNumber}</span>
+   492→                    {v.isCurrent && <Badge className="ml-1 text-[10px]">Current</Badge>}
+   493→                    <p className="text-muted-foreground">{new Date(v.uploadedAt).toLocaleString()}</p>
+   494→                  </div>
+   495→                  {!v.isCurrent && canMutate && (
+   496→                    <Button
+   497→                      size="sm"
+   498→                      variant="ghost"
+   499→                      className="h-6 text-xs"
+   500→                      onClick={() => restoreVersion(v.id)}
+   501→                    >
+   502→                      <RotateCcw className="mr-1 h-3 w-3" />
+   503→                      Restore
+   504→                    </Button>
+   505→                  )}
+   506→                </div>
+   507→              ))}
+   508→            </div>
+   509→          ) : (
+   510→            <p className="text-xs text-muted-foreground">No versions.</p>
+   511→          )}
+   512→        </div>
+   513→      )}
+   514→
+   515→      {previewDoc && (
+   516→        <DocumentPreviewModal
+   517→          open={!!previewDoc}
+   518→          onOpenChange={(open) => !open && setPreviewDoc(null)}
+   519→          documentType={previewDoc.documentType}
+   520→          version={previewDoc.version}
+   521→          fileName={previewDoc.fileName}
+   522→          fileExtension={previewDoc.fileExtension}
+   523→          downloadUrl={previewDoc.downloadUrl}
+   524→        />
+   525→      )}
+   526→    </div>
+   527→  );
+   528→}
+   529→
+   530→// -----------------------------------------------------------------------------
+   531→// Edit Union Dialog — with Officer silent-pin awareness
+   532→// -----------------------------------------------------------------------------
+   533→
+   534→function EditUnionDialog({
+   535→  union,
+   536→  userRole,
+   537→  onClose,
+   538→  onSaved,
+   539→}: {
+   540→  union: Union;
+   541→  userRole: string;
+   542→  onClose: () => void;
+   543→  onSaved: () => void;
+   544→}) {
+   545→  const isRegistrar = userRole === "REGISTRAR";
+   546→  const isOfficer = userRole === "OFFICER";
+   547→
+   548→  const [unionName, setUnionName] = useState(union.unionName);
+   549→  const [registrationNo, setRegistrationNo] = useState(union.registrationNo);
+   550→  const [fileNumber, setFileNumber] = useState(union.fileNumber || "");
+   551→  const [status, setStatus] = useState(union.status);
+   552→  const [address, setAddress] = useState(union.address || "");
+   553→  const [contactPerson, setContactPerson] = useState(union.contactPerson || "");
+   554→  const [contactEmail, setContactEmail] = useState(union.contactEmail || "");
+   555→  const [contactPhone, setContactPhone] = useState(union.contactPhone || "");
+   556→  const [remarks, setRemarks] = useState(union.remarks || "");
+   557→  const [saving, setSaving] = useState(false);
+   558→
+   559→  // Officer restricted fields (silently pinned server-side)
+   560→  const restrictedFields = isOfficer
+   561→    ? ["unionName", "registrationNo", "fileNumber", "status", "remarks"]
+   562→    : [];
+   563→
+   564→  async function handleSave(e: FormEvent) {
+   565→    e.preventDefault();
+   566→    setSaving(true);
+   567→    try {
+   568→      const body: Record<string, unknown> = {};
+   569→      if (isRegistrar) {
+   570→        body.unionName = unionName;
+   571→        body.registrationNo = registrationNo;
+   572→        body.fileNumber = fileNumber || null;
+   573→        body.status = status;
+   574→        body.remarks = remarks || null;
+   575→      }
+   576→      body.address = address || null;
+   577→      body.contactPerson = contactPerson || null;
+   578→      body.contactEmail = contactEmail || null;
+   579→      body.contactPhone = contactPhone || null;
+   580→
+   581→      const res = await fetch(`/api/unions/${union.id}`, {
+   582→        method: "PUT",
+   583→        headers: { "Content-Type": "application/json" },
+   584→        credentials: "include",
+   585→        body: JSON.stringify(body),
+   586→      });
+   587→      const data = await res.json();
+   588→      if (!res.ok) {
+   589→        toast.error(data.error || "Failed to update union.");
+   590→        return;
+   591→      }
+   592→      toast.success("Union updated successfully.");
+   593→      onSaved();
+   594→    } catch {
+   595→      toast.error("Network error.");
+   596→    } finally {
+   597→      setSaving(false);
+   598→    }
+   599→  }
+   600→
+   601→  return (
+   602→    <Dialog open onOpenChange={onClose}>
+   603→      <DialogContent className="max-w-lg">
+   604→        <DialogHeader>
+   605→          <DialogTitle>Edit Union</DialogTitle>
+   606→          <DialogDescription>
+   607→            {isOfficer
+   608→              ? "You can edit contact information only. Core identity fields are protected."
+   609→              : "Update union details. Changes are logged in the audit trail."}
+   610→          </DialogDescription>
+   611→        </DialogHeader>
+   612→        <form onSubmit={handleSave} className="space-y-4">
+   613→          {/* Union Name — Registrar only */}
+   614→          <div className="space-y-2">
+   615→            <Label>Union Name</Label>
+   616→            <Input
+   617→              value={unionName}
+   618→              onChange={(e) => setUnionName(e.target.value)}
+   619→              disabled={isOfficer}
+   620→              className={isOfficer ? "bg-muted" : ""}
+   621→            />
+   622→            {isOfficer && (
+   623→              <p className="text-xs text-muted-foreground">Restricted — only Registrars can change this.</p>
+   624→            )}
+   625→          </div>
+   626→
+   627→          {/* Registration No — Registrar only */}
+   628→          <div className="grid grid-cols-2 gap-4">
+   629→            <div className="space-y-2">
+   630→              <Label>Registration No</Label>
+   631→              <Input
+   632→                value={registrationNo}
+   633→                onChange={(e) => setRegistrationNo(e.target.value)}
+   634→                disabled={isOfficer}
+   635→                className={isOfficer ? "bg-muted" : ""}
+   636→              />
+   637→            </div>
+   638→            <div className="space-y-2">
+   639→              <Label>File Number</Label>
+   640→              <Input
+   641→                value={fileNumber}
+   642→                onChange={(e) => setFileNumber(e.target.value)}
+   643→                disabled={isOfficer}
+   644→                className={isOfficer ? "bg-muted" : ""}
+   645→                placeholder="Optional"
+   646→              />
+   647→            </div>
+   648→          </div>
+   649→
+   650→          {/* Status — Registrar only */}
+   651→          {isRegistrar && (
+   652→            <div className="space-y-2">
+   653→              <Label>Status</Label>
+   654→              <Select value={status} onValueChange={setStatus}>
+   655→                <SelectTrigger>
+   656→                  <SelectValue />
+   657→                </SelectTrigger>
+   658→                <SelectContent>
+   659→                  <SelectItem value="ACTIVE">Active</SelectItem>
+   660→                  <SelectItem value="SUSPENDED">Suspended</SelectItem>
+   661→                  <SelectItem value="DEREGISTERED">Deregistered</SelectItem>
+   662→                </SelectContent>
+   663→              </Select>
+   664→            </div>
+   665→          )}
+   666→
+   667→          {/* Contact fields — both roles can edit */}
+   668→          <div className="grid grid-cols-2 gap-4">
+   669→            <div className="space-y-2">
+   670→              <Label>Contact Person</Label>
+   671→              <Input
+   672→                value={contactPerson}
+   673→                onChange={(e) => setContactPerson(e.target.value)}
+   674→                placeholder="Optional"
+   675→              />
+   676→            </div>
+   677→            <div className="space-y-2">
+   678→              <Label>Contact Phone</Label>
+   679→              <Input
+   680→                value={contactPhone}
+   681→                onChange={(e) => setContactPhone(e.target.value)}
+   682→                placeholder="Optional"
+   683→              />
+   684→            </div>
+   685→          </div>
+   686→          <div className="space-y-2">
+   687→            <Label>Contact Email</Label>
+   688→            <Input
+   689→              value={contactEmail}
+   690→              onChange={(e) => setContactEmail(e.target.value)}
+   691→              placeholder="Optional"
+   692→            />
+   693→          </div>
+   694→          <div className="space-y-2">
+   695→            <Label>Address</Label>
+   696→            <Textarea
+   697→              value={address}
+   698→              onChange={(e) => setAddress(e.target.value)}
+   699→              placeholder="Optional"
+   700→              rows={2}
+   701→            />
+   702→          </div>
+   703→
+   704→          {/* Remarks — Registrar only */}
+   705→          {isRegistrar && (
+   706→            <div className="space-y-2">
+   707→              <Label>Remarks</Label>
+   708→              <Textarea
+   709→                value={remarks}
+   710→                onChange={(e) => setRemarks(e.target.value)}
+   711→                placeholder="Internal notes (Registrar only)"
+   712→                rows={2}
+   713→              />
+   714→            </div>
+   715→          )}
+   716→
+   717→          <DialogFooter>
+   718→            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+   719→              Cancel
+   720→            </Button>
+   721→            <Button type="submit" disabled={saving}>
+   722→              {saving ? (
+   723→                <>
+   724→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   725→                  Saving...
+   726→                </>
+   727→              ) : (
+   728→                "Save Changes"
+   729→              )}
+   730→            </Button>
+   731→          </DialogFooter>
+   732→        </form>
+   733→      </DialogContent>
+   734→    </Dialog>
+   735→  );
+   736→}
+   737→
+   738→
+   739→interface UploadDialogProps {
+   740→  unionId: string;
+   741→  defaultDocType: string;
+   742→  open: boolean;
+   743→  onClose: () => void;
+   744→  onUploaded: () => void;
+   745→}
+   746→
+   747→function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded }: UploadDialogProps) {
+   748→  const [documentType, setDocumentType] = useState(defaultDocType);
+   749→  const [title, setTitle] = useState("");
+   750→  const [file, setFile] = useState<File | null>(null);
+   751→  const [uploading, setUploading] = useState(false);
+   752→
+   753→  // Sync the doc type when the default changes (e.g., user clicks "New version" on a specific doc)
+   754→  useState(() => {
+   755→    if (defaultDocType) setDocumentType(defaultDocType);
+   756→  });
+   757→
+   758→  async function handleUpload(e: FormEvent) {
+   759→    e.preventDefault();
+   760→    if (!file) {
+   761→      toast.error("Please select a file.");
+   762→      return;
+   763→    }
+   764→    if (!documentType.trim()) {
+   765→      toast.error("Document type is required.");
+   766→      return;
+   767→    }
+   768→    if (!title.trim()) {
+   769→      toast.error("Title is required.");
+   770→      return;
+   771→    }
+   772→    setUploading(true);
+   773→    try {
+   774→      const formData = new FormData();
+   775→      formData.append("file", file);
+   776→      formData.append("documentType", documentType.trim());
+   777→      formData.append("title", title.trim());
+   778→      const res = await fetch(`/api/unions/${unionId}/documents`, {
+   779→        method: "POST",
+   780→        credentials: "include",
+   781→        body: formData,
+   782→      });
+   783→      const data = await res.json();
+   784→      if (!res.ok) {
+   785→        toast.error(data.error || "Upload failed.");
+   786→        return;
+   787→      }
+   788→      toast.success(`Uploaded ${documentType} v${data.version.versionNumber}.`);
+   789→      onUploaded();
+   790→    } catch {
+   791→      toast.error("Network error. Please try again.");
+   792→    } finally {
+   793→      setUploading(false);
+   794→    }
+   795→  }
+   796→
+   797→  return (
+   798→    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+   799→      <DialogContent>
+   800→        <DialogHeader>
+   801→          <DialogTitle>Upload Document</DialogTitle>
+   802→          <DialogDescription>
+   803→            Upload a new version of a document. Duplicate detection is based on SHA-256 checksum.
+   804→          </DialogDescription>
+   805→        </DialogHeader>
+   806→        <form onSubmit={handleUpload} className="space-y-4">
+   807→          <div className="space-y-2">
+   808→            <Label htmlFor="docType">Document Type</Label>
+   809→            <Input
+   810→              id="docType"
+   811→              value={documentType}
+   812→              onChange={(e) => setDocumentType(e.target.value)}
+   813→              placeholder="e.g. Constitution, Financial Return"
+   814→            />
+   815→          </div>
+   816→          <div className="space-y-2">
+   817→            <Label htmlFor="title">Title</Label>
+   818→            <Input
+   819→              id="title"
+   820→              value={title}
+   821→              onChange={(e) => setTitle(e.target.value)}
+   822→              placeholder="A descriptive title for this version"
+   823→            />
+   824→          </div>
+   825→          <div className="space-y-2">
+   826→            <Label htmlFor="file">File</Label>
+   827→            <Input
+   828→              id="file"
+   829→              type="file"
+   830→              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+   831→              accept=".pdf,.doc,.docx,.jpg,.png"
+   832→            />
+   833→            {file && (
+   834→              <p className="text-xs text-muted-foreground">
+   835→                {file.name} ({(file.size / 1024).toFixed(1)} KB)
+   836→              </p>
+   837→            )}
+   838→          </div>
+   839→          <DialogFooter>
+   840→            <Button type="button" variant="outline" onClick={onClose} disabled={uploading}>
+   841→              Cancel
+   842→            </Button>
+   843→            <Button type="submit" disabled={uploading || !file}>
+   844→              {uploading ? (
+   845→                <>
+   846→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   847→                  Uploading...
+   848→                </>
+   849→              ) : (
+   850→                <>
+   851→                  <Upload className="mr-2 h-4 w-4" />
+   852→                  Upload
+   853→                </>
+   854→              )}
+   855→            </Button>
+   856→          </DialogFooter>
+   857→        </form>
+   858→      </DialogContent>
+   859→    </Dialog>
+   860→  );
+   861→}
+   862→
