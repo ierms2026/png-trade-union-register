@@ -196,6 +196,10 @@ model Document {
   rejectionReason  String?
   archivedAt       DateTime?
   archivedReason   String?
+  // Per-document public visibility — the Registrar controls which documents
+  // appear on the public portal. Defaults to false (private). Only the
+  // Registrar can toggle this via the staff dashboard.
+  isPublic         Boolean           @default(false)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   union            Union             @relation(fields: [unionId], references: [id], onDelete: Cascade)

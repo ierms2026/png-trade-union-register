@@ -12,8 +12,6 @@ import { DocumentList } from "@/components/app/document-list";
 import { StatusBadge } from "@/components/app/status-badge";
 import type { Metadata } from "next";
 
-const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
-
 interface PageProps { params: Promise<{ registrationNo: string }>; }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -34,7 +32,7 @@ export default async function UnionDetailPage({ params }: PageProps) {
     select: {
       id: true, unionName: true, registrationNo: true, fileNumber: true, status: true,
       documents: {
-        where: { documentType: { in: PUBLIC_DOC_TYPES }, disposedAt: null },
+        where: { isPublic: true, disposedAt: null },
         select: { id: true, documentType: true, versions: { orderBy: { versionNumber: "desc" }, take: 1, select: { id: true, versionNumber: true, fileName: true, uploadedAt: true, fileExtension: true } } },
       },
     },

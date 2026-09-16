@@ -16,6 +16,8 @@ import {
   Pencil,
   Search,
   Plus,
+  Globe,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +74,7 @@ interface UnionDocument {
   reviewStatus: "PENDING" | "APPROVED" | "REJECTED";
   reviewedAt: string | null;
   rejectionReason: string | null;
+  isPublic: boolean;
   latestVersion: DocumentVersion | null;
 }
 
@@ -413,7 +416,15 @@ function DocumentTile({
         <div className="flex items-start gap-2">
           <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
           <div>
-            <p className="text-sm font-medium">{doc.documentType}</p>
+            <p className="text-sm font-medium">
+              {doc.documentType}
+              {doc.isPublic && (
+                <Badge variant="outline" className="ml-2 text-[10px] text-green-600 border-green-600/30">
+                  <Globe className="mr-0.5 h-2.5 w-2.5" />
+                  Public
+                </Badge>
+              )}
+            </p>
             {doc.disposedAt ? (
               <Badge variant="destructive" className="mt-1 text-xs">Disposed</Badge>
             ) : doc.latestVersion ? (
@@ -488,6 +499,53 @@ function DocumentTile({
           <History className="mr-1 h-3 w-3" />
           History
         </Button>
+        {/* Registrar-only: Publish/Unpublish toggle for public portal visibility */}
+        {userRole === "REGISTRAR" && !doc.disposedAt && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className={`h-7 text-xs ${doc.isPublic ? "text-green-600" : "text-muted-foreground"}`}
+            onClick={async () => {
+              try {
+                const res = await fetch(
+                  `/api/unions/${unionId}/documents/${doc.id}/visibility`,
+                  {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ isPublic: !doc.isPublic }),
+                  },
+                );
+                if (!res.ok) {
+                  const err = await res.json();
+                  toast.error(err.error || "Failed to update visibility.");
+                  return;
+                }
+                toast.success(
+                  doc.isPublic
+                    ? `${doc.documentType} unpublished from public portal.`
+                    : `${doc.documentType} published to public portal.`,
+                );
+                // Trigger a refetch by reloading the page data
+                window.location.reload();
+              } catch {
+                toast.error("Network error.");
+              }
+            }}
+          >
+            {doc.isPublic ? (
+              <>
+                <EyeOff className="mr-1 h-3 w-3" />
+                Unpublish
+              </>
+            ) : (
+              <>
+                <Globe className="mr-1 h-3 w-3" />
+                Publish
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {versionsOpen && (

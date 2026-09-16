@@ -21,13 +21,13 @@ import { db } from "@/lib/prisma";
 //   The status code is identical. The timing is roughly identical (we
 //   do the same DB queries regardless of outcome).
 //
-// PUBLIC DOC WHITELIST:
-//   Only Registration Certificate + Constitution versions are downloadable.
-//   The version's document type must be in this list, AND the document
-//   must not be disposed.
+// PUBLIC DOC VISIBILITY:
+//   Only documents the Registrar has explicitly published (isPublic: true)
+//   are downloadable. The document must also not be disposed.
+//   Per-document visibility is controlled via the staff dashboard's
+//   "Publish to Public" / "Unpublish" toggle (Registrar only).
 // =============================================================================
 
-const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
 const STORAGE_ROOT =
   process.env.STORAGE_ROOT || path.join(process.cwd(), "storage");
 
@@ -88,6 +88,7 @@ export async function GET(
           id: true,
           documentType: true,
           disposedAt: true,
+          isPublic: true,
         },
       },
     },
@@ -95,8 +96,8 @@ export async function GET(
 
   if (!version) return NOT_FOUND_RESPONSE;
 
-  // --- 2. Whitelist check (indistinguishable 404 if not public) ---------
-  if (!PUBLIC_DOC_TYPES.includes(version.document.documentType)) {
+  // --- 2. Visibility check (indistinguishable 404 if not public) ------
+  if (!version.document.isPublic) {
     return NOT_FOUND_RESPONSE;
   }
   if (version.document.disposedAt) {

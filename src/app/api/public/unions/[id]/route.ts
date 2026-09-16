@@ -5,22 +5,18 @@ import { db } from "@/lib/prisma";
 // GET /api/public/unions/[id]
 // -----------------------------------------------------------------------------
 // PUBLIC endpoint — no auth required. Returns a single union's public
-// details + ONLY Certificate/Constitution documents (the ones a member
-// or researcher would legitimately want to verify).
+// details + ONLY documents the Registrar has explicitly published
+// (isPublic: true). The Registrar controls per-document visibility via
+// the staff dashboard's "Publish to Public" / "Unpublish" toggle.
 //
-// WHY ONLY Certificate + Constitution:
-//   Other document types (Financial Returns, Election of Office Bearers,
-//   Secret Ballots, etc.) contain sensitive internal info. The public
-//   portal exposes only the documents whose verification is a legitimate
-//   public interest: "Is this union really registered? What's their
-//   governing document?"
+// FILTERS:
+//   - isPublic: true (Registrar must explicitly publish)
+//   - disposedAt: null (disposed docs are never public)
 //
 // FILE DOWNLOADS:
 //   The documents include a `fileUrl` pointing at /api/public/files/[id]
 //   — the secure download endpoint that serves the file content.
 // =============================================================================
-
-const PUBLIC_DOC_TYPES = ["Registration Certificate", "Constitution"];
 
 export async function GET(
   req: NextRequest,
@@ -37,8 +33,8 @@ export async function GET(
       status: true,
       documents: {
         where: {
-          documentType: { in: PUBLIC_DOC_TYPES },
-          disposedAt: null, // don't expose disposed docs
+          isPublic: true, // Only Registrar-published documents
+          disposedAt: null, // Don't expose disposed docs
         },
         select: {
           id: true,
