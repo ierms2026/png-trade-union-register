@@ -15,6 +15,7 @@ import {
   Eye,
   Pencil,
   Search,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,6 +97,7 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadDocType, setUploadDocType] = useState<string>("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const selectedUnion = data?.unions.find((u) => u.id === selectedUnionId);
@@ -268,11 +270,19 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
   // --- Union list view ---
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Registered Unions</h1>
-        <p className="text-sm text-muted-foreground">
-          {data.unions.length} registered union{data.unions.length !== 1 ? "s" : ""}.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Registered Unions</h1>
+          <p className="text-sm text-muted-foreground">
+            {data.unions.length} registered union{data.unions.length !== 1 ? "s" : ""}.
+          </p>
+        </div>
+        {user.role === "REGISTRAR" && (
+          <Button onClick={() => setRegisterDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Register New Union
+          </Button>
+        )}
       </div>
 
       {/* Filter box — reactive, no submit button (same pattern as public portal) */}
@@ -313,6 +323,16 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {registerDialogOpen && (
+        <RegisterUnionDialog
+          onClose={() => setRegisterDialogOpen(false)}
+          onSaved={() => {
+            setRegisterDialogOpen(false);
+            refetch();
+          }}
+        />
       )}
     </div>
   );
@@ -854,6 +874,203 @@ function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded }: Up
               )}
             </Button>
           </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =============================================================================
+// RegisterUnionDialog — creates a new union via POST /api/unions.
+// REGISTRAR only (enforced by the API + the button that opens this dialog
+// is only rendered for REGISTRAR).
+//
+// Mirrors the EditUnionDialog pattern but POSTs instead of PUTs, with
+// empty initial values + the registration number field is required.
+// =============================================================================
+
+function RegisterUnionDialog({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [unionName, setUnionName] = useState("");
+  const [registrationNo, setRegistrationNo] = useState("");
+  const [fileNumber, setFileNumber] = useState("");
+  const [status, setStatus] = useState("ACTIVE");
+  const [address, setAddress] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave(e: FormEvent) {
+    e.preventDefault();
+
+    if (!unionName.trim() || !registrationNo.trim()) {
+      toast.error("Union Name and Registration Number are required.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/unions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          unionName: unionName.trim(),
+          registrationNo: registrationNo.trim(),
+          fileNumber: fileNumber.trim() || null,
+          status,
+          address: address.trim() || null,
+          contactPerson: contactPerson.trim() || null,
+          contactEmail: contactEmail.trim() || null,
+          contactPhone: contactPhone.trim() || null,
+          remarks: remarks.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to register union.");
+        return;
+      }
+
+      toast.success(`Union "${unionName.trim()}" registered successfully.`);
+      onSaved();
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Register New Union</DialogTitle>
+          <DialogDescription>
+            Register a new trade union. The union will appear on the public portal immediately after creation.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSave} className="space-y-4">
+          {/* Union Name */}
+          <div className="space-y-2">
+            <Label>Union Name *</Label>
+            <Input
+              value={unionName}
+              onChange={(e) => setUnionName(e.target.value)}
+              placeholder="e.g. Papua New Guinea Maritime Workers Union"
+              required
+            />
+          </div>
+
+          {/* Registration No + Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Registration No *</Label>
+              <Input
+                value={registrationNo}
+                onChange={(e) => setRegistrationNo(e.target.value)}
+                placeholder="e.g. IO-07"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
+                  <SelectItem value="SUSPENDED">SUSPENDED</SelectItem>
+                  <SelectItem value="DEREGISTERED">DEREGISTERED</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* File Number */}
+          <div className="space-y-2">
+            <Label>File Number</Label>
+            <Input
+              value={fileNumber}
+              onChange={(e) => setFileNumber(e.target.value)}
+              placeholder="e.g. FN-2026-001"
+            />
+          </div>
+
+          {/* Contact Details */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Contact Person</Label>
+              <Input
+                value={contactPerson}
+                onChange={(e) => setContactPerson(e.target.value)}
+                placeholder="e.g. John Doe"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contact Email</Label>
+              <Input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="e.g. secretary@union.pg"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Contact Phone</Label>
+              <Input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="e.g. +675 123 4567"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g. Port Moresby, PNG"
+              />
+            </div>
+          </div>
+
+          {/* Remarks */}
+          <div className="space-y-2">
+            <Label>Remarks</Label>
+            <Input
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Internal notes (optional)"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Registering...
+                </>
+              ) : (
+                "Register Union"
+              )}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
