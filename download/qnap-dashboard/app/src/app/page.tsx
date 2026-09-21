@@ -1,0 +1,167 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { LoginForm } from "@/components/app/login-form";
+import { AppShell } from "@/components/app/app-shell";
+import { PublicPortal } from "@/components/app/public-portal";
+import { SetPasswordForm } from "@/components/app/set-password-form";
+import { DashboardView } from "@/components/app/views/dashboard";
+import { ComplianceView } from "@/components/app/views/compliance";
+import { ConfigureRulesView } from "@/components/app/views/configure-rules";
+import { CompareView } from "@/components/app/views/compare";
+import { UnionsView } from "@/components/app/views/unions";
+import { TasksView } from "@/components/app/views/tasks";
+import { ReviewsView } from "@/components/app/views/reviews";
+import { CalendarView } from "@/components/app/views/calendar";
+import { AuditView } from "@/components/app/views/audit";
+import { UsersView } from "@/components/app/views/users";
+import { SecurityView } from "@/components/app/views/security";
+import { ApiKeysView } from "@/components/app/views/api-keys";
+import { AccountSecurityView } from "@/components/app/views/account-security";
+import { navigateToComplianceFilter } from "@/lib/dashboard/status-filter";
+import { parseStatusParam, parseViewParam, PARAM_VIEW, PARAM_STATUS } from "@/lib/dashboard/dashboard-links";
+
+interface AuthUser {
+  id: string;
+  email: string;
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
+  assignedUnionId: string | null;
+  twoFactorEnabled: boolean;
+}
+
+type Mode = "loading" | "auth" | "public" | "login";
+
+export default function Home() {
+  const [mode, setMode] = useState<Mode>("loading");
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [activeView, setActiveView] = useState("dashboard");
+  const [initialUnionId, setInitialUnionId] = useState<string | null>(null);
+  const [initialStatusFilter, setInitialStatusFilter] = useState<string | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get("token");
+      if (token) {
+        if (!cancelled) { setResetToken(token); setMode("login"); }
+        return;
+      }
+      const wantLogin = urlParams.get("login") === "1";
+      if (wantLogin) {
+        window.history.replaceState({}, "", "/");
+        if (!cancelled) setMode("login");
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const data: { user: AuthUser | null } = await res.json();
+        if (cancelled) return;
+        if (data.user) {
+          setUser(data.user);
+          setMode("auth");
+          // Read deep-link params for view + status filter (chunk 4.1)
+          const viewParam = parseViewParam(urlParams.get(PARAM_VIEW));
+          const statusParam = parseStatusParam(urlParams.get(PARAM_STATUS));
+          const unionId = urlParams.get("union");
+          if (viewParam === "compliance") {
+            setActiveView("compliance");
+            if (statusParam) {
+              setInitialStatusFilter(statusParam);
+            }
+            window.history.replaceState({}, "", "/");
+          } else if (viewParam === "unions" || unionId) {
+            setActiveView("unions");
+            if (unionId) {
+              setInitialUnionId(unionId);
+            }
+            window.history.replaceState({}, "", "/");
+          }
+        } else {
+          setMode("public");
+        }
+      } catch {
+        if (!cancelled) setMode("public");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (mode === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === "public") {
+    return <PublicPortal onStaffLogin={() => setMode("login")} />;
+  }
+
+  if (resetToken) {
+    return (
+      <SetPasswordForm token={resetToken} onSuccess={() => {
+        setResetToken(null);
+        window.history.replaceState({}, "", "/");
+        window.location.href = "/";
+      }} />
+    );
+  }
+
+  if (mode === "login") {
+    return <LoginForm onBackToPortal={() => setMode("public")} />;
+  }
+
+  if (!user) return null;
+  const currentUser = user;
+
+  function handleFilterCompliance(status: string) {
+    const nav = navigateToComplianceFilter(status as Parameters<typeof navigateToComplianceFilter>[0]);
+    setInitialStatusFilter(nav.filter);
+    setActiveView(nav.view);
+  }
+
+  function renderView() {
+    switch (activeView) {
+      case "dashboard": return (
+        <DashboardView
+          user={currentUser}
+          onNavigate={setActiveView}
+          onFilterCompliance={handleFilterCompliance}
+        />
+      );
+      case "unions":
+      case "my-union": return <UnionsView user={currentUser} initialUnionId={initialUnionId} />;
+      case "compliance": return <ComplianceView initialFilter={initialStatusFilter} />;
+      case "configure-rules": return <ConfigureRulesView />;
+      case "compare": return <CompareView />;
+      case "tasks": return <TasksView />;
+      case "reviews": return <ReviewsView />;
+      case "calendar": return <CalendarView />;
+      case "audit": return <AuditView />;
+      case "users": return <UsersView />;
+      case "security": return <SecurityView />;
+      case "api-keys": return <ApiKeysView />;
+      case "account-security": return <AccountSecurityView user={currentUser} />;
+      default: return (
+        <DashboardView
+          user={currentUser}
+          onNavigate={setActiveView}
+          onFilterCompliance={handleFilterCompliance}
+        />
+      );
+    }
+  }
+
+  return (
+    <AppShell user={currentUser} activeView={activeView} onNavigate={setActiveView}>
+      {renderView()}
+    </AppShell>
+  );
+}

@@ -1,0 +1,42 @@
+# =============================================================================
+# docker-compose.yml for QNAP Container Station
+# =============================================================================
+# USAGE on QNAP:
+#   1. Copy the entire qnap-dashboard/ folder to your QNAP
+#   2. In Container Station → Create → "Create from YAML", upload this file
+#      (or SSH in + run: docker-compose up -d)
+#
+# The `unless-stopped` restart policy auto-starts the container on QNAP boot.
+# The `dashboard-db` volume persists the SQLite database across restarts.
+# =============================================================================
+
+services:
+  dashboard:
+    build: .
+    container_name: trade-unions-dashboard
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist the SQLite database across container restarts
+      - dashboard-db:/app/db
+    environment:
+      # Required for session cookies. Change this for production!
+      - SESSION_SECRET=change-this-to-a-random-32-hex-string-in-production
+      # SQLite database location (inside the container)
+      - DATABASE_URL=file:/app/db/custom.db
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    # Resource limits for the TS-x31K (1GB RAM)
+    # The dashboard itself uses ~100-150MB; this leaves headroom for the NAS
+    mem_limit: 512m
+    memswap_limit: 1g
+    # Log rotation — prevent log files from filling the disk
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  dashboard-db:
