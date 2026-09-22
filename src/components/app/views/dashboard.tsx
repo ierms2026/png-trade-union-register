@@ -1453,6 +1453,12 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
               <span className="text-xs font-medium">View Audit Log</span>
             </Button>
           )}
+          <a href="/reports/compliance" target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" className="h-auto w-full flex-col gap-1 py-3">
+              <FileText className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Compliance Report</span>
+            </Button>
+          </a>
         </div>
       )}
 

@@ -236,9 +236,17 @@
 
   /* But don't show URLs for internal anchor links */
   a[href^="#"]::after,
-  a[href^="javascript"]::after {
+  a[href^="javascript"]::after,
+  a[href^="/"]::after {
     content: "";
   }
+
+  /* Multi-page table support: repeat headers on each page + no row splitting */
+  table { width: 100% !important; font-size: 9pt !important; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  th, td { border: 1px solid #999 !important; padding: 4px 6px !important; }
+  th { background: #eee !important; }
 }
 
 /* On screen, hide print-only content */
