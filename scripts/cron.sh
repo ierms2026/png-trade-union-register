@@ -46,15 +46,18 @@ BASE_URL=$BASE_URL
 # Captures the canonical compliance counts as a daily history row.
 55 7 * * * $0 snapshot >> /var/log/urm-compliance-snapshot.log 2>&1
 
-# --- Compliance sweep: daily at 8:00 AM ---
+# --- Compliance sweep: daily at 8:00 AM (tiered reminders + auto-assign tasks + escalation) ---
 0 8 * * * $0 compliance >> /var/log/urm-compliance-sweep.log 2>&1
+
+# --- Compliance digest: every Monday at 9:00 AM (weekly summary email) ---
+0 9 * * 1 $0 digest >> /var/log/urm-compliance-digest.log 2>&1
 
 # --- Audit retention sweep: every Sunday at 2:00 AM ---
 0 2 * * 0 $0 audit >> /var/log/urm-audit-sweep.log 2>&1
 
 # =============================================================================
 # LOG ROTATION (recommended):
-# /var/log/urm-compliance-snapshot.log /var/log/urm-compliance-sweep.log /var/log/urm-audit-sweep.log {
+# /var/log/urm-compliance-snapshot.log /var/log/urm-compliance-sweep.log /var/log/urm-compliance-digest.log /var/log/urm-audit-sweep.log {
 #   weekly rotate 12 compress missingok notifempty create 640 root adm
 # }
 # =============================================================================
@@ -64,11 +67,12 @@ EOF
 case "${1:-help}" in
   crontab) print_crontab; exit 0 ;;
   help|--help|-h) print_help; exit 0 ;;
-  compliance|audit|snapshot) : ;;
+  compliance|audit|snapshot|digest) : ;;
   *)
-    echo "Usage: $0 {snapshot|compliance|audit|crontab|help}" >&2
+    echo "Usage: $0 {snapshot|compliance|digest|audit|crontab|help}" >&2
     echo "  snapshot    — capture today's compliance snapshot now" >&2
-    echo "  compliance  — run the compliance sweep now" >&2
+    echo "  compliance  — run the compliance sweep now (tiered reminders + tasks)" >&2
+    echo "  digest      — send the weekly compliance digest email now" >&2
     echo "  audit       — run the audit retention sweep now" >&2
     echo "  crontab     — print the crontab lines to install" >&2
     echo "  help        — print the setup instructions" >&2
@@ -101,5 +105,6 @@ run_sweep() {
 case "${1:-}" in
   snapshot) run_sweep "compliance-snapshot" ;;
   compliance) run_sweep "compliance-sweep" ;;
+  digest) run_sweep "compliance-digest" ;;
   audit) run_sweep "audit-retention-sweep" ;;
 esac

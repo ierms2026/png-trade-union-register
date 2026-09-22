@@ -14,47 +14,45 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 // AUTH:
 //   Bearer token via the `authorization` header. The token must match
 //   CRON_SECRET (set in .env) using a CONSTANT-TIME comparison
-//   (timingSafeEqual) to prevent timing side-channels. This is a
-//   programmatic endpoint — no browser session, no cookie.
+//   (timingSafeEqual) to prevent timing side-channels.
 //
-//   The endpoint also enforces role-based notification routing:
-//   - REGISTRAR + OFFICER receive compliance notifications.
-//   - INSPECTOR is EXCLUDED (Inspectors don't act on compliance issues —
-//     they just observe).
+// AUTOMATED COMPLIANCE REMINDERS (enhanced):
+//   1. Tiered notifications: T_180_DAYS, T_90_DAYS, T_30_DAYS, T_0_OVERDUE
+//   2. Weekly re-notification: dedupKey includes the ISO week number so
+//      documents that linger in a tier get re-notified every 7 days
+//      (prevents "notify once + forget" for docs stuck in T_30_DAYS)
+//   3. Auto-assign tasks: OVERDUE docs get a Non-Compliance task auto-
+//      assigned to the union's Officer (if one exists)
+//   4. 30-day overdue escalation: docs overdue 30+ days get an additional
+//      ESCALATED notification to all Registrars with a higher-priority title
 //
-// IDEMPOTENCY (critical):
-//   The dedupKey on the Notification table is unique. We build the key as:
-//     `compliance:{userId}:{unionId}:{documentType}:{status}`
-//   This means: for a given (user, union, docType, status) tuple, there's at
-//   most ONE notification. Running the sweep twice in a day doesn't
-//   create duplicate notifications — the second run's INSERTs hit the
-//   unique constraint and are skipped.
-//
-//   userId is part of the key because the Notification table stores one row
-//   per recipient — without userId, only the FIRST recipient would get the
-//   notification; all others would be deduped against the first.
-//
-//   The status is part of the key because a doc can transition from
-//   EXPIRING → OVERDUE, and those are DIFFERENT notifications (the
-//   OVERDUE one is more urgent). Without status in the key, the OVERDUE
-//   notification would be deduped against the EXPIRING one and never
-//   sent.
+// DEDUPKEY SCHEME (weekly re-notification):
+//   `compliance:{recipientId}:{unionId}:{documentType}:{tier}:{YYYY-Www}`
+//   The week component (e.g. "2026-W38") ensures the same tier re-fires
+//   once per week. A doc that stays in T_30_DAYS for 4 weeks will generate
+//   4 notifications (one per week), not just 1.
 //
 // NOTIFICATION TARGETS:
-//   For each compliance issue, we notify:
-//   - The Officer assigned to that union (if any).
-//   - ALL Registrars (they have system-wide oversight).
-//   We do NOT notify Inspectors (per the spec).
+//   - REGISTRAR (all): system-wide oversight
+//   - OFFICER (assigned to the union): action required
+//   - INSPECTOR: excluded (observe-only role)
 // =============================================================================
+
+/**
+ * Get the ISO week number for a date (e.g. "2026-W38").
+ * Used in the dedupKey to enable weekly re-notification.
+ */
+function getWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+}
 
 export async function POST(req: NextRequest) {
   // --- 1. Bearer token auth (constant-time) --------------------------------
-  // We use timingSafeEqual instead of plain `===` to prevent timing-side-
-  // channel attacks where an attacker probes the secret byte-by-byte by
-  // measuring response time. The lengths are compared first (timingSafeEqual
-  // throws on length mismatch), and we return the same 401 for any failure
-  // so the attacker can't distinguish "wrong length" from "right length,
-  // wrong bytes."
   const authHeader = req.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return NextResponse.json(
@@ -80,11 +78,12 @@ export async function POST(req: NextRequest) {
   }
 
   // --- 2. Compute the compliance matrix ----------------------------------
+  const now = new Date();
   const data = await fetchMatrixData();
   const matrix = buildComplianceMatrix(data);
 
   // --- 3. Build the list of compliance issues with tiered urgency -------
-  type Tier = "T_180_DAYS" | "T_90_DAYS" | "T_30_DAYS" | "T_0_OVERDUE";
+  type Tier = "T_180_DAYS" | "T_90_DAYS" | "T_30_DAYS" | "T_0_OVERDUE" | "T_30_OVERDUE";
   interface Issue {
     unionId: string;
     unionName: string;
@@ -96,7 +95,7 @@ export async function POST(req: NextRequest) {
   }
   const issues: Issue[] = [];
   const renewalByType = new Map(data.rules.map((r) => [r.documentType, r.renewalYears]));
-  const nowMs = Date.now();
+  const nowMs = now.getTime();
   const msPerDay = 24 * 60 * 60 * 1000;
   for (const row of matrix.unions) {
     for (const cell of row.scores) {
@@ -106,7 +105,8 @@ export async function POST(req: NextRequest) {
       const expiryMs = new Date(cell.expiresAt).getTime();
       const daysUntil = Math.floor((expiryMs - nowMs) / msPerDay);
       let tier: Tier | null = null;
-      if (daysUntil < 0) tier = "T_0_OVERDUE";
+      if (daysUntil < -30) tier = "T_30_OVERDUE";  // 30+ days overdue → escalation
+      else if (daysUntil < 0) tier = "T_0_OVERDUE";
       else if (daysUntil <= 30) tier = "T_30_DAYS";
       else if (daysUntil <= 90) tier = "T_90_DAYS";
       else if (daysUntil <= 180 && renewalYears >= 3) tier = "T_180_DAYS";
@@ -125,14 +125,11 @@ export async function POST(req: NextRequest) {
   }
 
   // --- 4. Load notification recipients -----------------------------------
-  // Registrars (all of them) + the Officer assigned to each affected union.
-  // Inspectors are excluded.
   const registrars = await db.user.findMany({
     where: { role: Role.REGISTRAR, disabled: false },
     select: { id: true },
   });
 
-  // Build a map of unionId → officer (for per-union officer notification).
   const officers = await db.user.findMany({
     where: { role: Role.OFFICER, disabled: false, assignedUnionId: { not: null } },
     select: { id: true, assignedUnionId: true },
@@ -141,14 +138,21 @@ export async function POST(req: NextRequest) {
     officers.map((o) => [o.assignedUnionId, o.id]),
   );
 
-  // --- 5. Generate notifications (idempotent via dedupKey) ---------------
+  // --- 5. Generate notifications (weekly dedup + auto-assign tasks) ------
+  const weekKey = getWeekKey(now);
   let notificationsCreated = 0;
+  let tasksCreated = 0;
+  let escalationsCreated = 0;
 
   for (const issue of issues) {
-    const recipientIds = [
-      ...registrars.map((r) => r.id),
-      ...(officerByUnion.get(issue.unionId) ? [officerByUnion.get(issue.unionId)!] : []),
-    ];
+    // T_30_OVERDUE is an escalation — only notify Registrars
+    const recipientIds = issue.tier === "T_30_OVERDUE"
+      ? registrars.map((r) => r.id)  // Escalation: Registrars only
+      : [
+          ...registrars.map((r) => r.id),
+          ...(officerByUnion.get(issue.unionId) ? [officerByUnion.get(issue.unionId)!] : []),
+        ];
+
     const cycleLabel = `${issue.renewalYears}-year renewal cycle`;
     const expiryStr = issue.expiresAt
       ? new Date(issue.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
@@ -175,13 +179,15 @@ export async function POST(req: NextRequest) {
         title = `OVERDUE: ${issue.unionName}: ${issue.documentType} — Notice of Non-Compliance`;
         body = `The ${issue.documentType} for ${issue.unionName} is past its renewal date (${expiryStr}, ${daysLabel}) and is now OVERDUE. A Notice of Non-Compliance has been generated. This document is on a ${cycleLabel}. The Industrial Registrar has been notified to initiate enforcement protocols.`;
         break;
+      case "T_30_OVERDUE":
+        title = `ESCALATION: ${issue.unionName}: ${issue.documentType} — ${Math.abs(issue.daysUntilExpiry!)} days overdue`;
+        body = `ESCALATION: The ${issue.documentType} for ${issue.unionName} has been OVERDUE for ${Math.abs(issue.daysUntilExpiry!)} days (${expiryStr}). This requires immediate Registrar attention. Enforcement protocols under the Industrial Organizations Act 1962 should be initiated. A Non-Compliance task has been created and assigned.`;
+        break;
     }
-    // dedupKey is per-recipient (includes recipientId), so we call
-    // createNotificationForUsers once per recipient. The helper fetches
-    // each recipient's email + emailNotificationsEnabled prefs internally
-    // and handles dedup via the unique constraint.
+
+    // Weekly dedupKey: includes the ISO week so the same tier re-fires weekly
     for (const recipientId of recipientIds) {
-      const dedupKey = `compliance:${recipientId}:${issue.unionId}:${issue.documentType}:${issue.tier}`;
+      const dedupKey = `compliance:${recipientId}:${issue.unionId}:${issue.documentType}:${issue.tier}:${weekKey}`;
       const results = await createNotificationForUsers([recipientId], {
         type: NotificationType.COMPLIANCE,
         title,
@@ -189,20 +195,54 @@ export async function POST(req: NextRequest) {
         dedupKey,
         linkUrl: `/compliance`,
       });
-      if (results[0]?.created) notificationsCreated++;
+      if (results[0]?.created) {
+        notificationsCreated++;
+        if (issue.tier === "T_30_OVERDUE") escalationsCreated++;
+      }
     }
-    // For OVERDUE issues, create a Non-Compliance task
-    if (issue.tier === "T_0_OVERDUE" && registrars.length > 0) {
-      const existingTask = await db.task.findFirst({ where: { title: { contains: `Non-Compliance: ${issue.documentType} — ${issue.unionName}` }, status: { in: ["PENDING", "IN_PROGRESS"] } } });
+
+    // --- Auto-assign Non-Compliance tasks for OVERDUE docs ---
+    // For T_0_OVERDUE + T_30_OVERDUE: create a task auto-assigned to the
+    // union's Officer (if one exists). Deduped by title + open status.
+    if ((issue.tier === "T_0_OVERDUE" || issue.tier === "T_30_OVERDUE") && registrars.length > 0) {
+      const taskTitle = `Non-Compliance: ${issue.documentType} — ${issue.unionName}`;
+      const existingTask = await db.task.findFirst({
+        where: { title: { contains: taskTitle }, status: { in: ["PENDING", "IN_PROGRESS"] } },
+      });
       if (!existingTask) {
         try {
+          // Auto-assign to the union's Officer if one exists
+          const officerId = officerByUnion.get(issue.unionId) ?? null;
           await db.task.create({
             data: {
-              title: `Non-Compliance: ${issue.documentType} — ${issue.unionName}`,
-              description: `The ${issue.documentType} for ${issue.unionName} is OVERDUE (expired ${expiryStr}). A Notice of Non-Compliance has been generated. Please initiate enforcement protocols per the Industrial Organizations Act 1962.`,
-              status: "PENDING", priority: "HIGH", unionId: issue.unionId, createdById: registrars[0].id,
+              title: taskTitle,
+              description: `The ${issue.documentType} for ${issue.unionName} is OVERDUE (expired ${expiryStr}, ${daysLabel}). A Notice of Non-Compliance has been generated. Please initiate enforcement protocols per the Industrial Organizations Act 1962.`,
+              status: "PENDING",
+              priority: issue.tier === "T_30_OVERDUE" ? "HIGH" : "HIGH",
+              unionId: issue.unionId,
+              createdById: registrars[0].id,
+              assigneeId: officerId,  // Auto-assign to the union's Officer
             },
           });
+          tasksCreated++;
+
+          // If we auto-assigned to an officer, notify them about the task
+          if (officerId) {
+            const { createNotification, getUserNotificationPrefs } = await import("@/lib/notifications");
+            const prefs = await getUserNotificationPrefs(officerId);
+            if (prefs) {
+              await createNotification({
+                userId: officerId,
+                userEmail: prefs.email,
+                emailNotificationsEnabled: prefs.emailNotificationsEnabled,
+                type: NotificationType.TASK,
+                title: `Non-Compliance task assigned: ${issue.documentType} — ${issue.unionName}`,
+                body: `A Non-Compliance task has been assigned to you. The ${issue.documentType} for ${issue.unionName} is OVERDUE. Please initiate enforcement protocols.`,
+                dedupKey: `task:auto-assigned:${issue.unionId}:${issue.documentType}:${weekKey}`,
+                linkUrl: "/?view=tasks",
+              });
+            }
+          }
         } catch { /* task creation failure shouldn't block sweep */ }
       }
     }
@@ -212,5 +252,8 @@ export async function POST(req: NextRequest) {
     swept: true,
     issuesFound: issues.length,
     notificationsCreated,
+    tasksCreated,
+    escalationsCreated,
+    weekKey,
   });
 }
