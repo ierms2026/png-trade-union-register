@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity, NotificationType } from "@prisma/client";
+import { createNotification, getUserNotificationPrefs } from "@/lib/notifications";
 
 // =============================================================================
 // GET /api/tasks  |  POST /api/tasks
@@ -209,20 +210,18 @@ export async function POST(req: NextRequest) {
   // If the task is assigned to someone other than the creator, send a
   // bell-icon notification so the assignee discovers the task.
   if (task.assigneeId && task.assigneeId !== user.id) {
-    try {
-      await db.notification.create({
-        data: {
-          userId: task.assigneeId,
-          type: NotificationType.TASK,
-          title: `New task assigned: ${task.title}`,
-          body: `Assigned by ${user.email}. Priority: ${task.priority}.`,
-          dedupKey: `task:assigned:${task.id}`,
-          linkUrl: "/?view=tasks",
-        },
+    const prefs = await getUserNotificationPrefs(task.assigneeId);
+    if (prefs) {
+      await createNotification({
+        userId: task.assigneeId,
+        userEmail: prefs.email,
+        emailNotificationsEnabled: prefs.emailNotificationsEnabled,
+        type: NotificationType.TASK,
+        title: `New task assigned: ${task.title}`,
+        body: `Assigned by ${user.email}. Priority: ${task.priority}.`,
+        dedupKey: `task:assigned:${task.id}`,
+        linkUrl: "/?view=tasks",
       });
-    } catch {
-      // dedupKey violation = notification already exists for this task+user.
-      // Safe to ignore — the assignee was already notified.
     }
   }
 

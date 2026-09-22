@@ -95,7 +95,7 @@ export function PublicPortal({ onStaffLogin }: Props) {
     return (
       <div className="space-y-4">
         <div className="space-y-2 text-center">
-          <h2 className="text-lg font-semibold">Legislation Library</h2>
+          <h2 className="text-lg font-semibold">Resources Library</h2>
           <p className="text-sm text-muted-foreground">Acts and regulations governing trade unions in Papua New Guinea.</p>
         </div>
         {legLoading ? <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (<Card key={i}><CardContent className="space-y-2 p-4"><div className="h-5 w-2/3 animate-pulse rounded bg-muted" /><div className="h-4 w-full animate-pulse rounded bg-muted" /></CardContent></Card>))}</div>
@@ -123,7 +123,7 @@ export function PublicPortal({ onStaffLogin }: Props) {
       <div className="border-b bg-card">
         <div className="mx-auto flex max-w-4xl gap-1 px-4">
           <button onClick={() => setTab("search")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "search" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Register</button>
-          <button onClick={() => setTab("legislation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "legislation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Legislation Library</button>
+          <button onClick={() => setTab("legislation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "legislation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Resources Library</button>
         </div>
       </div>
       <main className="mx-auto max-w-4xl space-y-10 p-4 py-10">

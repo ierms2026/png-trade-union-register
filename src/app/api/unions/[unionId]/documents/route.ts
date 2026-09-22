@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity, NotificationType, ReviewStatus } from "@prisma/client";
+import { createNotificationForUsers } from "@/lib/notifications";
 import { hasPdfMagicBytes, validatePdfIntegrity } from "@/lib/file-validation";
 import { checkArchival } from "@/lib/document-archive";
 import {
@@ -393,23 +394,22 @@ export async function POST(
     try {
       const registrars = await db.user.findMany({
         where: { role: Role.REGISTRAR, disabled: false },
-        select: { id: true, email: true },
+        select: { id: true },
       });
       const notifTitle = `${existingUnion.unionName}: ${documentType.trim()} uploaded for review`;
       const notifBody = `Version ${versionNumber} of "${documentType.trim()}" was uploaded by ${user.email}. Please review it in the Review Queue.`;
+      // dedupKey is per-registrar (includes registrar.id), so we call
+      // createNotificationForUsers once per registrar. The helper fetches
+      // each registrar's email + emailNotificationsEnabled prefs internally
+      // and handles dedup via the unique constraint.
       for (const registrar of registrars) {
-        try {
-          await db.notification.create({
-            data: {
-              userId: registrar.id,
-              type: NotificationType.TASK,
-              title: notifTitle,
-              body: notifBody,
-              dedupKey: `review:${documentId}:${versionNumber}:${registrar.id}`,
-              linkUrl: `/reviews`,
-            },
-          });
-        } catch { /* dedup */ }
+        await createNotificationForUsers([registrar.id], {
+          type: NotificationType.TASK,
+          title: notifTitle,
+          body: notifBody,
+          dedupKey: `review:${documentId}:${versionNumber}:${registrar.id}`,
+          linkUrl: `/reviews`,
+        });
       }
       await db.auditLog.create({
         data: {

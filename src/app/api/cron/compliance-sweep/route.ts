@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/prisma";
 import { Role, NotificationType } from "@prisma/client";
+import { createNotificationForUsers } from "@/lib/notifications";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 
 // =============================================================================
@@ -128,27 +129,25 @@ export async function POST(req: NextRequest) {
   // Inspectors are excluded.
   const registrars = await db.user.findMany({
     where: { role: Role.REGISTRAR, disabled: false },
-    select: { id: true, email: true },
+    select: { id: true },
   });
 
   // Build a map of unionId → officer (for per-union officer notification).
   const officers = await db.user.findMany({
     where: { role: Role.OFFICER, disabled: false, assignedUnionId: { not: null } },
-    select: { id: true, email: true, assignedUnionId: true },
+    select: { id: true, assignedUnionId: true },
   });
   const officerByUnion = new Map(
-    officers.map((o) => [o.assignedUnionId, o]),
+    officers.map((o) => [o.assignedUnionId, o.id]),
   );
 
   // --- 5. Generate notifications (idempotent via dedupKey) ---------------
   let notificationsCreated = 0;
 
   for (const issue of issues) {
-    const recipients = [
-      ...registrars.map((r) => ({ id: r.id, email: r.email })),
-      ...(officerByUnion.get(issue.unionId)
-        ? [{ id: officerByUnion.get(issue.unionId)!.id, email: officerByUnion.get(issue.unionId)!.email }]
-        : []),
+    const recipientIds = [
+      ...registrars.map((r) => r.id),
+      ...(officerByUnion.get(issue.unionId) ? [officerByUnion.get(issue.unionId)!] : []),
     ];
     const cycleLabel = `${issue.renewalYears}-year renewal cycle`;
     const expiryStr = issue.expiresAt
@@ -157,34 +156,40 @@ export async function POST(req: NextRequest) {
     const daysLabel = issue.daysUntilExpiry !== null
       ? (issue.daysUntilExpiry < 0 ? `${Math.abs(issue.daysUntilExpiry)} day(s) past expiry` : `${issue.daysUntilExpiry} day(s) remaining`)
       : "";
-    for (const recipient of recipients) {
-      const dedupKey = `compliance:${recipient.id}:${issue.unionId}:${issue.documentType}:${issue.tier}`;
-      let title: string;
-      let body: string;
-      switch (issue.tier) {
-        case "T_180_DAYS":
-          title = `${issue.unionName}: ${issue.documentType} — cyclical renewal approaching`;
-          body = `The ${issue.documentType} for ${issue.unionName} will expire on ${expiryStr} (${daysLabel}). This document is on a ${cycleLabel}. Please prepare for upcoming cyclical renewal (e.g., schedule elections, renegotiate awards, or arrange secret ballots).`;
-          break;
-        case "T_90_DAYS":
-          title = `${issue.unionName}: ${issue.documentType} expiring ${expiryStr}`;
-          body = `The ${issue.documentType} for ${issue.unionName} will expire on ${expiryStr} (${daysLabel}). This document is on a ${cycleLabel}. Please arrange renewal before the expiry date to maintain compliance.`;
-          break;
-        case "T_30_DAYS":
-          title = `URGENT: ${issue.unionName}: ${issue.documentType} expires in ${issue.daysUntilExpiry} days`;
-          body = `URGENT RENEWAL WARNING: The ${issue.documentType} for ${issue.unionName} expires on ${expiryStr} (${daysLabel}). This document is on a ${cycleLabel}. Please arrange renewal IMMEDIATELY to avoid non-compliance.`;
-          break;
-        case "T_0_OVERDUE":
-          title = `OVERDUE: ${issue.unionName}: ${issue.documentType} — Notice of Non-Compliance`;
-          body = `The ${issue.documentType} for ${issue.unionName} is past its renewal date (${expiryStr}, ${daysLabel}) and is now OVERDUE. A Notice of Non-Compliance has been generated. This document is on a ${cycleLabel}. The Industrial Registrar has been notified to initiate enforcement protocols.`;
-          break;
-      }
-      try {
-        await db.notification.create({
-          data: { userId: recipient.id, type: NotificationType.COMPLIANCE, title, body, dedupKey, linkUrl: `/compliance` },
-        });
-        notificationsCreated++;
-      } catch { /* dedup */ }
+    let title: string;
+    let body: string;
+    switch (issue.tier) {
+      case "T_180_DAYS":
+        title = `${issue.unionName}: ${issue.documentType} — cyclical renewal approaching`;
+        body = `The ${issue.documentType} for ${issue.unionName} will expire on ${expiryStr} (${daysLabel}). This document is on a ${cycleLabel}. Please prepare for upcoming cyclical renewal (e.g., schedule elections, renegotiate awards, or arrange secret ballots).`;
+        break;
+      case "T_90_DAYS":
+        title = `${issue.unionName}: ${issue.documentType} expiring ${expiryStr}`;
+        body = `The ${issue.documentType} for ${issue.unionName} will expire on ${expiryStr} (${daysLabel}). This document is on a ${cycleLabel}. Please arrange renewal before the expiry date to maintain compliance.`;
+        break;
+      case "T_30_DAYS":
+        title = `URGENT: ${issue.unionName}: ${issue.documentType} expires in ${issue.daysUntilExpiry} days`;
+        body = `URGENT RENEWAL WARNING: The ${issue.documentType} for ${issue.unionName} expires on ${expiryStr} (${daysLabel}). This document is on a ${cycleLabel}. Please arrange renewal IMMEDIATELY to avoid non-compliance.`;
+        break;
+      case "T_0_OVERDUE":
+        title = `OVERDUE: ${issue.unionName}: ${issue.documentType} — Notice of Non-Compliance`;
+        body = `The ${issue.documentType} for ${issue.unionName} is past its renewal date (${expiryStr}, ${daysLabel}) and is now OVERDUE. A Notice of Non-Compliance has been generated. This document is on a ${cycleLabel}. The Industrial Registrar has been notified to initiate enforcement protocols.`;
+        break;
+    }
+    // dedupKey is per-recipient (includes recipientId), so we call
+    // createNotificationForUsers once per recipient. The helper fetches
+    // each recipient's email + emailNotificationsEnabled prefs internally
+    // and handles dedup via the unique constraint.
+    for (const recipientId of recipientIds) {
+      const dedupKey = `compliance:${recipientId}:${issue.unionId}:${issue.documentType}:${issue.tier}`;
+      const results = await createNotificationForUsers([recipientId], {
+        type: NotificationType.COMPLIANCE,
+        title,
+        body,
+        dedupKey,
+        linkUrl: `/compliance`,
+      });
+      if (results[0]?.created) notificationsCreated++;
     }
     // For OVERDUE issues, create a Non-Compliance task
     if (issue.tier === "T_0_OVERDUE" && registrars.length > 0) {

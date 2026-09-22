@@ -36,6 +36,10 @@ model User {
   failedLoginAttempts  Int            @default(0)
   lockedUntil          DateTime?
   disabled             Boolean        @default(false)
+  // Email notification opt-in (chunk: email notifications). Defaults to
+  // true — users receive email notifications unless they explicitly opt
+  // out in Account Security settings.
+  emailNotificationsEnabled Boolean   @default(true)
   // Session 4: password reset flow — token generated at create time or on
   // admin reset, expires after a window. The set-password route consumes
   // the token + the user's chosen password (NEVER accepted in the admin
@@ -284,20 +288,22 @@ model Task {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType
-  title     String
-  body      String
-  dedupKey  String           @unique
-  linkUrl   String?
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
+  id           String           @id @default(cuid())
+  userId       String
+  type         NotificationType
+  title        String
+  body         String
+  dedupKey     String           @unique
+  linkUrl      String?
+  readAt       DateTime?
+  emailSentAt  DateTime?
+  emailError   String?
+  createdAt    DateTime         @default(now())
 
   // FK relation — added in Chunk 5. Cascade delete: when a User is deleted,
   // their notifications are deleted too (notifications are personal —
   // they have no value once the user is gone).
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model LegalHold {

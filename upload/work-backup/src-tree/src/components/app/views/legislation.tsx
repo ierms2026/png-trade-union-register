@@ -76,10 +76,10 @@ export function LegislationView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Legislation Library</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Resources Library</h1>
           <p className="text-sm text-muted-foreground">Manage acts, regulations, and amendments.</p>
         </div>
-        <Button onClick={handleAdd} className="gap-2"><Plus className="h-4 w-4" />Add Legislation</Button>
+        <Button onClick={handleAdd} className="gap-2"><Plus className="h-4 w-4" />Add Resource</Button>
       </div>
 
       {loading ? <TableSkeleton />

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, TaskStatus, Severity, NotificationType } from "@prisma/client";
+import { createNotification, getUserNotificationPrefs } from "@/lib/notifications";
 
 // =============================================================================
 // PATCH /api/tasks/[id]  |  DELETE /api/tasks/[id]
@@ -231,19 +232,18 @@ export async function PATCH(
     updated.assigneeId !== existing.assigneeId &&
     updated.assigneeId !== user.id
   ) {
-    try {
-      await db.notification.create({
-        data: {
-          userId: updated.assigneeId,
-          type: NotificationType.TASK,
-          title: `Task assigned to you: ${updated.title}`,
-          body: `Assigned by ${user.email}. Priority: ${updated.priority}.`,
-          dedupKey: `task:assigned:${updated.id}:${updated.assigneeId}`,
-          linkUrl: "/?view=tasks",
-        },
+    const prefs = await getUserNotificationPrefs(updated.assigneeId);
+    if (prefs) {
+      await createNotification({
+        userId: updated.assigneeId,
+        userEmail: prefs.email,
+        emailNotificationsEnabled: prefs.emailNotificationsEnabled,
+        type: NotificationType.TASK,
+        title: `Task assigned to you: ${updated.title}`,
+        body: `Assigned by ${user.email}. Priority: ${updated.priority}.`,
+        dedupKey: `task:assigned:${updated.id}:${updated.assigneeId}`,
+        linkUrl: "/?view=tasks",
       });
-    } catch {
-      // dedupKey violation — already notified. Safe to ignore.
     }
   }
 
