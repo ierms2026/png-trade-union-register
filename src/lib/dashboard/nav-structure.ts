@@ -222,7 +222,7 @@ export const NAV_STRUCTURE: NavGroup[] = [
         roles: ["REGISTRAR"],
       },
       {
-        label: "Legislation",
+        label: "Resources",
         route: "legislation",
         icon: Scale,
         roles: ["REGISTRAR"],
