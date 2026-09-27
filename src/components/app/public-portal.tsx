@@ -116,7 +116,7 @@ export function PublicPortal({ onStaffLogin }: Props) {
             <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={32} height={26} className="h-8 w-auto" />
             <div><p className="text-sm font-semibold leading-tight">Register of Trade Unions</p><p className="text-xs text-muted-foreground">Office of The Industrial Registrar · Papua New Guinea</p></div>
           </div>
-          <Button variant="outline" size="sm" className="border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40" onClick={onStaffLogin}><LogIn className="mr-2 h-4 w-4" />Staff Login</Button>
+          <Button variant="outline" size="sm" className="border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40" onClick={onStaffLogin}><LogIn className="mr-2 h-4 w-4" />Sign In</Button>
         </div>
         <div className="h-1.5 bg-accent" />
       </header>

@@ -53,7 +53,7 @@ export default async function UnionDetailPage({ params }: PageProps) {
           ) : (
             <div className="flex items-center gap-2">
               <Button asChild variant="ghost" size="sm"><Link href="/"><ArrowLeft className="mr-2 h-4 w-4" />Back to Register</Link></Button>
-              <Button asChild variant="default" size="sm"><Link href="/?login=1"><LogIn className="mr-2 h-4 w-4" />Staff Login</Link></Button>
+              <Button asChild variant="default" size="sm"><Link href="/?login=1"><LogIn className="mr-2 h-4 w-4" />Sign In</Link></Button>
             </div>
           )}
         </div>
