@@ -83,7 +83,12 @@ export async function POST(
 ) {
   const { unionId } = await params;
 
-  // 0. Auth check + INSPECTOR 403 + Officer scoping.
+  // 0. Auth check + INSPECTOR 403 + Officer/Representative scoping.
+  //
+  // Chunk 5: REPRESENTATIVE role (union self-service portal) is now allowed
+  // to upload, with the same Officer-style scoping rule — reps can only
+  // upload to their own assigned union. The review-queue flow is identical:
+  // every upload enters PENDING state, Registrar approves from Reviews view.
   const user = await getAuthUser(req);
   if (!user) {
     return NextResponse.json(
@@ -97,7 +102,10 @@ export async function POST(
       { status: 403 },
     );
   }
-  if (user.role === Role.OFFICER && user.assignedUnionId !== unionId) {
+  // Both OFFICER and REPRESENTATIVE are scoped to their assigned union.
+  // REGISTRAR can upload to any union.
+  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only upload documents to your own union." },
       { status: 403 },
@@ -434,6 +442,59 @@ export async function POST(
       });
     } catch (sideEffectErr) {
       console.error("[documents/upload] Side-effect failed:", sideEffectErr);
+    }
+
+    // Chunk 6 + 7: best-effort automatic text extraction for full-text search.
+    //
+    // Non-blocking — extraction failure does NOT fail the upload. The
+    // DocumentVersion row already exists (created in the transaction
+    // above); we update its `textContent` field in place.
+    //
+    // IMPORTANT: useOcr is FALSE here (the default). OCR is too slow
+    // (30-60s per scanned PDF) for a synchronous upload request. Scanned
+    // PDFs get textContent=null at upload time; the Registrar can trigger
+    // OCR later via the manual extract-text route or the backfill script.
+    //
+    // We import lazily to avoid loading the text-extraction module (and
+    // its child_process import) on every request — only when an upload
+    // actually happens.
+    try {
+      const { extractTextFromFileWithMeta } = await import("@/lib/auth/text-extraction");
+      const extractResult = await extractTextFromFileWithMeta(
+        result.newVersion.filePath,
+        result.newVersion.fileExtension,
+        // useOcr: false (default) — pdftotext only. See comment above.
+      );
+      if (extractResult.text) {
+        await db.documentVersion.update({
+          where: { id: result.newVersion.id },
+          data: { textContent: extractResult.text },
+        });
+        // Audit the extraction (same shape as the manual extract-text route,
+        // so the activity feed + audit log treat them identically).
+        await db.auditLog.create({
+          data: {
+            actorId: null, // System — automatic extraction
+            actorName: "System",
+            action: "document_text_extracted",
+            entityType: "DocumentVersion",
+            entityId: result.newVersion.id,
+            afterJson: JSON.stringify({
+              documentId,
+              versionId: result.newVersion.id,
+              versionNumber,
+              textLength: extractResult.text.length,
+              method: extractResult.method, // "pdftotext" (upload route never OCRs)
+              ocrPages: extractResult.ocrPages,
+              source: "upload_auto",
+            }),
+            severity: Severity.INFO,
+          },
+        });
+      }
+    } catch (extractErr) {
+      // Non-fatal — the upload succeeded; only search indexing failed.
+      console.error("[documents/upload] Auto text-extraction failed:", extractErr);
     }
 
     // 14. Return 201 Created with the new version's metadata.

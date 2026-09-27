@@ -57,6 +57,7 @@ const PRE_CHUNK_ROUTES = [
   "compare",
   "tasks",
   "reviews",
+  "contact-requests",
   "calendar",
   "audit",
   "users",
@@ -87,9 +88,9 @@ describe("nav-structure — NAV_STRUCTURE config (chunk 6.3)", () => {
     expect(dropdowns.map((g) => g.label)).toEqual(["Unions", "Compliance", "Admin"]);
   });
 
-  it("all 14 destinations are present (13 original + legislation added post-6.3)", () => {
+  it("all 15 destinations are present (13 original + legislation + contact-requests)", () => {
     const allRoutes = getAllRoutes();
-    expect(allRoutes).toHaveLength(14);
+    expect(allRoutes).toHaveLength(15);
   });
 
   it("every destination has a non-empty label + route + icon + roles array", () => {
@@ -113,7 +114,7 @@ describe("nav-structure — deep-link preservation (DONE WHEN criterion)", () =>
     }
   });
 
-  it("NAV_STRUCTURE introduces NO new routes (only the pre-chunk 13)", () => {
+  it("NAV_STRUCTURE introduces NO new routes (only the pre-chunk 15)", () => {
     const allRoutes = getAllRoutes();
     const preChunkSet = new Set(PRE_CHUNK_ROUTES);
     const newRoutes = allRoutes.filter((r) => !preChunkSet.has(r as typeof PRE_CHUNK_ROUTES[number]));
@@ -212,11 +213,11 @@ describe("nav-structure — route smoke test (DONE WHEN criterion)", () => {
 });
 
 describe("nav-structure — getNavForRole (role filtering)", () => {
-  it("REGISTRAR sees all 5 groups (13 destinations accessible — my-union is OFFICER-only)", () => {
+  it("REGISTRAR sees all 5 groups (15 destinations accessible — my-union is OFFICER-only)", () => {
     const nav = getNavForRole("REGISTRAR");
     expect(nav).toHaveLength(5);
     const allRoutes = nav.flatMap((g) => g.destinations.map((d) => d.route));
-    expect(allRoutes).toHaveLength(13); // all 14 minus my-union
+    expect(allRoutes).toHaveLength(14); // all 15 minus my-union
     expect(allRoutes).not.toContain("my-union");
   });
 
@@ -303,7 +304,7 @@ describe("app-shell.tsx — nav component uses NAV_STRUCTURE (no hardcoded desti
   });
 
   it("AppShell uses getNavForRole (not the old buildNav)", () => {
-    expect(appShellSource).toContain("getNavForRole(user.role)");
+    expect(appShellSource).toContain("getNavForRole(user.role as StaffRole)");
     expect(appShellSource).not.toContain("buildNav(");
   });
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useState, useEffect, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
   ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck, Home, FileCheck,
-  ChevronDown,
+  ChevronDown, Search,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import { useFetch } from "@/components/app/use-fetch";
 import { NotificationsSkeleton } from "@/components/app/skeletons";
 import { ScrollToTop } from "@/components/app/scroll-to-top";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { GlobalSearch } from "@/components/app/global-search";
 import {
   NAV_STRUCTURE,
   getNavForRole,
@@ -36,7 +37,7 @@ import {
 
 interface AuthUser {
   id: string; email: string;
-  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE";
   assignedUnionId: string | null; twoFactorEnabled: boolean;
 }
 interface Notification { id: string; type: string; title: string; body: string; linkUrl: string | null; createdAt: string; }
@@ -240,11 +241,27 @@ function NavDropdown({ group, activeView, onNavigate, hasActiveChild }: NavDropd
 interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view: string) => void; children: ReactNode; }
 
 export function AppShell({ user, activeView, onNavigate, children }: AppShellProps) {
-  const nav = getNavForRole(user.role);
-  const crumbs = buildBreadcrumbs(activeView, user.role);
+  // REPRESENTATIVE users are redirected to /portal before reaching here,
+  // so we can safely narrow to StaffRole for the nav structure.
+  const nav = getNavForRole(user.role as StaffRole);
+  const crumbs = buildBreadcrumbs(activeView, user.role as StaffRole);
   const { data: notifData, loading: notifLoading, refetch: refetchNotifs } = useFetch<{ notifications: Notification[]; unreadCount: number; }>("/api/notifications");
   const notifications = notifData?.notifications ?? [];
   const unreadCount = notifData?.unreadCount ?? 0;
+
+  // Chunk 6: Cmd+K / Ctrl+K opens the global search palette.
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Cmd+K (Mac) or Ctrl+K (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   async function markAsRead(id: string, linkUrl: string | null) {
     try {
@@ -306,6 +323,28 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="hidden text-xs md:inline-flex">{user.role}</Badge>
+            {/* Chunk 6: search button — opens the Cmd+K palette. Also opens on Cmd+K/Ctrl+K. */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSearchOpen(true)}
+              className="hidden h-8 gap-2 px-2 text-xs text-muted-foreground sm:flex"
+              title="Search (Cmd+K)"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span className="hidden lg:inline">Search documents...</span>
+              <kbd className="ml-1 hidden rounded border bg-muted px-1 py-0.5 text-[10px] font-sans lg:inline">⌘K</kbd>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchOpen(true)}
+              className="sm:hidden"
+              title="Search (Cmd+K)"
+            >
+              <Search className="h-5 w-5" />
+              <span className="sr-only">Search</span>
+            </Button>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -393,6 +432,14 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
       </main>
 
       <ScrollToTop />
+
+      {/* Chunk 6: global search palette (Cmd+K) */}
+      <GlobalSearch
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onNavigate={(view) => onNavigate(view)}
+        userRole={user.role}
+      />
     </div>
   );
 }

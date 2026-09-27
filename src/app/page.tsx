@@ -13,6 +13,8 @@ import { CompareView } from "@/components/app/views/compare";
 import { UnionsView } from "@/components/app/views/unions";
 import { TasksView } from "@/components/app/views/tasks";
 import { ReviewsView } from "@/components/app/views/reviews";
+import { ContactRequestsView } from "@/components/app/views/contact-requests";
+import { SearchView } from "@/components/app/views/search";
 import { CalendarView } from "@/components/app/views/calendar";
 import { AuditView } from "@/components/app/views/audit";
 import { UsersView } from "@/components/app/views/users";
@@ -26,7 +28,7 @@ import { parseStatusParam, parseViewParam, PARAM_VIEW, PARAM_STATUS } from "@/li
 interface AuthUser {
   id: string;
   email: string;
-  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE";
   assignedUnionId: string | null;
   twoFactorEnabled: boolean;
 }
@@ -61,6 +63,12 @@ export default function Home() {
         const data: { user: AuthUser | null } = await res.json();
         if (cancelled) return;
         if (data.user) {
+          // Chunk 5: REPRESENTATIVE users are redirected to the /portal
+          // route tree (union self-service portal). Staff roles stay here.
+          if (data.user.role === "REPRESENTATIVE") {
+            window.location.href = "/portal";
+            return;
+          }
           setUser(data.user);
           setMode("auth");
           // Read deep-link params for view + status filter (chunk 4.1)
@@ -79,6 +87,11 @@ export default function Home() {
               setInitialUnionId(unionId);
             }
             window.history.replaceState({}, "", "/");
+          } else if (viewParam === "search") {
+            // Chunk 6: deep-link to search view. The ?q= param is read by
+            // the SearchView component itself, so we leave the URL intact
+            // (don't replaceState) — the search bar initializes from it.
+            setActiveView("search");
           }
         } else {
           setMode("public");
@@ -144,7 +157,9 @@ export default function Home() {
       case "compare": return <CompareView />;
       case "tasks": return <TasksView />;
       case "reviews": return <ReviewsView />;
-      case "calendar": return <CalendarView />;
+      case "contact-requests": return <ContactRequestsView />;
+      case "search": return <SearchView />;
+      case "calendar": return <CalendarView onNavigate={setActiveView} />;
       case "audit": return <AuditView />;
       case "users": return <UsersView />;
       case "security": return <SecurityView />;

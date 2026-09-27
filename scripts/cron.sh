@@ -2,10 +2,11 @@
 # =============================================================================
 # cron.sh — cron invocation guide for the Union Records Management System.
 #
-# Schedules the three automated sweep/snapshot endpoints:
-#   1. POST /api/cron/compliance-snapshot — daily at 7:55 AM (chunk 4.2a)
-#   2. POST /api/cron/compliance-sweep    — daily at 8:00 AM
-#   3. POST /api/cron/audit-retention-sweep — weekly (Sunday 2:00 AM)
+# Schedules the four automated sweep/snapshot endpoints:
+#   1. POST /api/cron/compliance-snapshot        — daily at 7:55 AM (chunk 4.2a)
+#   2. POST /api/cron/compliance-sweep           — daily at 8:00 AM
+#   3. POST /api/cron/audit-retention-sweep      — weekly (Sunday 2:00 AM)
+#   4. POST /api/cron/snapshot-retention-sweep   — weekly (Sunday 2:30 AM, chunk 4.3)
 #
 # The snapshot fires 5 minutes BEFORE the sweep so it captures the
 # pre-notification state. The sweep only generates notifications — it
@@ -18,11 +19,12 @@
 #   3. The app must be running and reachable from the cron host.
 #
 # USAGE:
-#   ./scripts/cron.sh snapshot    — capture today's compliance snapshot now
-#   ./scripts/cron.sh compliance — run the compliance sweep now
-#   ./scripts/cron.sh audit       — run the audit retention sweep now
-#   ./scripts/cron.sh crontab     — print the crontab lines to install
-#   ./scripts/cron.sh help        — print this help
+#   ./scripts/cron.sh snapshot            — capture today's compliance snapshot now
+#   ./scripts/cron.sh compliance           — run the compliance sweep now
+#   ./scripts/cron.sh audit                — run the audit retention sweep now
+#   ./scripts/cron.sh snapshot-retention   — run the snapshot retention sweep now
+#   ./scripts/cron.sh crontab              — print the crontab lines to install
+#   ./scripts/cron.sh help                 — print this help
 # =============================================================================
 
 set -euo pipefail
@@ -55,9 +57,14 @@ BASE_URL=$BASE_URL
 # --- Audit retention sweep: every Sunday at 2:00 AM ---
 0 2 * * 0 $0 audit >> /var/log/urm-audit-sweep.log 2>&1
 
+# --- Snapshot retention sweep: every Sunday at 2:30 AM (chunk 4.3) ---
+# Prunes compliance snapshots older than 365 days. Runs 30 min AFTER the
+# audit-retention sweep so the two retention sweeps don't contend for the DB.
+30 2 * * 0 $0 snapshot-retention >> /var/log/urm-snapshot-retention.log 2>&1
+
 # =============================================================================
 # LOG ROTATION (recommended):
-# /var/log/urm-compliance-snapshot.log /var/log/urm-compliance-sweep.log /var/log/urm-compliance-digest.log /var/log/urm-audit-sweep.log {
+# /var/log/urm-compliance-snapshot.log /var/log/urm-compliance-sweep.log /var/log/urm-compliance-digest.log /var/log/urm-audit-sweep.log /var/log/urm-snapshot-retention.log {
 #   weekly rotate 12 compress missingok notifempty create 640 root adm
 # }
 # =============================================================================
@@ -67,15 +74,16 @@ EOF
 case "${1:-help}" in
   crontab) print_crontab; exit 0 ;;
   help|--help|-h) print_help; exit 0 ;;
-  compliance|audit|snapshot|digest) : ;;
+  compliance|audit|snapshot|snapshot-retention|digest) : ;;
   *)
-    echo "Usage: $0 {snapshot|compliance|digest|audit|crontab|help}" >&2
-    echo "  snapshot    — capture today's compliance snapshot now" >&2
-    echo "  compliance  — run the compliance sweep now (tiered reminders + tasks)" >&2
-    echo "  digest      — send the weekly compliance digest email now" >&2
-    echo "  audit       — run the audit retention sweep now" >&2
-    echo "  crontab     — print the crontab lines to install" >&2
-    echo "  help        — print the setup instructions" >&2
+    echo "Usage: $0 {snapshot|compliance|digest|audit|snapshot-retention|crontab|help}" >&2
+    echo "  snapshot            — capture today's compliance snapshot now" >&2
+    echo "  compliance          — run the compliance sweep now (tiered reminders + tasks)" >&2
+    echo "  digest              — send the weekly compliance digest email now" >&2
+    echo "  audit               — run the audit retention sweep now" >&2
+    echo "  snapshot-retention  — run the snapshot retention sweep now (prune >365d)" >&2
+    echo "  crontab             — print the crontab lines to install" >&2
+    echo "  help                — print the setup instructions" >&2
     exit 1
     ;;
 esac
@@ -107,4 +115,5 @@ case "${1:-}" in
   compliance) run_sweep "compliance-sweep" ;;
   digest) run_sweep "compliance-digest" ;;
   audit) run_sweep "audit-retention-sweep" ;;
+  snapshot-retention) run_sweep "snapshot-retention-sweep" ;;
 esac

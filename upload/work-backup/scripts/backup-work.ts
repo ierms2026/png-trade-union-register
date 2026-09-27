@@ -3,9 +3,11 @@
 // backup-work.ts — snapshot the current source tree into upload/work-backup/
 //
 // Run this at the end of every work batch. It copies:
-//   - prisma/schema.prisma
-//   - .env (so custom env vars survive)
 //   - src/**/* (all source files)
+//   - prisma/**/* (schema, seed scripts, text generators)
+//   - scripts/**/* (backfill, smoke tests, PDF generators, cron.sh)
+//   - .env (so custom env vars survive)
+//   - package.json
 //   - A MANIFEST.json listing every backed-up file + its SHA-256 + mtime
 //
 // The backup lives in upload/work-backup/ which is OUTSIDE the snapshot path
@@ -20,8 +22,8 @@ import crypto from "node:crypto";
 
 const PROJECT_ROOT = "/home/z/my-project";
 const BACKUP_ROOT = path.join(PROJECT_ROOT, "upload", "work-backup");
-const SOURCE_DIRS = ["src"];
-const EXTRA_FILES = ["prisma/schema.prisma", ".env", "package.json"];
+const SOURCE_DIRS = ["src", "prisma", "scripts"];
+const EXTRA_FILES = [".env", "package.json"];
 
 interface ManifestEntry {
   path: string;          // relative to PROJECT_ROOT, e.g. "src/lib/auth/constants.ts"

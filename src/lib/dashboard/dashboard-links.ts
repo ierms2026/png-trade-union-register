@@ -30,7 +30,7 @@ export const PARAM_VIEW = "view";
 export const PARAM_STATUS = "status";
 
 /** Valid `view` param values. */
-export type ViewParam = "compliance" | "unions" | "dashboard";
+export type ViewParam = "compliance" | "unions" | "dashboard" | "search";
 
 /**
  * Build a deep-link URL for the compliance view filtered by a specific status.
@@ -89,7 +89,7 @@ export function parseStatusParam(value: string | null): ComplianceStatus | null 
  */
 export function parseViewParam(value: string | null): ViewParam | null {
   if (!value) return null;
-  const validViews: ViewParam[] = ["compliance", "unions", "dashboard"];
+  const validViews: ViewParam[] = ["compliance", "unions", "dashboard", "search"];
   if (validViews.includes(value as ViewParam)) {
     return value as ViewParam;
   }

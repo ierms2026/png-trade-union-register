@@ -17,6 +17,7 @@ enum Role {
   REGISTRAR
   INSPECTOR
   OFFICER
+  REPRESENTATIVE
 }
 
 enum Severity {
@@ -62,6 +63,12 @@ model User {
   dispositionsExecuted  DispositionRequest[] @relation("DispositionExecutor")
   dispositionsCancelled DispositionRequest[] @relation("DispositionCanceller")
   notifications        Notification[]
+  // Chunk 5: back-relations for ContactUpdateRequest. Two FKs from
+  // ContactUpdateRequest → User exist (requester + reviewer), so Prisma
+  // requires named relations to disambiguate which back-relation maps to
+  // which FK. Same pattern as Task (assignee + creator).
+  contactUpdatesRequested  ContactUpdateRequest[] @relation("ContactUpdateRequester")
+  contactUpdatesReviewed   ContactUpdateRequest[] @relation("ContactUpdateReviewer")
 }
 
 // -----------------------------------------------------------------------------
@@ -159,6 +166,15 @@ enum DispositionStatus {
   BLOCKED
 }
 
+// Chunk 5 (Union self-service portal) — staged contact-info updates.
+// Reps submit changes here; Registrar approves/rejects from the staff
+// Reviews view. Approved requests mutate the parent Union row.
+enum ContactUpdateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model ComplianceRule {
   id            String   @id @default(cuid())
   documentType  String   @unique
@@ -185,6 +201,9 @@ model Union {
   updatedAt      DateTime     @updatedAt
   documents      Document[]
   tasks          Task[]
+  // Chunk 5: staged contact-info updates submitted by union representatives.
+  // Cascade-delete if the union is deleted (no orphaned update requests).
+  contactUpdateRequests ContactUpdateRequest[]
 }
 
 model Document {
@@ -392,4 +411,57 @@ model ComplianceSnapshot {
   capturedWith     String
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// =============================================================================
+// Chunk 5 — Union self-service portal: ContactUpdateRequest
+//
+// Staged contact-info changes submitted by union representatives (Role =
+// REPRESENTATIVE) from the /portal/contact view. Each request is a SNAPSHOT
+// of the requested new values for the four Officer-allowed fields on Union:
+//   address, contactPerson, contactEmail, contactPhone
+//
+// Lifecycle:
+//   1. Rep submits a request → status = PENDING, reviewedById = null
+//   2. Registrar approves (POST /api/contact-requests/[id]/approve)
+//      → the four fields are written to the Union row, status = APPROVED,
+//        reviewedById = registrar.id, reviewedAt = now
+//   3. OR Registrar rejects (POST /api/contact-requests/[id]/reject) with
+//      a reason → status = REJECTED, reviewedById, reviewedAt, rejectionReason
+//
+// The request row is NEVER deleted — it's the audit trail for the change.
+// Only ONE PENDING request per union at a time (enforced in the route, not
+// at the DB level — SQLite doesn't make partial unique indexes easy, and
+// the route-level check is sufficient given the low write volume).
+//
+// RESTRICTED FIELDS: unionName, registrationNo, fileNumber, status, remarks
+// are NOT editable by reps. A request that tries to set them is rejected
+// at the API layer (the route only accepts the four allowed fields).
+// =============================================================================
+
+model ContactUpdateRequest {
+  id              String              @id @default(cuid())
+  unionId         String
+  requestedById   String
+  // Snapshot of requested new values. NULL means "no change requested for
+  // this field" — the rep can submit a partial update (e.g. just the phone
+  // number) without re-stating unchanged fields. The approval route applies
+  // only non-null values to the Union row.
+  address         String?
+  contactPerson   String?
+  contactEmail    String?
+  contactPhone    String?
+  status          ContactUpdateStatus @default(PENDING)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  union           Union               @relation(fields: [unionId], references: [id], onDelete: Cascade)
+  requestedBy     User                @relation("ContactUpdateRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy      User?               @relation("ContactUpdateReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([unionId, status])
+  @@index([status])
 }

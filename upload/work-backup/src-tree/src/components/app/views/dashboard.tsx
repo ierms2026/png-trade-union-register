@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, Plus, Upload, ListTodo, ScrollText, ArrowRight } from "lucide-react";
+import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, Plus, Upload, ListTodo, ScrollText, ArrowRight, FileDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -429,10 +429,22 @@ function TrendChart({ points, loading, error, onRetry }: TrendChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Compliance Trend</CardTitle>
-        <CardDescription>
-          Daily compliance rate over the last {windowDays} days of collected history.
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Compliance Trend</CardTitle>
+            <CardDescription>
+              Daily compliance rate over the last {windowDays} days of collected history.
+            </CardDescription>
+          </div>
+          {sufficient && (
+            <a href="/api/export/trend" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <FileDown className="h-3.5 w-3.5" />
+                Export CSV
+              </Button>
+            </a>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -930,8 +942,20 @@ function NeedsAttentionPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Needs Attention</CardTitle>
-        <CardDescription>Overdue and expiring documents across all unions.</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Needs Attention</CardTitle>
+            <CardDescription>Overdue and expiring documents across all unions.</CardDescription>
+          </div>
+          {total > 0 && (
+            <a href="/api/export/stats" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <FileDown className="h-3.5 w-3.5" />
+                Export CSV
+              </Button>
+            </a>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {total === 0 ? (
@@ -1054,10 +1078,20 @@ function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Compliance Matrix</CardTitle>
-        <CardDescription>
-          {matrix.rows.length} unions × {matrix.columnTypes.length} document types.
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Compliance Matrix</CardTitle>
+            <CardDescription>
+              {matrix.rows.length} unions × {matrix.columnTypes.length} document types.
+            </CardDescription>
+          </div>
+          <a href="/api/export/compliance-matrix" target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <FileDown className="h-3.5 w-3.5" />
+              Export CSV
+            </Button>
+          </a>
+        </div>
       </CardHeader>
       <CardContent>
         {/* Grid with sticky union column + horizontal scroll */}
@@ -1209,8 +1243,20 @@ function ExpiryForecastCard({ forecast, onFilter }: ExpiryForecastCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Expiry Forecast</CardTitle>
-        <CardDescription>Documents coming due, by window.</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Expiry Forecast</CardTitle>
+            <CardDescription>Documents coming due, by window.</CardDescription>
+          </div>
+          {!allZero && (
+            <a href="/api/export/expiry-forecast" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <FileDown className="h-3.5 w-3.5" />
+                Export CSV
+              </Button>
+            </a>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {allZero ? (
@@ -1316,7 +1362,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export function DashboardView({ user, onNavigate, onFilterCompliance }: {
-  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" };
+  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE" };
   onNavigate?: (view: string) => void;
   onFilterCompliance?: (status: string) => void;
 }) {

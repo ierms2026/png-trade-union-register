@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useFetch } from "@/components/app/use-fetch";
 import { CalendarSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
@@ -12,9 +18,8 @@ import { ErrorState } from "@/components/app/error-state";
 // =============================================================================
 // Calendar view — monthly grid with 4 tabs (all/documents/tasks/compliance).
 //
-// Shows events for the selected month. The `tab` query param filters
-// which event types are shown. Events are grouped by day; each day cell
-// shows its events as colored badges.
+// Enhanced: events are clickable (drill-through to the source view) + days
+// with 4+ events open a detail dialog showing all events for that day.
 // =============================================================================
 
 type Tab = "all" | "documents" | "tasks" | "compliance";
@@ -40,9 +45,23 @@ const EVENT_COLORS: Record<string, string> = {
   compliance: "bg-accent/15 text-accent-foreground border-accent/30",
 };
 
-export function CalendarView() {
+const EVENT_DOT_COLORS: Record<string, string> = {
+  task: "bg-primary",
+  document: "bg-chart-4",
+  compliance: "bg-accent",
+};
+
+// Where each event type navigates when clicked
+const EVENT_LINKS: Record<string, string> = {
+  task: "/?view=tasks",
+  document: "/?view=unions",
+  compliance: "/?view=compliance",
+};
+
+export function CalendarView({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const [tab, setTab] = useState<Tab>("all");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<{ dateStr: string; events: CalendarEvent[] } | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -56,10 +75,9 @@ export function CalendarView() {
   const days = useMemo(() => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startWeekday = firstDay.getDay(); // 0 = Sunday
+    const startWeekday = firstDay.getDay();
     const totalDays = lastDay.getDate();
     const cells: Array<{ day: number | null; dateStr: string | null }> = [];
-    // Leading empty cells
     for (let i = 0; i < startWeekday; i++) {
       cells.push({ day: null, dateStr: null });
     }
@@ -67,7 +85,6 @@ export function CalendarView() {
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       cells.push({ day: d, dateStr });
     }
-    // Trailing empty cells to fill the last week
     while (cells.length % 7 !== 0) {
       cells.push({ day: null, dateStr: null });
     }
@@ -95,13 +112,28 @@ export function CalendarView() {
     setCurrentDate(new Date());
   }
 
+  function handleEventClick(e: CalendarEvent) {
+    // Navigate to the relevant view based on event type
+    if (onNavigate) {
+      if (e.type === "task") onNavigate("tasks");
+      else if (e.type === "document") onNavigate("unions");
+      else if (e.type === "compliance") onNavigate("compliance");
+    }
+  }
+
+  function handleDayClick(dateStr: string, events: CalendarEvent[]) {
+    if (events.length > 0) {
+      setSelectedDay({ dateStr, events });
+    }
+  }
+
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
-        <p className="text-sm text-muted-foreground">Tasks, document uploads, and compliance events.</p>
+        <p className="text-sm text-muted-foreground">Tasks, document uploads, and compliance events. Click an event to navigate to its source.</p>
       </div>
 
       {/* Tabs + month navigation */}
@@ -160,26 +192,36 @@ export function CalendarView() {
                 return (
                   <div
                     key={i}
-                    className={`aspect-square min-h-[80px] rounded border p-1.5 ${
+                    className={`aspect-square min-h-[80px] rounded border p-1.5 transition-colors ${
                       isToday ? "border-primary bg-primary/5" : "border-muted"
-                    }`}
+                    } ${dayEvents.length > 0 ? "cursor-pointer hover:border-foreground/30 hover:bg-muted/30" : ""}`}
+                    onClick={() => handleDayClick(cell.dateStr!, dayEvents)}
                   >
                     <div className={`mb-1 text-xs font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                       {cell.day}
+                      {dayEvents.length > 0 && (
+                        <span className="ml-1 inline-flex h-3 min-w-3 items-center justify-center rounded-full bg-muted px-1 text-[9px] font-semibold text-muted-foreground">
+                          {dayEvents.length}
+                        </span>
+                      )}
                     </div>
                     <div className="space-y-0.5">
                       {dayEvents.slice(0, 3).map((e, j) => (
                         <div
                           key={j}
-                          className={`truncate rounded border px-1 py-0.5 text-[10px] ${EVENT_COLORS[e.type]}`}
+                          className={`truncate rounded border px-1 py-0.5 text-[10px] cursor-pointer hover:brightness-110 ${EVENT_COLORS[e.type]}`}
                           title={e.title}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleEventClick(e);
+                          }}
                         >
                           {e.title}
                         </div>
                       ))}
                       {dayEvents.length > 3 && (
-                        <div className="text-[10px] text-muted-foreground">
-                          +{dayEvents.length - 3} more
+                        <div className="text-[10px] text-muted-foreground hover:text-foreground">
+                          +{dayEvents.length - 3} more...
                         </div>
                       )}
                     </div>
@@ -200,7 +242,43 @@ export function CalendarView() {
             </span>
           </div>
         ))}
+        <span className="text-muted-foreground">Click an event to navigate to its source view. Click a day to see all events.</span>
       </div>
+
+      {/* Day detail dialog */}
+      <Dialog open={!!selectedDay} onOpenChange={(open) => { if (!open) setSelectedDay(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDay ? new Date(selectedDay.dateStr + "T12:00:00Z").toLocaleDateString("en-US", {
+                weekday: "long", year: "numeric", month: "long", day: "numeric",
+              }) : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {selectedDay?.events.map((e, i) => (
+              <div
+                key={i}
+                className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 cursor-pointer hover:brightness-95 ${EVENT_COLORS[e.type]}`}
+                onClick={() => {
+                  handleEventClick(e);
+                  setSelectedDay(null);
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{e.title}</p>
+                  <p className="text-xs opacity-70 capitalize">
+                    {e.type}
+                    {e.meta?.status ? ` · ${e.meta.status}` : ""}
+                    {e.meta?.unionName ? ` · ${e.meta.unionName}` : ""}
+                  </p>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-50" />
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

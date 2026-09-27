@@ -583,3 +583,115 @@ export function extractSparklineSeries(
     return p.percentage; // rate
   });
 }
+
+// =============================================================================
+// 4.3 — Snapshot retention sweep.
+//
+// Old snapshots older than the trend window are invisible to the chart anyway
+// (sliceTrendToWindow drops them). Keeping them forever grows the table
+// without benefit. This section provides the prune helper + a wrapper that
+// uses the canonical retention period.
+//
+// POLICY: prune snapshots whose `date` (UTC YYYY-MM-DD) is older than
+// `RETENTION_DAYS` days ago. We prune by `date` (the canonical day boundary)
+// rather than `createdAt` (which can be up to 24h off the day boundary for
+// intra-day re-triggers). The `date` field has a UNIQUE constraint and is
+// the field the chart filters on — it's the right semantic anchor.
+//
+// PATTERN: mirrors src/lib/audit-retention.ts (chunk 9-a). Batched deleteMany
+// in 1000-row chunks inside a loop with a 500-iteration safety valve. Each
+// transaction stays short so other requests can interleave. SQLite's
+// deleteMany caps at 999 rows per statement when using OR hooks — batching
+// avoids hitting that limit.
+// =============================================================================
+
+/**
+ * Retention period for compliance snapshots.
+ *
+ * Set to TREND_WINDOW_DAYS (365) — anything older is invisible to the chart's
+ * window (sliceTrendToWindow drops it), so keeping it just bloats the table.
+ *
+ * If a future chunk wants year-over-year comparison charts, bump this to 730
+ * (or wider) and add a separate `getComplianceTrendYearAgo` selector — don't
+ * widen the chart's window.
+ */
+export const SNAPSHOT_RETENTION_DAYS = TREND_WINDOW_DAYS;
+
+/** Safety valve — caps the batch loop so a runaway sweep can't lock the DB. */
+const MAX_PRUNE_ITERATIONS = 500;
+
+/**
+ * Delete compliance snapshots whose `date` (UTC YYYY-MM-DD) is strictly older
+ * than `days` days ago (measured from `now`).
+ *
+ * BATCHED: deletes in chunks (SQLite's default limit per deleteMany is fine,
+ * but batching keeps transactions short so concurrent requests can interleave
+ * — same pattern as audit-retention.ts). Stops as soon as a chunk deletes
+ * zero rows.
+ *
+ * PURE-DB: no audit-log side effect (the caller — the cron route — writes
+ * the audit entry so the policy + counts are recorded together).
+ *
+ * @param days  Age threshold in days. Snapshots older than this are pruned.
+ * @param now   Injectable "now" for testability — defaults to new Date().
+ * @returns The number of rows deleted.
+ */
+export async function deleteSnapshotsOlderThan(
+  days: number = SNAPSHOT_RETENTION_DAYS,
+  now: Date = new Date(),
+): Promise<number> {
+  // Compute the cutoff as a UTC YYYY-MM-DD string. The `date` column is a
+  // string (not DateTime) so we compare lexicographically — which is correct
+  // for ISO-8601 dates. Lexicographic comparison on YYYY-MM-DD strings is
+  // equivalent to calendar comparison.
+  const cutoffDate = formatUtcDate(new Date(now.getTime() - days * 24 * 60 * 60 * 1000));
+
+  let totalDeleted = 0;
+  for (let i = 0; i < MAX_PRUNE_ITERATIONS; i++) {
+    const result = await db.complianceSnapshot.deleteMany({
+      where: { date: { lt: cutoffDate } },
+    });
+    totalDeleted += result.count;
+    if (result.count === 0) break;
+  }
+  return totalDeleted;
+}
+
+/**
+ * Result of runSnapshotRetentionSweep — for the audit-log entry + route response.
+ */
+export interface SnapshotRetentionSweepResult {
+  /** Number of snapshot rows pruned. */
+  pruned: number;
+  /** The cutoff date (UTC YYYY-MM-DD). Rows older than this were pruned. */
+  cutoff: string;
+  /** The retention policy in days. */
+  retentionDays: number;
+}
+
+/**
+ * Run the snapshot retention sweep using the canonical retention period.
+ *
+ * Wrapper around `deleteSnapshotsOlderThan(SNAPSHOT_RETENTION_DAYS, now)`
+ * that returns a structured result suitable for the cron route's audit-log
+ * entry + JSON response. Same shape pattern as `runRetentionSweep` in
+ * audit-retention.ts.
+ *
+ * IDEMPOTENT: re-running finds nothing to prune (the first run already
+ * deleted everything older than the cutoff). Returns pruned: 0.
+ *
+ * @param now  Injectable "now" for testability — defaults to new Date().
+ */
+export async function runSnapshotRetentionSweep(
+  now: Date = new Date(),
+): Promise<SnapshotRetentionSweepResult> {
+  const cutoff = formatUtcDate(
+    new Date(now.getTime() - SNAPSHOT_RETENTION_DAYS * 24 * 60 * 60 * 1000),
+  );
+  const pruned = await deleteSnapshotsOlderThan(SNAPSHOT_RETENTION_DAYS, now);
+  return {
+    pruned,
+    cutoff,
+    retentionDays: SNAPSHOT_RETENTION_DAYS,
+  };
+}

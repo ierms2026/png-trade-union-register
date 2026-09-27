@@ -8,6 +8,9 @@ import {
   buildCapturedWith,
   parseCapturedWith,
   formatUtcDate,
+  deleteSnapshotsOlderThan,
+  runSnapshotRetentionSweep,
+  SNAPSHOT_RETENTION_DAYS,
   PastDayImmutabilityError,
   type ComplianceTrendPoint,
   type SnapshotCapturedWith,
@@ -800,5 +803,135 @@ describe("compliance snapshot — chunk 4.2a", () => {
       const trend = await getComplianceTrend(FROZEN_NOW);
       expect(trend).toEqual([]);
     });
+  });
+});
+
+// =============================================================================
+// Chunk 4.3 — Snapshot retention sweep tests.
+//
+// Covers:
+//   - deleteSnapshotsOlderThan: prunes old rows, preserves recent rows
+//   - Cutoff is computed from `now` (injectable) — deterministic, no Date.now() leaks
+//   - Idempotency: running twice deletes nothing the second time
+//   - Pruning by `date` (the UTC YYYY-MM-DD string), not `createdAt`
+//   - runSnapshotRetentionSweep returns the structured result with cutoff + count
+//   - SNAPSHOT_RETENTION_DAYS matches TREND_WINDOW_DAYS (365) — anything older
+//     is invisible to the chart, so pruning at that boundary is correct
+// =============================================================================
+
+describe("Snapshot retention sweep (chunk 4.3)", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("SNAPSHOT_RETENTION_DAYS equals TREND_WINDOW_DAYS (365)", () => {
+    // Pruning at the trend window boundary is correct: anything older is
+    // invisible to sliceTrendToWindow, so keeping it just bloats the table.
+    expect(SNAPSHOT_RETENTION_DAYS).toBe(365);
+  });
+
+  it("deleteSnapshotsOlderThan prunes rows older than the cutoff and preserves newer ones", async () => {
+    const now = new Date("2026-06-15T12:00:00Z");
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+    // Insert 3 rows: 400 days old (should prune), 200 days old (keep), 1 day old (keep).
+    const oldDate = formatUtcDate(new Date(now.getTime() - 400 * MS_PER_DAY));
+    const midDate = formatUtcDate(new Date(now.getTime() - 200 * MS_PER_DAY));
+    const recentDate = formatUtcDate(new Date(now.getTime() - 1 * MS_PER_DAY));
+
+    await testDb.complianceSnapshot.create({
+      data: { date: oldDate, compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+    });
+    await testDb.complianceSnapshot.create({
+      data: { date: midDate, compliant: 2, expiring: 0, overdue: 0, missing: 0, rateNumerator: 2, rateDenominator: 2, capturedWith: "{}" },
+    });
+    await testDb.complianceSnapshot.create({
+      data: { date: recentDate, compliant: 3, expiring: 0, overdue: 0, missing: 0, rateNumerator: 3, rateDenominator: 3, capturedWith: "{}" },
+    });
+
+    const deleted = await deleteSnapshotsOlderThan(365, now);
+    expect(deleted).toBe(1);
+
+    const remaining = await testDb.complianceSnapshot.findMany({ orderBy: { date: "asc" } });
+    expect(remaining.map((r) => r.date)).toEqual([midDate, recentDate]);
+    expect(remaining.map((r) => r.compliant)).toEqual([2, 3]);
+  });
+
+  it("deleteSnapshotsOlderThan is idempotent — second run deletes 0", async () => {
+    const now = new Date("2026-06-15T12:00:00Z");
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const oldDate = formatUtcDate(new Date(now.getTime() - 400 * MS_PER_DAY));
+
+    await testDb.complianceSnapshot.create({
+      data: { date: oldDate, compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+    });
+
+    const first = await deleteSnapshotsOlderThan(365, now);
+    expect(first).toBe(1);
+
+    const second = await deleteSnapshotsOlderThan(365, now);
+    expect(second).toBe(0);
+  });
+
+  it("deleteSnapshotsOlderThan with empty DB returns 0 (no error)", async () => {
+    const deleted = await deleteSnapshotsOlderThan(365, new Date("2026-06-15T12:00:00Z"));
+    expect(deleted).toBe(0);
+  });
+
+  it("deleteSnapshotsOlderThan boundary: exactly 365 days old is PRESERVED (strict less-than)", async () => {
+    // The cutoff is `now - 365 days`. A row whose date is exactly at the
+    // cutoff is NOT pruned (the predicate is `date < cutoff`, strict). This
+    // matches the trend window: a 365-day-old row is still the last point
+    // in a 365-day window.
+    const now = new Date("2026-06-15T12:00:00Z");
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const boundaryDate = formatUtcDate(new Date(now.getTime() - 365 * MS_PER_DAY));
+
+    await testDb.complianceSnapshot.create({
+      data: { date: boundaryDate, compliant: 5, expiring: 0, overdue: 0, missing: 0, rateNumerator: 5, rateDenominator: 5, capturedWith: "{}" },
+    });
+
+    const deleted = await deleteSnapshotsOlderThan(365, now);
+    expect(deleted).toBe(0);
+
+    const remaining = await testDb.complianceSnapshot.findMany();
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].date).toBe(boundaryDate);
+  });
+
+  it("runSnapshotRetentionSweep returns structured result with cutoff + count + retentionDays", async () => {
+    const now = new Date("2026-06-15T12:00:00Z");
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+    // Insert 2 old rows + 1 recent row.
+    await testDb.complianceSnapshot.create({
+      data: { date: formatUtcDate(new Date(now.getTime() - 400 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+    });
+    await testDb.complianceSnapshot.create({
+      data: { date: formatUtcDate(new Date(now.getTime() - 380 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+    });
+    await testDb.complianceSnapshot.create({
+      data: { date: formatUtcDate(new Date(now.getTime() - 10 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+    });
+
+    const result = await runSnapshotRetentionSweep(now);
+
+    expect(result.pruned).toBe(2);
+    expect(result.retentionDays).toBe(365);
+    // Cutoff should be 365 days before `now`: 2025-06-15.
+    // (Jun 15 2026 - 365 days = Jun 15 2025 — going back one full year
+    // in a non-leap year lands on the same month-day.)
+    expect(result.cutoff).toBe("2025-06-15");
+
+    // Verify the recent row survived.
+    const remaining = await testDb.complianceSnapshot.findMany();
+    expect(remaining.length).toBe(1);
+  });
+
+  it("runSnapshotRetentionSweep on empty DB returns pruned: 0 (no error)", async () => {
+    const result = await runSnapshotRetentionSweep(new Date("2026-06-15T12:00:00Z"));
+    expect(result.pruned).toBe(0);
+    expect(result.retentionDays).toBe(365);
+    expect(result.cutoff).toBe("2025-06-15");
   });
 });

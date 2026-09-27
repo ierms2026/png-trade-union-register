@@ -44,7 +44,7 @@ interface RetentionItem {
 }
 
 interface User {
-  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE";
 }
 
 export function RetentionView({ user }: { user: User }) {

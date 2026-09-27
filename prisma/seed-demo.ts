@@ -3,6 +3,12 @@ import bcrypt from "bcryptjs";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import os from "node:os";
+import { generateDocText } from "./generate-doc-text";
+
+const execFileAsync = promisify(execFile);
 
 // =============================================================================
 // Demo data seed — creates a realistic dataset for the Union Records
@@ -16,12 +22,20 @@ import crypto from "node:crypto";
 //     - Some filed ~85 days before expiry (EXPIRING)
 //     - Some past expiry (OVERDUE)
 //     - Some missing entirely (MISSING)
-//   - Document version files written to disk (placeholder .bin content)
+//   - Document version files written to disk as REAL PDFs:
+//     - Born-digital PDFs (with text layer) for recent uploads
+//     - Scanned/image-only PDFs for older documents (demonstrates OCR)
+//   - textContent populated directly at seed time (search works immediately)
 //   - 3 demo tasks
 //
 // IDEMPOTENT:
 //   Re-running this seed is safe — it upserts users and skips existing
 //   unions/documents (matched by registrationNo / (unionId, documentType)).
+//
+// CHUNK 7+8: Real PDFs generated via Python (reportlab + PIL). The text
+// content is generated per document type + stored in DocumentVersion.textContent
+// so full-text search (chunk 6) works immediately without running the
+// backfill script.
 // =============================================================================
 
 const db = new PrismaClient();
@@ -210,15 +224,38 @@ function daysAgo(days: number): Date {
 }
 
 /**
- * Write a placeholder .bin file for a document version.
- * Returns the relative path (stored in DB) and the checksum.
+ * Generate a real PDF file for a document version.
+ *
+ * Two modes:
+ *   - "born-digital" : PDF with a text layer (pdftotext extracts it instantly)
+ *   - "scanned"      : Image-only PDF (no text layer — needs OCR)
+ *
+ * The text content is passed to the Python helper via stdin. The same text
+ * is stored in DocumentVersion.textContent so search works immediately
+ * without needing to run the backfill/extract-text script.
+ *
+ * Returns the relative path (stored in DB), the checksum, the file size,
+ * and the text content (for populating textContent).
+ *
+ * Falls back to placeholder text if Python/PIL/reportlab aren't available
+ * — the seed still works, just without real PDFs.
  */
 async function writeVersionFile(
   unionId: string,
   documentId: string,
   versionNumber: number,
-  content: string,
-): Promise<{ relativePath: string; checksum: string; size: number }> {
+  documentType: string,
+  unionName: string,
+  registrationNo: string,
+  fileName: string,
+  filedDaysAgo: number,
+): Promise<{
+  relativePath: string;
+  checksum: string;
+  size: number;
+  textContent: string | null;
+  pdfMode: "born-digital" | "scanned" | "placeholder";
+}> {
   const relativePath = path.posix.join(
     "unions",
     unionId,
@@ -227,10 +264,72 @@ async function writeVersionFile(
   );
   const absolutePath = path.join(STORAGE_ROOT, relativePath);
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-  const buffer = Buffer.from(content, "utf8");
-  await fs.writeFile(absolutePath, buffer);
+
+  // Generate realistic text content for this document type
+  const textContent = generateDocText({
+    unionName,
+    registrationNo,
+    documentType,
+    fileName,
+    filedDaysAgo,
+  });
+
+  // Determine PDF mode: documents filed > 3 years ago are "scanned"
+  // (realistic — older documents were likely paper, then scanned). Recent
+  // uploads are "born-digital" (modern workflow).
+  const isScanned = filedDaysAgo > 365 * 3;
+  const pdfMode: "born-digital" | "scanned" = isScanned ? "scanned" : "born-digital";
+  const title = `${documentType} — ${unionName}`;
+
+  // Try to generate a real PDF via the Python helper.
+  // Fall back to placeholder text if Python/PIL/reportlab aren't available.
+  let buffer: Buffer;
+  let actualMode: "born-digital" | "scanned" | "placeholder" = pdfMode;
+  try {
+    const scriptPath = path.join(process.cwd(), "scripts", "generate-demo-pdf.py");
+    // Write the text content to a temp file that the Python script reads via stdin.
+    // (execFile doesn't support stdin directly, so we pass the temp file path
+    // as an argument and delete it after.)
+    const tmpTextFile = path.join(os.tmpdir(), `urm-seed-text-${documentId}.txt`);
+    await fs.writeFile(tmpTextFile, textContent, "utf8");
+    try {
+      await execFileAsync(
+        "python3",
+        [
+          scriptPath,
+          "--output", absolutePath,
+          "--mode", pdfMode,
+          "--title", title,
+          "--text-file", tmpTextFile,
+        ],
+        { maxBuffer: 50 * 1024 * 1024 },
+      );
+      buffer = await fs.readFile(absolutePath);
+    } finally {
+      await fs.unlink(tmpTextFile).catch(() => {});
+    }
+  } catch (err) {
+    // Fallback: write the text as a placeholder .bin file.
+    // The seed still works — search won't find these until real PDFs are
+    // uploaded, but the UI is fully functional.
+    console.warn(`    ⚠ PDF generation failed (${pdfMode}), using placeholder: ${err instanceof Error ? err.message : err}`);
+    buffer = Buffer.from(textContent, "utf8");
+    await fs.writeFile(absolutePath, buffer);
+    actualMode = "placeholder";
+  }
+
   const checksum = crypto.createHash("sha256").update(buffer).digest("hex");
-  return { relativePath, checksum, size: buffer.length };
+  return {
+    relativePath,
+    checksum,
+    size: buffer.length,
+    // textContent is stored so search works immediately. For born-digital
+    // PDFs, this is the exact text in the PDF (pdftotext would extract it).
+    // For scanned PDFs, this is the text that OCR would recognize (we're
+    // pre-populating it to avoid needing OCR at seed time).
+    textContent,
+    pdfMode: actualMode,
+  };
 }
 
 interface DocSeed {
@@ -287,6 +386,8 @@ async function seedDocuments(unionIdByName: Record<string, string>, userIdByEmai
   console.log("\nSeeding demo documents...");
   const registrarId = userIdByEmail["registrar@example.com"];
   let created = 0;
+  let bornDigitalCount = 0;
+  let scannedCount = 0;
 
   for (const seed of DOC_SEEDS) {
     const unionId = unionIdByName[seed.unionName];
@@ -299,6 +400,13 @@ async function seedDocuments(unionIdByName: Record<string, string>, userIdByEmai
     if (existing) {
       continue; // idempotent — skip
     }
+
+    // Look up the union to get its name + registration number for the text content.
+    const union = await db.union.findUnique({
+      where: { id: unionId },
+      select: { unionName: true, registrationNo: true },
+    });
+    if (!union) continue;
 
     // Create the Document row first (we need its ID for the file path).
     const documentId = crypto.randomUUID();
@@ -318,18 +426,26 @@ async function seedDocuments(unionIdByName: Record<string, string>, userIdByEmai
       continue;
     }
 
-    // Write the version file to disk.
-    const content = `Placeholder content for ${seed.fileName} (${seed.documentType}) — Union Records Management System demo data.`;
-    const { relativePath, checksum, size } = await writeVersionFile(
+    // Generate a real PDF file (born-digital or scanned).
+    const { relativePath, checksum, size, textContent, pdfMode } = await writeVersionFile(
       unionId,
       documentId,
       1,
-      content,
+      seed.documentType,
+      union.unionName,
+      union.registrationNo,
+      seed.fileName,
+      seed.filedDaysAgo,
     );
+
+    if (pdfMode === "born-digital") bornDigitalCount++;
+    else if (pdfMode === "scanned") scannedCount++;
 
     const uploadedAt = daysAgo(seed.filedDaysAgo);
 
     // Create Document + DocumentVersion in a transaction.
+    // textContent is populated directly so search works immediately
+    // (no need to run the backfill/extract-text script after seeding).
     const versionId = crypto.randomUUID();
     await db.$transaction(async (tx) => {
       await tx.document.create({
@@ -353,13 +469,15 @@ async function seedDocuments(unionIdByName: Record<string, string>, userIdByEmai
           fileExtension: ".pdf",
           uploadedById: registrarId,
           uploadedAt,
+          textContent, // populated at seed time — search works immediately
         },
       });
     });
     created++;
+    console.log(`  ✓ ${union.unionName} — ${seed.documentType} [${pdfMode}]`);
   }
 
-  console.log(`  ✓ ${created} documents processed`);
+  console.log(`  ✓ ${created} documents processed (${bornDigitalCount} born-digital, ${scannedCount} scanned)`);
 }
 
 // -----------------------------------------------------------------------------

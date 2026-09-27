@@ -1,27 +1,28 @@
 import { db } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { sendSMS, truncateForSms } from "@/lib/sms";
 import { NotificationType } from "@prisma/client";
 
 // =============================================================================
 // Notification helper — the single entry point for creating notifications.
 //
 // This replaces the scattered `db.notification.create({ ... })` calls across
-// 6+ routes with a centralized function that:
+// 7+ routes with a centralized function that:
 //   1. Creates the in-app notification (the bell icon) — with dedupKey
 //   2. Sends an email if the user has emailNotificationsEnabled = true
-//   3. Records email delivery status (emailSentAt / emailError) on the
-//      notification row
+//   3. Sends an SMS if the user has smsNotificationsEnabled = true + phone
+//   4. Sends a WhatsApp message if whatsappNotificationsEnabled = true + phone
+//   5. Records delivery status for all channels (emailSentAt/emailError,
+//      smsSentAt/smsError)
 //
 // The dedupKey prevents duplicate notifications — if a notification with
 // the same dedupKey already exists, the DB unique constraint fires + the
-// function returns { created: false, notification: null }. The caller
-// should treat this as a no-op (not an error).
+// function returns { created: false }. The caller should treat this as
+// a no-op (not an error).
 //
-// EMAIL FAILURES ARE NON-FATAL:
-//   If email sending fails, the in-app notification is still created.
-//   The emailError field is set for diagnostics. A future retry cron
-//   could query notifications where emailSentAt IS NULL AND emailError
-//   IS NOT NULL AND createdAt > (now - 24h) and retry.
+// ALL CHANNEL FAILURES ARE NON-FATAL:
+//   If email/SMS/WhatsApp sending fails, the in-app notification is still
+//   created. The error fields are set for diagnostics.
 // =============================================================================
 
 export interface CreateNotificationParams {
@@ -33,7 +34,7 @@ export interface CreateNotificationParams {
   emailNotificationsEnabled: boolean;
   /** Notification type (COMPLIANCE or TASK). */
   type: NotificationType;
-  /** Short title (shown in the bell dropdown + email subject). */
+  /** Short title (shown in the bell dropdown + email subject + SMS body). */
   title: string;
   /** Body text (shown in the bell dropdown + email body). */
   body: string;
@@ -41,6 +42,13 @@ export interface CreateNotificationParams {
   dedupKey: string;
   /** Optional link URL (where clicking the notification takes the user). */
   linkUrl?: string;
+  // --- SMS/WhatsApp channel params (optional — callers without these skip SMS) ---
+  /** User's phone number in E.164 format (e.g. +67512345678). */
+  phone?: string | null;
+  /** Whether the user has SMS notifications enabled. */
+  smsNotificationsEnabled?: boolean;
+  /** Whether the user has WhatsApp notifications enabled. */
+  whatsappNotificationsEnabled?: boolean;
 }
 
 export interface CreateNotificationResult {
@@ -52,76 +60,113 @@ export interface CreateNotificationResult {
   emailSent: boolean | null;
   /** Email error message (if email was attempted + failed). */
   emailError: string | null;
+  /** Whether the SMS was sent successfully (null if not attempted). */
+  smsSent: boolean | null;
+  /** SMS error message (if SMS was attempted + failed). */
+  smsError: string | null;
 }
 
 /**
- * Create a notification + send an email (if enabled).
+ * Create a notification + send email/SMS/WhatsApp (as enabled).
  *
  * This is the SINGLE function all routes should call instead of
  * `db.notification.create()`. It handles:
  *   - dedupKey uniqueness (returns created: false on collision)
  *   - email sending (if the user has emailNotificationsEnabled)
- *   - email delivery tracking (emailSentAt / emailError)
- *   - graceful failure (email errors don't prevent the notification)
+ *   - SMS sending (if smsNotificationsEnabled + phone provided)
+ *   - WhatsApp sending (if whatsappNotificationsEnabled + phone provided)
+ *   - delivery tracking (emailSentAt/emailError, smsSentAt/smsError)
+ *   - graceful failure (channel errors don't prevent the notification)
  *
  * @returns CreateNotificationResult — never throws.
  */
 export async function createNotification(
   params: CreateNotificationParams,
 ): Promise<CreateNotificationResult> {
-  const { userId, userEmail, emailNotificationsEnabled, type, title, body, dedupKey, linkUrl } = params;
+  const {
+    userId, userEmail, emailNotificationsEnabled,
+    phone, smsNotificationsEnabled, whatsappNotificationsEnabled,
+    type, title, body, dedupKey, linkUrl,
+  } = params;
 
   // --- 1. Create the in-app notification (with dedup) ---
   let notificationId: string | null = null;
   try {
     const notification = await db.notification.create({
-      data: {
-        userId,
-        type,
-        title,
-        body,
-        dedupKey,
-        linkUrl: linkUrl || null,
-      },
+      data: { userId, type, title, body, dedupKey, linkUrl: linkUrl || null },
       select: { id: true },
     });
     notificationId = notification.id;
   } catch {
     // dedupKey unique constraint violation — notification already exists.
-    return { created: false, notification: null, emailSent: null, emailError: null };
+    return { created: false, notification: null, emailSent: null, emailError: null, smsSent: null, smsError: null };
   }
 
   // --- 2. Send email (if enabled) ---
-  if (!emailNotificationsEnabled) {
-    return { created: true, notification: { id: notificationId }, emailSent: null, emailError: null };
+  let emailSent: boolean | null = null;
+  let emailError: string | null = null;
+
+  if (emailNotificationsEnabled) {
+    const emailResult = await sendEmail({
+      to: userEmail,
+      subject: title,
+      html: renderEmailTemplate(title, body, linkUrl),
+      text: `${title}\n\n${body}\n${linkUrl ? `\nView: ${linkUrl}` : ""}`,
+    });
+    emailSent = emailResult.success;
+    emailError = emailResult.success ? null : (emailResult.error || "Unknown error");
   }
 
-  const emailResult = await sendEmail({
-    to: userEmail,
-    subject: title,
-    html: renderEmailTemplate(title, body, linkUrl),
-    text: `${title}\n\n${body}\n${linkUrl ? `\nView: ${linkUrl}` : ""}`,
-  });
+  // --- 3. Send SMS (if enabled + phone provided) ---
+  let smsSent: boolean | null = null;
+  let smsError: string | null = null;
 
-  // --- 3. Record email delivery status ---
-  try {
-    await db.notification.update({
-      where: { id: notificationId },
-      data: {
-        emailSentAt: emailResult.success ? new Date() : null,
-        emailError: emailResult.success ? null : (emailResult.error || "Unknown error"),
-      },
-    });
-  } catch {
-    // If the update fails (e.g. notification was deleted between create + update),
-    // we don't care — the email was still sent (or not). Non-fatal.
+  if (smsNotificationsEnabled && phone) {
+    const smsBody = truncateForSms(`${title}\n\n${body}`);
+    const smsResult = await sendSMS({ to: phone, body: smsBody, whatsapp: false });
+    smsSent = smsResult.success;
+    smsError = smsResult.success ? null : (smsResult.error || "Unknown error");
+  }
+
+  // --- 4. Send WhatsApp (if enabled + phone provided) ---
+  if (whatsappNotificationsEnabled && phone) {
+    const waBody = `${title}\n\n${body}${linkUrl ? `\n\nView: ${linkUrl}` : ""}`;
+    const waResult = await sendSMS({ to: phone, body: waBody, whatsapp: true });
+    // If SMS was also sent, we keep both results. The smsSentAt tracks the
+    // last SMS-channel attempt (WhatsApp is technically a separate channel
+    // but uses the same Twilio client). For simplicity, we track WhatsApp
+    // delivery in the same smsSentAt/smsError fields — if both are enabled,
+    // the last one wins. A future schema change could add separate fields.
+    if (smsSent === null || !smsSent) {
+      smsSent = waResult.success;
+      smsError = waResult.success ? null : (waResult.error || "Unknown error");
+    }
+  }
+
+  // --- 5. Record delivery status for all channels ---
+  if (notificationId) {
+    try {
+      await db.notification.update({
+        where: { id: notificationId },
+        data: {
+          emailSentAt: emailSent ? new Date() : null,
+          emailError,
+          smsSentAt: smsSent ? new Date() : null,
+          smsError,
+        },
+      });
+    } catch {
+      // Non-fatal — the notification was still created + messages may have been sent.
+    }
   }
 
   return {
     created: true,
-    notification: { id: notificationId },
-    emailSent: emailResult.success,
-    emailError: emailResult.success ? null : (emailResult.error || null),
+    notification: notificationId ? { id: notificationId } : null,
+    emailSent,
+    emailError,
+    smsSent,
+    smsError,
   };
 }
 
@@ -180,10 +225,19 @@ function escapeHtml(text: string): string {
 export async function getUserNotificationPrefs(userId: string): Promise<{
   email: string;
   emailNotificationsEnabled: boolean;
+  phone: string | null;
+  smsNotificationsEnabled: boolean;
+  whatsappNotificationsEnabled: boolean;
 } | null> {
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { email: true, emailNotificationsEnabled: true },
+    select: {
+      email: true,
+      emailNotificationsEnabled: true,
+      phone: true,
+      smsNotificationsEnabled: true,
+      whatsappNotificationsEnabled: true,
+    },
   });
   return user;
 }
@@ -195,7 +249,7 @@ export async function getUserNotificationPrefs(userId: string): Promise<{
  */
 export async function createNotificationForUsers(
   userIds: string[],
-  params: Omit<CreateNotificationParams, "userId" | "userEmail" | "emailNotificationsEnabled">,
+  params: Omit<CreateNotificationParams, "userId" | "userEmail" | "emailNotificationsEnabled" | "phone" | "smsNotificationsEnabled" | "whatsappNotificationsEnabled">,
 ): Promise<CreateNotificationResult[]> {
   const results: CreateNotificationResult[] = [];
   for (const userId of userIds) {
@@ -206,6 +260,9 @@ export async function createNotificationForUsers(
       userId,
       userEmail: prefs.email,
       emailNotificationsEnabled: prefs.emailNotificationsEnabled,
+      phone: prefs.phone,
+      smsNotificationsEnabled: prefs.smsNotificationsEnabled,
+      whatsappNotificationsEnabled: prefs.whatsappNotificationsEnabled,
     });
     results.push(result);
   }

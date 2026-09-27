@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Shield, QrCode, KeyRound, Loader2, Smartphone, Monitor, MapPin, Trash2, X } from "lucide-react";
+import { Shield, QrCode, KeyRound, Loader2, Smartphone, Monitor, MapPin, Trash2, X, Bell, MessageSquare, Mail, Globe, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +69,7 @@ export function AccountSecurityView({ user }: { user: AuthUser }) {
       </div>
 
       <TwoFactorSection user={user} />
+      <NotificationPreferencesSection />
       <SessionsSection />
     </div>
   );
@@ -465,6 +467,178 @@ function SessionsSection() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No active sessions.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Notification Preferences section (email / SMS / WhatsApp)
+// -----------------------------------------------------------------------------
+
+interface NotificationPrefs {
+  emailNotificationsEnabled: boolean;
+  phone: string | null;
+  phoneVerifiedAt: string | null;
+  smsNotificationsEnabled: boolean;
+  whatsappNotificationsEnabled: boolean;
+}
+
+function NotificationPreferencesSection() {
+  const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+
+  // Load current preferences on mount
+  useState(() => {
+    fetch("/api/auth/me/preferences", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setPrefs(data);
+          setPhoneInput(data.phone || "");
+        }
+      })
+      .catch(() => toast.error("Failed to load notification preferences."))
+      .finally(() => setLoading(false));
+  });
+
+  async function updatePrefs(updates: Partial<NotificationPrefs>) {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/auth/me/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update preferences.");
+        return;
+      }
+      setPrefs(data);
+      toast.success("Notification preferences updated.");
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function savePhone() {
+    await updatePrefs({ phone: phoneInput.trim() || null });
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" />Notification Preferences</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-32 animate-pulse rounded-md bg-muted" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" />Notification Preferences</CardTitle>
+        <CardDescription>
+          Choose how you want to receive compliance alerts, task assignments, and review notifications.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Email toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-primary/10 p-2"><Mail className="h-4 w-4 text-primary" /></div>
+            <div>
+              <p className="text-sm font-medium">Email Notifications</p>
+              <p className="text-xs text-muted-foreground">Receive notifications via email.</p>
+            </div>
+          </div>
+          <Switch
+            checked={prefs?.emailNotificationsEnabled ?? true}
+            disabled={saving}
+            onCheckedChange={(checked) => {
+              updatePrefs({ emailNotificationsEnabled: checked });
+              setPrefs(prev => prev ? { ...prev, emailNotificationsEnabled: checked } : prev);
+            }}
+          />
+        </div>
+
+        {/* Phone number input */}
+        <div className="space-y-2 border-t pt-4">
+          <Label htmlFor="phone">Mobile Phone Number</Label>
+          <div className="flex gap-2">
+            <Input
+              id="phone"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="+675 1234 5678"
+              className="flex-1"
+            />
+            <Button onClick={savePhone} disabled={saving} variant="outline" size="sm">
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Enter your number in international format (e.g. +675 1234 5678). Required for SMS and WhatsApp notifications.
+            {prefs?.phone && prefs.phoneVerifiedAt && (
+              <Badge variant="outline" className="ml-2 text-xs text-green-600">Verified</Badge>
+            )}
+          </p>
+        </div>
+
+        {/* SMS toggle */}
+        <div className="flex items-center justify-between border-t pt-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-primary/10 p-2"><MessageSquare className="h-4 w-4 text-primary" /></div>
+            <div>
+              <p className="text-sm font-medium">SMS Notifications</p>
+              <p className="text-xs text-muted-foreground">Receive short text alerts on your phone.</p>
+            </div>
+          </div>
+          <Switch
+            checked={prefs?.smsNotificationsEnabled ?? false}
+            disabled={saving || !prefs?.phone}
+            onCheckedChange={(checked) => {
+              updatePrefs({ smsNotificationsEnabled: checked });
+              setPrefs(prev => prev ? { ...prev, smsNotificationsEnabled: checked } : prev);
+            }}
+          />
+        </div>
+
+        {/* WhatsApp toggle */}
+        <div className="flex items-center justify-between border-t pt-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-primary/10 p-2"><Globe className="h-4 w-4 text-primary" /></div>
+            <div>
+              <p className="text-sm font-medium">WhatsApp Notifications</p>
+              <p className="text-xs text-muted-foreground">Receive messages via WhatsApp (cheaper than SMS).</p>
+            </div>
+          </div>
+          <Switch
+            checked={prefs?.whatsappNotificationsEnabled ?? false}
+            disabled={saving || !prefs?.phone}
+            onCheckedChange={(checked) => {
+              updatePrefs({ whatsappNotificationsEnabled: checked });
+              setPrefs(prev => prev ? { ...prev, whatsappNotificationsEnabled: checked } : prev);
+            }}
+          />
+        </div>
+
+        {!prefs?.phone && (
+          <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            Enter your phone number above to enable SMS and WhatsApp notifications.
+          </p>
         )}
       </CardContent>
     </Card>

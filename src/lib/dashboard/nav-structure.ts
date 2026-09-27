@@ -47,7 +47,7 @@
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
   ListTodo, Calendar, ScrollText, Users, Shield, Key, FileCheck, Home,
-  Scale, type LucideIcon,
+  Scale, Contact as AddressBook, type LucideIcon,
 } from "lucide-react";
 
 /** The three staff roles. Matches AuthUser["role"] in app-shell.tsx. */
@@ -170,6 +170,12 @@ export const NAV_STRUCTURE: NavGroup[] = [
         label: "Review Queue",
         route: "reviews",
         icon: FileCheck,
+        roles: ["REGISTRAR"],
+      },
+      {
+        label: "Contact Updates",
+        route: "contact-requests",
+        icon: AddressBook,
         roles: ["REGISTRAR"],
       },
     ],

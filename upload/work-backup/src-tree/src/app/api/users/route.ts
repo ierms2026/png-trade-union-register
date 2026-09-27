@@ -134,26 +134,24 @@ export async function POST(req: NextRequest) {
   // role — required, must be one of the enum values
   if (
     typeof body.role !== "string" ||
-    !["REGISTRAR", "INSPECTOR", "OFFICER"].includes(body.role)
+    !["REGISTRAR", "INSPECTOR", "OFFICER", "REPRESENTATIVE"].includes(body.role)
   ) {
     return NextResponse.json(
-      { error: "Field 'role' is required and must be one of: REGISTRAR, INSPECTOR, OFFICER." },
+      { error: "Field 'role' is required and must be one of: REGISTRAR, INSPECTOR, OFFICER, REPRESENTATIVE." },
       { status: 400 },
     );
   }
 
-  // assignedUnionId — required for OFFICER, must be null for others.
-  // Per spec, Officers are scoped to exactly one union; Registrars and
-  // Inspectors have no scoping. We enforce this at creation time — the
-  // alternative (allow any role to have an assignedUnionId, ignore it for
-  // non-Officers) would create confusing audit trails.
-  if (body.role === "OFFICER") {
+  // assignedUnionId — required for OFFICER + REPRESENTATIVE, must be null
+  // for others. Per spec, Officers and Representatives are scoped to
+  // exactly one union; Registrars and Inspectors have no scoping.
+  if (body.role === "OFFICER" || body.role === "REPRESENTATIVE") {
     if (
       typeof body.assignedUnionId !== "string" ||
       body.assignedUnionId.trim().length === 0
     ) {
       return NextResponse.json(
-        { error: "Field 'assignedUnionId' is required when role is OFFICER." },
+        { error: `Field 'assignedUnionId' is required when role is ${body.role}.` },
         { status: 400 },
       );
     }
@@ -172,7 +170,7 @@ export async function POST(req: NextRequest) {
     if (body.assignedUnionId !== undefined && body.assignedUnionId !== null) {
       return NextResponse.json(
         {
-          error: `Field 'assignedUnionId' must be null when role is ${body.role}. Only Officers are scoped to a union.`,
+          error: `Field 'assignedUnionId' must be null when role is ${body.role}. Only Officers and Representatives are scoped to a union.`,
         },
         { status: 400 },
       );
@@ -182,7 +180,9 @@ export async function POST(req: NextRequest) {
   const email = body.email.trim().toLowerCase();
   const role = body.role as Role;
   const assignedUnionId =
-    role === Role.OFFICER ? (body.assignedUnionId as string) : null;
+    role === Role.OFFICER || role === Role.REPRESENTATIVE
+      ? (body.assignedUnionId as string)
+      : null;
 
   // --- 3. Check for duplicate email (409 if exists) -------------------------
   const existing = await db.user.findUnique({ where: { email } });

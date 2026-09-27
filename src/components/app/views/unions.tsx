@@ -18,6 +18,7 @@ import {
   Plus,
   Globe,
   EyeOff,
+  FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -286,6 +287,12 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
             Register New Union
           </Button>
         )}
+        <a href="/api/export/unions" target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" className="gap-2">
+            <FileDown className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </a>
       </div>
 
       {/* Filter box — reactive, no submit button (same pattern as public portal) */}

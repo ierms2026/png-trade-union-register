@@ -7,7 +7,7 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 import { getExpiryForecast, getNeedsAttention, type ComplianceCell, type UnionSummary } from "@/lib/dashboard/metrics";
 import { getComplianceTrend } from "@/lib/dashboard/snapshot";
 import { STATUS_CONFIG, EXPIRING_WINDOW_DAYS } from "@/lib/dashboard/status-config";
-import { ArrowLeft, Printer, FileText, AlertTriangle, CheckCircle2, XCircle, FileQuestion, Ban } from "lucide-react";
+import { ArrowLeft, Printer, FileText, AlertTriangle, CheckCircle2, XCircle, FileQuestion, Ban, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,7 +129,21 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
           <Button asChild variant="ghost" size="sm">
             <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" />Back to Dashboard</Link>
           </Button>
-          <PrintButton />
+          <div className="flex items-center gap-2">
+            <a href="/api/export/compliance-matrix" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                Matrix CSV
+              </Button>
+            </a>
+            <a href="/api/export/expiry-forecast" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                Forecast CSV
+              </Button>
+            </a>
+            <PrintButton />
+          </div>
         </div>
       </header>
 

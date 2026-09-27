@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ScrollText, Search, ChevronDown, ChevronRight, Filter } from "lucide-react";
+import { ScrollText, Search, ChevronDown, ChevronRight, Filter, FileDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,11 +88,19 @@ export function AuditView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
-        <p className="text-sm text-muted-foreground">
-          Complete record of all system actions. Filterable by entity, action, actor, and date range.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+          <p className="text-sm text-muted-foreground">
+            Complete record of all system actions. Filterable by entity, action, actor, and date range.
+          </p>
+        </div>
+        <a href={`/api/export/audit?entityType=${encodeURIComponent(entityType)}&action=${encodeURIComponent(action)}&actor=${encodeURIComponent(actor)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`} target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" className="gap-2">
+            <FileDown className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </a>
       </div>
 
       {/* Filters */}

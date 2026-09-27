@@ -39,21 +39,26 @@ export async function GET(req: NextRequest) {
   }
 
   // Role-based scoping:
-  //   REGISTRAR → all tasks
-  //   INSPECTOR → tasks assigned to them only (assigneeId = self)
-  //   OFFICER   → tasks in their union OR assigned to them
+  //   REGISTRAR     → all tasks
+  //   INSPECTOR     → tasks assigned to them only (assigneeId = self)
+  //   OFFICER       → tasks in their union OR assigned to them
+  //   REPRESENTATIVE → tasks in their union (chunk 5 — read-only view
+  //                   from the union self-service portal; reps don't get
+  //                   tasks assigned to them personally)
+  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
   const where: Record<string, unknown> =
     user.role === Role.REGISTRAR
       ? {}
       : user.role === Role.INSPECTOR
         ? { assigneeId: user.id }
-        : // OFFICER
-          {
-            OR: [
-              ...(user.assignedUnionId ? [{ unionId: user.assignedUnionId }] : []),
-              { assigneeId: user.id },
-            ],
-          };
+        : isUnionScopedRole
+          ? {
+              OR: [
+                ...(user.assignedUnionId ? [{ unionId: user.assignedUnionId }] : []),
+                { assigneeId: user.id },
+              ],
+            }
+          : {};
 
   const tasks = await db.task.findMany({
     where,

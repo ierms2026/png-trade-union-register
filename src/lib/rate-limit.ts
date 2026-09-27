@@ -173,6 +173,9 @@ export const RATE_LIMITS = {
   documentDownload: { max: 30, windowMs: 60_000 },
   documentRestore: { max: 10, windowMs: 60_000 },
   publicSearch: { max: 60, windowMs: 60_000 },
+  // Chunk 6: full-text search — 30 queries/min per user. Generous for
+  // interactive use (a Registrar doing iterative searches), blocks scraping.
+  search: { max: 30, windowMs: 60_000 },
 } as const;
 
 // =============================================================================

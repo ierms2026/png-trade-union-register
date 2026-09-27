@@ -248,8 +248,8 @@ function CreateUserDialog({
     const newErrors = { email: validateEmail(email) };
     setErrors(newErrors);
     if (!isValid(newErrors)) return;
-    if (role === "OFFICER" && unionId === "none") {
-      setErrors({ ...newErrors, unionId: "Officer must be assigned to a union." });
+    if ((role === "OFFICER" || role === "REPRESENTATIVE") && unionId === "none") {
+      setErrors({ ...newErrors, unionId: `${role === "OFFICER" ? "Officer" : "Representative"} must be assigned to a union.` });
       return;
     }
 
@@ -259,7 +259,7 @@ function CreateUserDialog({
         email: email.trim().toLowerCase(),
         role,
       };
-      if (role === "OFFICER" && unionId !== "none") {
+      if ((role === "OFFICER" || role === "REPRESENTATIVE") && unionId !== "none") {
         body.assignedUnionId = unionId;
       }
       const res = await fetch("/api/users", {
@@ -336,10 +336,11 @@ function CreateUserDialog({
                   <SelectItem value="REGISTRAR">Registrar</SelectItem>
                   <SelectItem value="INSPECTOR">Inspector</SelectItem>
                   <SelectItem value="OFFICER">Officer</SelectItem>
+                  <SelectItem value="REPRESENTATIVE">Union Representative</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {role === "OFFICER" && (
+            {(role === "OFFICER" || role === "REPRESENTATIVE") && (
               <div className="space-y-2">
                 <Label>Assigned Union</Label>
                 <Select value={unionId} onValueChange={setUnionId}>
