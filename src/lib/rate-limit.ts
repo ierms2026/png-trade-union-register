@@ -173,9 +173,12 @@ export const RATE_LIMITS = {
   documentDownload: { max: 30, windowMs: 60_000 },
   documentRestore: { max: 10, windowMs: 60_000 },
   publicSearch: { max: 60, windowMs: 60_000 },
-  // Chunk 6: full-text search — 30 queries/min per user. Generous for
-  // interactive use (a Registrar doing iterative searches), blocks scraping.
   search: { max: 30, windowMs: 60_000 },
+  // Chunk 9: v1 API + webhook delivery rate limits.
+  // apiV1: 120/min per API key — generous for integration, blocks abuse.
+  // webhook: 60/min per endpoint — outbound delivery budget.
+  apiV1: { max: 120, windowMs: 60_000 },
+  webhook: { max: 60, windowMs: 60_000 },
 } as const;
 
 // =============================================================================

@@ -63,6 +63,7 @@ const PRE_CHUNK_ROUTES = [
   "users",
   "security",
   "api-keys",
+  "webhooks",
   "legislation",
 ] as const;
 
@@ -88,9 +89,9 @@ describe("nav-structure — NAV_STRUCTURE config (chunk 6.3)", () => {
     expect(dropdowns.map((g) => g.label)).toEqual(["Unions", "Compliance", "Admin"]);
   });
 
-  it("all 15 destinations are present (13 original + legislation + contact-requests)", () => {
+  it("all 16 destinations are present (13 original + legislation + contact-requests + webhooks)", () => {
     const allRoutes = getAllRoutes();
-    expect(allRoutes).toHaveLength(15);
+    expect(allRoutes).toHaveLength(16);
   });
 
   it("every destination has a non-empty label + route + icon + roles array", () => {
@@ -114,7 +115,7 @@ describe("nav-structure — deep-link preservation (DONE WHEN criterion)", () =>
     }
   });
 
-  it("NAV_STRUCTURE introduces NO new routes (only the pre-chunk 15)", () => {
+  it("NAV_STRUCTURE introduces NO new routes (only the pre-chunk 16)", () => {
     const allRoutes = getAllRoutes();
     const preChunkSet = new Set(PRE_CHUNK_ROUTES);
     const newRoutes = allRoutes.filter((r) => !preChunkSet.has(r as typeof PRE_CHUNK_ROUTES[number]));
@@ -213,11 +214,11 @@ describe("nav-structure — route smoke test (DONE WHEN criterion)", () => {
 });
 
 describe("nav-structure — getNavForRole (role filtering)", () => {
-  it("REGISTRAR sees all 5 groups (15 destinations accessible — my-union is OFFICER-only)", () => {
+  it("REGISTRAR sees all 5 groups (16 destinations accessible — my-union is OFFICER-only)", () => {
     const nav = getNavForRole("REGISTRAR");
     expect(nav).toHaveLength(5);
     const allRoutes = nav.flatMap((g) => g.destinations.map((d) => d.route));
-    expect(allRoutes).toHaveLength(14); // all 15 minus my-union
+    expect(allRoutes).toHaveLength(15); // all 16 minus my-union
     expect(allRoutes).not.toContain("my-union");
   });
 

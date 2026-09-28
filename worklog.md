@@ -388,3 +388,105 @@ Stage Summary:
   fixed and documented.
 - Three screenshots captured: confirm dialog, token display, and the
   Users view with the new button.
+
+---
+Task ID: 16
+Agent: main (continuation)
+Task: Chunk 9 — API expansion for external integrations (v1 REST API + webhook system)
+
+Work Log:
+- **9-a: Schema changes.** Added to `prisma/schema.prisma`:
+  * `WebhookEventType` enum (5 values: COMPLIANCE_STATUS_CHANGE, DOCUMENT_UPLOADED, DOCUMENT_REVIEWED, CONTACT_UPDATE_SUBMITTED, CONTACT_UPDATE_REVIEWED)
+  * `WebhookDeliveryStatus` enum (PENDING, DELIVERED, FAILED)
+  * `WebhookEndpoint` model: id, url, name, events (comma-separated), secret (HMAC signing), active, createdById, timestamps. Indexes on [active].
+  * `WebhookDelivery` model: id, endpointId, eventId, eventType, payload (JSON string), status, attempts, maxAttempts, lastResponseCode, lastError, nextRetryAt, firstAttemptAt, deliveredAt, timestamps. Indexes on [endpointId, status], [status, nextRetryAt], [eventType]. Cascade-delete with endpoint.
+  * Back-relation on User: `webhookEndpoints WebhookEndpoint[] @relation("WebhookEndpointCreator")`
+  * Added 2 new scopes to ALLOWED_SCOPES: `unions:read:pii` (PII-elevated read) + `webhooks:manage` (manage webhook endpoints)
+  * Added 2 rate-limit buckets: `apiV1` (120/min) + `webhook` (60/min per endpoint)
+
+- **9-b: Webhook dispatcher module.** Created `src/lib/webhooks/dispatcher.ts`:
+  * `dispatchEvent(event)` — finds all active endpoints subscribed to the event type, creates a WebhookDelivery row per endpoint (PENDING), attempts immediate delivery
+  * `attemptDelivery(deliveryId, endpoint, payloadJson)` — performs the HTTP POST with HMAC-SHA256 signature, updates the delivery row with result
+  * `processPendingDeliveries()` — called by the retry cron, picks up PENDING rows with nextRetryAt <= now
+  * `signPayload(payload, secret, timestamp)` — HMAC-SHA256 over `${timestamp}.${payload}`, returns `sha256=<hex>`
+  * `verifySignature(...)` — constant-time comparison (for receivers + testing)
+  * `generateWebhookSecret()` — 32-byte hex secret
+  * Retry strategy: exponential backoff (1min, 5min, 25min, 2h, 10h — 5 attempts max)
+  * Rate-limited: 60 deliveries/min per endpoint (blocks runaway retry loops)
+  * Headers: X-URM-Signature, X-URM-Event, X-URM-Delivery, X-URM-Timestamp, User-Agent
+
+- **9-c: Compliance-sweep cron wired to fire webhooks.** Updated
+  `src/app/api/cron/compliance-sweep/route.ts`:
+  * After computing the matrix + generating notifications, dispatches COMPLIANCE_STATUS_CHANGE events for all unions with EXPIRING or OVERDUE cells
+  * Compares against yesterday's ComplianceSnapshot (chunk 4.2a) — if no snapshot exists, no webhooks fire (first run)
+  * Best-effort: webhook dispatch failure doesn't block the sweep
+  * Response now includes `webhookEventsDispatched` count
+
+- **9-d: Webhook retry cron.** Created `src/app/api/cron/webhook-retry/route.ts`:
+  * POST handler with Bearer-token auth (CRON_SECRET, constant-time comparison)
+  * Calls `processPendingDeliveries()` — picks up PENDING deliveries whose nextRetryAt has passed
+  * Recommended schedule: every 5 minutes
+
+- **9-e: v1 REST API endpoints.** Created 3 new endpoints under `/api/v1/`:
+  * `GET /api/v1/compliance/status?unionId=...` — machine-readable compliance status for a single union. Returns union info, overallScore, summary counts (compliant/expiring/overdue/missing/notApplicable), + per-requirement details with daysUntilExpiry. Requires `compliance:read` scope. Officer/Rep scoped.
+  * `GET /api/v1/unions/export` — bulk union data export for data warehouse integration. Returns all unions (or scoped to assigned union for Officer/Rep). PII fields (contactEmail, contactPhone, contactPerson, address) gated behind `unions:read:pii` scope. Requires `unions:read` scope.
+  * `POST /api/v1/unions/[unionId]/documents` — external document submission. Mirrors the existing internal upload route but uses API key auth (`documents:write` scope). Same file validation (PDF magic bytes + integrity), versioning, duplicate detection, atomic write. ALL submissions enter PENDING review queue — Registrar must approve. Fires DOCUMENT_UPLOADED webhook event. Rate-limited: apiV1 (120/min) + documentUpload (10/min).
+  * All 3 endpoints: rate-limited with X-RateLimit-* headers on every response, role-scoped (Officer/Representative can only access their own union's data)
+
+- **9-f: Webhook admin API.** Created 4 endpoints under `/api/webhooks/`:
+  * `GET /api/webhooks` — list all endpoints (REGISTRAR only, session-only — no API keys for admin actions)
+  * `POST /api/webhooks` — register a new endpoint (URL + name + events). Generates signing secret, returns it ONCE.
+  * `DELETE /api/webhooks/[id]` — delete an endpoint (cascades to delivery history)
+  * `PATCH /api/webhooks/[id]` — toggle active/inactive or update events
+  * `GET /api/webhooks/[id]/deliveries` — view delivery log (recent deliveries with status, attempts, response codes, timestamps). Filterable by status.
+
+- **9-g: Existing export routes opened to API keys.** Updated 6 export routes from `getAuthUser` → `getAuthUserOrApiKey` + added scope checks:
+  * `/api/export/audit` — requires `audit:read`
+  * `/api/export/compliance-matrix` — requires `compliance:read`
+  * `/api/export/expiry-forecast` — requires `compliance:read`
+  * `/api/export/stats` — requires `compliance:read`
+  * `/api/export/trend` — requires `compliance:read`
+  * `/api/export/unions` — requires `unions:read`
+  * (Previously only `/api/export/compliance` accepted API keys — now all 7 do.)
+
+- **9-h: Webhook admin UI.** Created `src/components/app/views/webhooks.tsx`:
+  * List view: all endpoints with name, URL, active/inactive badge, pending-deliveries count, event subscriptions, "Deliveries" + "Delete" buttons
+  * Create dialog: name + URL + event-type checkboxes (empty = all events). Signing secret shown ONCE after creation with copy-to-clipboard.
+  * Deliveries dialog: recent deliveries for an endpoint with status badges, attempt counts, response codes, error messages, retry timestamps
+  * Wired into page.tsx (`case "webhooks": return <WebhooksView />`) + nav-structure.ts (under Admin group, REGISTRAR-only, Webhook icon)
+
+- **9-i: Tests.** Created `src/lib/__tests__/webhook-dispatcher.test.ts` with 10 tests:
+  * signPayload returns correct format (sha256=<64 hex>)
+  * verifySignature true for valid signature
+  * verifySignature false for tampered payload (different text)
+  * verifySignature false for wrong secret
+  * verifySignature false for wrong timestamp (replay protection)
+  * verifySignature false for malformed signature header
+  * Signatures are deterministic (same inputs → same output)
+  * Different secrets produce different signatures
+  * generateWebhookSecret returns 64-char hex
+  * generateWebhookSecret returns unique secrets (100/100 unique)
+  Updated dashboard-nav.test.ts: 16 destinations (was 15), REGISTRAR sees 15 (was 14).
+
+- **9-j: Smoke test via curl + agent-browser.**
+  * Created a test API key with all v1 scopes via DB
+  * `GET /api/v1/compliance/status` → returned full compliance status for East Sepik Fisherfolk Cooperative (summary: 0 compliant, 13 missing; per-requirement details with daysUntilExpiry) ✓
+  * `GET /api/v1/unions/export` → returned 6 unions with PII fields (contactEmail, contactPhone, contactPerson, address) included because the key has `unions:read:pii` ✓
+  * No API key → 401 ✓
+  * Rate-limit headers present: X-RateLimit-Limit: 120, X-RateLimit-Remaining: 116 ✓
+  * Webhook admin UI: navigated to Admin → Webhooks, registered a test endpoint (https://httpbin.org/status/200), saw the signing secret displayed once, endpoint appeared in the list ✓
+  * Screenshots saved: webhooks-empty.png, webhooks-with-endpoint.png
+
+- **9-k: Full test suite green.** `npx vitest run` → 27 files, 545 tests, all passing (was 535 + 10 new webhook tests).
+
+Stage Summary:
+- 3 new v1 REST API endpoints under `/api/v1/*` (versioned namespace for external integrations)
+- Full webhook system: WebhookEndpoint + WebhookDelivery models, HMAC-SHA256 signing, exponential backoff retry (5 attempts: 1min/5min/25min/2h/10h), delivery log with per-endpoint rate limiting, admin UI for endpoint management
+- Compliance-sweep cron fires COMPLIANCE_STATUS_CHANGE webhooks on status changes
+- Webhook retry cron (every 5 min) picks up pending deliveries
+- 6 existing export routes opened to API keys (parity with /api/export/compliance)
+- 2 new scopes: `unions:read:pii` (PII-elevated) + `webhooks:manage`
+- 2 new rate-limit buckets: `apiV1` (120/min) + `webhook` (60/min per endpoint)
+- External document submissions enter the PENDING review queue (Registrar gate)
+- 10 new tests for webhook signing/verification + secret generation
+- 545 tests passing across 27 files

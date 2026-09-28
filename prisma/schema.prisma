@@ -69,6 +69,8 @@ model User {
   // which FK. Same pattern as Task (assignee + creator).
   contactUpdatesRequested  ContactUpdateRequest[] @relation("ContactUpdateRequester")
   contactUpdatesReviewed   ContactUpdateRequest[] @relation("ContactUpdateReviewer")
+  // Chunk 9: webhook endpoints created by this user
+  webhookEndpoints         WebhookEndpoint[] @relation("WebhookEndpointCreator")
 }
 
 // -----------------------------------------------------------------------------
@@ -464,4 +466,90 @@ model ContactUpdateRequest {
 
   @@index([unionId, status])
   @@index([status])
+}
+
+// =============================================================================
+// Chunk 9 — Webhook system for external integrations.
+//
+// WebhookEndpoint: a registered external URL that receives HTTP POST
+// notifications when specific events occur (e.g., a union's compliance
+// status changes). Each endpoint has a signing secret used to HMAC-sign
+// the payload so the receiver can verify authenticity.
+//
+// WebhookDelivery: one row per delivery attempt. Tracks status (PENDING,
+// DELIVERED, FAILED), attempt count, response code, + nextRetryAt for
+// exponential backoff. Provides a full audit trail of webhook deliveries.
+//
+// EVENT TYPES: stored as a comma-separated string on WebhookEndpoint.events
+// (same pattern as ApiKey.scopes). The dispatcher filters endpoints by
+// whether the event type is in their list. An empty events string means
+// "all events" (convenience for catch-all endpoints).
+// =============================================================================
+
+enum WebhookEventType {
+  COMPLIANCE_STATUS_CHANGE
+  DOCUMENT_UPLOADED
+  DOCUMENT_REVIEWED
+  CONTACT_UPDATE_SUBMITTED
+  CONTACT_UPDATE_REVIEWED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+model WebhookEndpoint {
+  id          String   @id @default(cuid())
+  url         String
+  // Human-readable label for the admin UI (e.g., "DLIR Data Warehouse")
+  name        String
+  // Comma-separated WebhookEventType values. Empty string = all events.
+  events      String   @default("")
+  // HMAC-SHA256 signing secret (32 bytes, hex-encoded). Used to sign
+  // payloads so the receiver can verify authenticity. Generated at
+  // creation time, shown once, then only the hash is stored... actually,
+  // we store the secret in plaintext because we need it to sign outbound
+  // payloads. This is acceptable because:
+  //   1. Only REGISTRAR can view/create endpoints
+  //   2. The DB file is on the server, not exposed externally
+  //   3. We need the raw secret to compute HMAC signatures
+  secret      String
+  active      Boolean  @default(true)
+  createdById String?
+  creator     User?    @relation("WebhookEndpointCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deliveries  WebhookDelivery[]
+
+  @@index([active])
+}
+
+model WebhookDelivery {
+  id              String               @id @default(cuid())
+  endpointId      String
+  eventId         String               // unique event ID (e.g., "evt_abc123") — sent in the payload
+  eventType       WebhookEventType
+  payload         String               // JSON string of the event payload
+  status          WebhookDeliveryStatus @default(PENDING)
+  attempts        Int                  @default(0)
+  maxAttempts     Int                  @default(5)
+  // HTTP response code from the last attempt (null if not yet attempted)
+  lastResponseCode Int?
+  // Error message from the last attempt (null on success)
+  lastError       String?
+  // When to next retry (null if delivered or exhausted retries)
+  nextRetryAt     DateTime?
+  // Timestamps of first attempt + final delivery/failure
+  firstAttemptAt  DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  endpoint        WebhookEndpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, status])
+  @@index([status, nextRetryAt])
+  @@index([eventType])
 }

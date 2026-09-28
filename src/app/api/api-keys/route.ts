@@ -66,11 +66,13 @@ const MAX_EXPIRY_DAYS = 365;
 // session, not a programmable key.
 const ALLOWED_SCOPES = new Set([
   "unions:read",
+  "unions:read:pii", // Chunk 9: PII-elevated read (contactEmail, contactPhone, contactPerson, address)
   "unions:write",
   "documents:read",
   "documents:write",
   "compliance:read",
   "audit:read",
+  "webhooks:manage", // Chunk 9: manage webhook endpoints (register/list/delete)
 ]);
 
 // Public fields for the GET response — strip keyHash always.

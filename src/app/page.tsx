@@ -15,6 +15,7 @@ import { TasksView } from "@/components/app/views/tasks";
 import { ReviewsView } from "@/components/app/views/reviews";
 import { ContactRequestsView } from "@/components/app/views/contact-requests";
 import { SearchView } from "@/components/app/views/search";
+import { WebhooksView } from "@/components/app/views/webhooks";
 import { CalendarView } from "@/components/app/views/calendar";
 import { AuditView } from "@/components/app/views/audit";
 import { UsersView } from "@/components/app/views/users";
@@ -159,6 +160,7 @@ export default function Home() {
       case "reviews": return <ReviewsView />;
       case "contact-requests": return <ContactRequestsView />;
       case "search": return <SearchView />;
+      case "webhooks": return <WebhooksView />;
       case "calendar": return <CalendarView onNavigate={setActiveView} />;
       case "audit": return <AuditView />;
       case "users": return <UsersView />;

@@ -47,7 +47,7 @@
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
   ListTodo, Calendar, ScrollText, Users, Shield, Key, FileCheck, Home,
-  Scale, Contact as AddressBook, type LucideIcon,
+  Scale, Contact as AddressBook, Webhook, type LucideIcon,
 } from "lucide-react";
 
 /** The three staff roles. Matches AuthUser["role"] in app-shell.tsx. */
@@ -225,6 +225,12 @@ export const NAV_STRUCTURE: NavGroup[] = [
         label: "API Keys",
         route: "api-keys",
         icon: Key,
+        roles: ["REGISTRAR"],
+      },
+      {
+        label: "Webhooks",
+        route: "webhooks",
+        icon: Webhook,
         roles: ["REGISTRAR"],
       },
       {
