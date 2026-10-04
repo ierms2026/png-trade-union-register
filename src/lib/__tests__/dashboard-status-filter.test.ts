@@ -45,9 +45,10 @@ describe("navigateToComplianceFilter", () => {
     }
   });
 
-  it("FILTERABLE_STATUSES excludes NOT_APPLICABLE", () => {
+  it("FILTERABLE_STATUSES excludes NOT_APPLICABLE, includes AWAITING_REVIEW", () => {
     expect(FILTERABLE_STATUSES).not.toContain("NOT_APPLICABLE");
-    expect(FILTERABLE_STATUSES).toHaveLength(4);
+    expect(FILTERABLE_STATUSES).toContain("AWAITING_REVIEW");
+    expect(FILTERABLE_STATUSES).toHaveLength(5);
   });
 
   it("return type is ComplianceFilterNavigation", () => {

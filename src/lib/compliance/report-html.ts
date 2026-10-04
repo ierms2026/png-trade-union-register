@@ -24,11 +24,12 @@ import type { ComplianceStatus } from "@/lib/dashboard/status-config";
 // Status colors — hardcoded hex (resolved from globals.css oklch values).
 // WeasyPrint doesn't support oklch(), so we use close sRGB approximations.
 const STATUS_COLORS: Record<ComplianceStatus, { bg: string; text: string; border: string }> = {
-  COMPLIANT:     { bg: "#d4edda", text: "#155724", border: "#c3e6cb" },
-  EXPIRING:      { bg: "#fff3cd", text: "#856404", border: "#ffeaa7" },
-  OVERDUE:       { bg: "#f8d7da", text: "#721c24", border: "#f5c6cb" },
-  MISSING:       { bg: "#e2e3e5", text: "#383d41", border: "#d6d8db" },
-  NOT_APPLICABLE:{ bg: "#f8f9fa", text: "#6c757d", border: "#dee2e6" },
+  COMPLIANT:      { bg: "#d4edda", text: "#155724", border: "#c3e6cb" },
+  EXPIRING:       { bg: "#fff3cd", text: "#856404", border: "#ffeaa7" },
+  OVERDUE:        { bg: "#f8d7da", text: "#721c24", border: "#f5c6cb" },
+  AWAITING_REVIEW:{ bg: "#cce5ff", text: "#004085", border: "#b8daff" },
+  MISSING:        { bg: "#e2e3e5", text: "#383d41", border: "#d6d8db" },
+  NOT_APPLICABLE: { bg: "#f8f9fa", text: "#6c757d", border: "#dee2e6" },
 };
 
 export interface ReportOptions {

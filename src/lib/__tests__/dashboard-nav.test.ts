@@ -721,12 +721,19 @@ describe("help layer — status definitions (single source of truth)", () => {
     }
   });
 
-  it("the MISSING definition mentions review (PENDING/REJECTED documents count as Missing)", () => {
-    // This is the key "surprises people" case from the brief: a document
-    // awaiting approval is NOT compliant — it's Missing. The definition
-    // must make this clear so staff don't chase a union for a document
-    // that's only awaiting approval.
-    expect(COMPLIANCE_STATUS_CONFIG.MISSING.definition).toMatch(/review|pending|approved/i);
+  it("the MISSING definition mentions filing/disposed (NOT review — that's now AWAITING_REVIEW)", () => {
+    // After the AWAITING_REVIEW split, MISSING no longer mentions review/
+    // pending/approved. Those are now in the AWAITING_REVIEW definition.
+    // MISSING is now only about "no document filed" or "disposed".
+    expect(COMPLIANCE_STATUS_CONFIG.MISSING.definition).toMatch(/filed|disposed/i);
+    expect(COMPLIANCE_STATUS_CONFIG.MISSING.definition).not.toMatch(/review|pending|approved/i);
+  });
+
+  it("the AWAITING_REVIEW definition mentions review / Registrar", () => {
+    // The new AWAITING_REVIEW status covers PENDING/REJECTED documents.
+    // Its definition should make clear this is a Registrar action item.
+    expect(COMPLIANCE_STATUS_CONFIG.AWAITING_REVIEW.definition).toMatch(/review|registrar/i);
+    expect(COMPLIANCE_STATUS_CONFIG.AWAITING_REVIEW.label).toBe("Awaiting Review");
   });
 });
 

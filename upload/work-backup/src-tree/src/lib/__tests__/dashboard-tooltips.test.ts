@@ -176,13 +176,13 @@ describe("dashboard tooltips — surface checklist (chunk 6.2)", () => {
     expect(STATUS_CONFIG.OVERDUE.definition).toMatch(/renewal date has passed/i);
   });
 
-  it("surface 7: KPI band — Missing card has a focus-accessible definition tooltip (same wiring; STATUS_CONFIG.MISSING.definition mentions PENDING/REJECTED review)", () => {
+  it("surface 7: KPI band — Missing card has a focus-accessible definition tooltip (definition mentions filing/disposed; review is now AWAITING_REVIEW)", () => {
     assertFocusAccessibleTooltip(
       source,
       "KPI band — Missing",
       "definition={STATUS_CONFIG[status].definition}",
     );
-    expect(STATUS_CONFIG.MISSING.definition).toMatch(/PENDING\/REJECTED/i);
+    expect(STATUS_CONFIG.MISSING.definition).toMatch(/filed|disposed/i);
   });
 
   it("surface 8: Composition bar segments have focus-accessible tooltips showing STATUS_CONFIG[status].definition (config-driven, <button> trigger)", () => {

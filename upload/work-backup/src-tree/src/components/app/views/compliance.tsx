@@ -2,7 +2,7 @@
 
 import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 import { useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, FileText, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, FileText, Loader2, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -57,12 +57,13 @@ interface ComplianceMatrixResponse {
   generatedAt: string;
 }
 
-type StatusFilter = "ALL" | "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
+type StatusFilter = "ALL" | "COMPLIANT" | "EXPIRING" | "OVERDUE" | "AWAITING_REVIEW" | "MISSING" | "NOT_APPLICABLE";
 
 const STATUS_CONFIG: Record<string, { label: string; cell: string; dot: string; icon: typeof CheckCircle2 }> = {
   COMPLIANT: { label: "Compliant", cell: "bg-chart-3/15 text-chart-3 border-chart-3/30", dot: "bg-chart-3", icon: CheckCircle2 },
   EXPIRING: { label: "Expiring", cell: "bg-accent/15 text-accent-foreground border-accent/30", dot: "bg-accent", icon: AlertTriangle },
   OVERDUE: { label: "Overdue", cell: "bg-destructive/10 text-destructive border-destructive/30", dot: "bg-destructive", icon: XCircle },
+  AWAITING_REVIEW: { label: "Awaiting Review", cell: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900", dot: "bg-blue-500", icon: Clock },
   MISSING: { label: "Missing", cell: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground/40", icon: FileQuestion },
   NOT_APPLICABLE: { label: "N/A", cell: "bg-muted/50 text-muted-foreground border-border", dot: "bg-muted-foreground/20", icon: Ban },
 };
@@ -193,6 +194,7 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
             <SelectItem value="COMPLIANT">Compliant only</SelectItem>
             <SelectItem value="EXPIRING">Expiring only</SelectItem>
             <SelectItem value="OVERDUE">Overdue only</SelectItem>
+            <SelectItem value="AWAITING_REVIEW">Awaiting Review only</SelectItem>
             <SelectItem value="MISSING">Missing only</SelectItem>
             <SelectItem value="NOT_APPLICABLE">N/A only</SelectItem>
           </SelectContent>

@@ -39,6 +39,7 @@ export type ComplianceStatus =
   | "COMPLIANT"
   | "EXPIRING"
   | "OVERDUE"
+  | "AWAITING_REVIEW"
   | "MISSING"
   | "NOT_APPLICABLE";
 
@@ -73,12 +74,19 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
     dot: "bg-destructive",
     definition: "Document filed and approved, but renewal date has passed.",
   },
+  AWAITING_REVIEW: {
+    label: "Awaiting Review",
+    icon: Clock,
+    cell: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900",
+    dot: "bg-blue-500",
+    definition: "Document has been uploaded by the union but the Registrar has not yet approved it (or has rejected it). The union has done their part — this is not a gap in compliance, it's an item on the Registrar's desk.",
+  },
   MISSING: {
     label: "Missing",
     icon: FileQuestion,
     cell: "bg-muted text-muted-foreground border-border",
     dot: "bg-muted-foreground/40",
-    definition: "No document filed, document disposed, or document awaiting Registrar review.",
+    definition: "No document has been filed for this type, or a previously-filed document was disposed under retention rules. The union needs to file a new document.",
   },
   NOT_APPLICABLE: {
     label: "Not Applicable",

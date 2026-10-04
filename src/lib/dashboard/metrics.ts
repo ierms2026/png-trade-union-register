@@ -84,6 +84,7 @@ export interface ComplianceCounts {
   COMPLIANT: number;
   EXPIRING: number;
   OVERDUE: number;
+  AWAITING_REVIEW: number;
   MISSING: number;
   NOT_APPLICABLE: number;
 }
@@ -122,6 +123,7 @@ export function tallyComplianceCounts(cells: ComplianceCell[]): ComplianceCounts
     COMPLIANT: 0,
     EXPIRING: 0,
     OVERDUE: 0,
+    AWAITING_REVIEW: 0,
     MISSING: 0,
     NOT_APPLICABLE: 0,
   };
@@ -134,14 +136,20 @@ export function tallyComplianceCounts(cells: ComplianceCell[]): ComplianceCounts
 /**
  * Compute the compliance rate from a set of cells.
  * numerator = COMPLIANT count.
- * denominator = COMPLIANT + EXPIRING + OVERDUE + MISSING (excludes NOT_APPLICABLE).
- * percentage = round(numerator / denominator × 100), or 0 if denominator is 0.
+ * denominator = COMPLIANT + EXPIRING + OVERDUE + AWAITING_REVIEW + MISSING
+ * (excludes NOT_APPLICABLE).
+ *
+ * AWAITING_REVIEW is included in the denominator — the document type IS
+ * required, the union just hasn't gotten approval yet. This means a pending
+ * review lowers the compliance rate (it's not compliant yet), but the
+ * matrix shows it as a distinct status (not folded into MISSING) so the
+ * Registrar can see their review backlog.
  */
 export function computeComplianceRate(cells: ComplianceCell[]): ComplianceRate {
   const counts = tallyComplianceCounts(cells);
   const numerator = counts.COMPLIANT;
   const denominator =
-    counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.MISSING;
+    counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.AWAITING_REVIEW + counts.MISSING;
   const percentage =
     denominator === 0 ? 0 : Math.round((numerator / denominator) * 100);
   return { numerator, denominator, percentage };
@@ -239,15 +247,25 @@ export function getMissingCells(cells: ComplianceCell[]): ComplianceCell[] {
 }
 
 /**
- * Get unions that have at least one non-compliant cell (OVERDUE or MISSING).
- * Useful for "unions needing attention" widgets.
+ * Get unions that have at least one non-compliant cell (OVERDUE, AWAITING_REVIEW,
+ * or MISSING). Useful for "unions needing attention" widgets.
+ *
+ * AWAITING_REVIEW is included because the union's compliance is not yet
+ * confirmed — the Registrar needs to act. It's a different KIND of attention
+ * than MISSING (which means the union needs to act), but both mean "this
+ * union's compliance is not currently green."
  */
 export function getUnionsWithNonCompliance(
   metrics: DashboardMetrics,
 ): UnionSummary[] {
   const nonCompliantUnionIds = new Set(
     metrics.compliance.cells
-      .filter((cell) => cell.status === "OVERDUE" || cell.status === "MISSING")
+      .filter(
+        (cell) =>
+          cell.status === "OVERDUE" ||
+          cell.status === "AWAITING_REVIEW" ||
+          cell.status === "MISSING",
+      )
       .map((cell) => cell.unionId),
   );
   return metrics.unions.list.filter((u) =>
@@ -471,8 +489,10 @@ export function getExpiryForecast(
   for (const cell of cells) {
     // Exclude: no due date
     if (!cell.expiryDate) continue;
-    // Exclude: MISSING (no document on file)
-    if (cell.status === "MISSING" || cell.status === "NOT_APPLICABLE") continue;
+    // Exclude: MISSING (no document on file), AWAITING_REVIEW (document
+    // exists but isn't approved yet — its expiry date isn't meaningful for
+    // compliance forecasting until the Registrar approves it), NOT_APPLICABLE.
+    if (cell.status === "MISSING" || cell.status === "AWAITING_REVIEW" || cell.status === "NOT_APPLICABLE") continue;
 
     const diffDays = (cell.expiryDate.getTime() - nowMs) / MS_PER_DAY;
 
@@ -596,6 +616,7 @@ export function getUnionDocMatrix(
       COMPLIANT: 0,
       EXPIRING: 0,
       OVERDUE: 0,
+      AWAITING_REVIEW: 0,
       MISSING: 0,
       NOT_APPLICABLE: 0,
     };
@@ -606,6 +627,7 @@ export function getUnionDocMatrix(
     COMPLIANT: 0,
     EXPIRING: 0,
     OVERDUE: 0,
+    AWAITING_REVIEW: 0,
     MISSING: 0,
     NOT_APPLICABLE: 0,
   };
@@ -652,6 +674,7 @@ export function getUnionDocMatrix(
       COMPLIANT: 0,
       EXPIRING: 0,
       OVERDUE: 0,
+      AWAITING_REVIEW: 0,
       MISSING: 0,
       NOT_APPLICABLE: 0,
     };

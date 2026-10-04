@@ -81,6 +81,7 @@
   --status-compliant: oklch(0.60 0.15 155);   /* Sage green — positive */
   --status-expiring: oklch(0.75 0.16 80);     /* Warm gold — caution */
   --status-overdue: oklch(0.55 0.22 25);      /* Rich red — urgent */
+  --status-review: oklch(0.60 0.15 250);      /* Blue — awaiting review */
   --status-missing: oklch(0.65 0.01 80);      /* Warm grey — neutral/unknown */
   --sidebar: oklch(0.96 0.012 255);
   --sidebar-foreground: oklch(0.20 0.02 50);
@@ -122,6 +123,7 @@
   --status-compliant: oklch(0.68 0.16 155);
   --status-expiring: oklch(0.78 0.16 80);
   --status-overdue: oklch(0.62 0.24 25);
+  --status-review: oklch(0.68 0.15 250);
   --status-missing: oklch(0.70 0.01 80);
   --sidebar: oklch(0.22 0.02 255);
   --sidebar-foreground: oklch(0.95 0.008 80);

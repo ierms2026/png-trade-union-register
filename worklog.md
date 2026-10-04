@@ -625,3 +625,41 @@ Stage Summary:
 - Search is paginated (20 per page) with Previous/page numbers/Next controls. No more invisible results beyond #50.
 - All search state is URL-addressable: /?view=search&q=ballot&union=ID&documentType=Constitution&reviewStatus=APPROVED&page=2 works for refresh, sharing, Back/Forward.
 - The API returns total + totalPages so the frontend can render "Showing 1–20 of 150 results" + the correct number of page buttons.
+
+---
+Task ID: awaiting-review-status
+Agent: main
+Task: Show "Awaiting Review" as its own visible state instead of folding it into Missing
+
+Work Log:
+- Audited the current state: the compliance calculator folded PENDING/REJECTED documents into MISSING (step 2b: `if (document.reviewStatus !== "APPROVED") return "MISSING"`). The MISSING definition said "No document filed, document disposed, or document awaiting Registrar review (PENDING/REJECTED)" — one word doing triple duty.
+- Added AWAITING_REVIEW as a sixth compliance status:
+  - calculator.ts: added "AWAITING_REVIEW" to the ComplianceStatus type + COMPLIANCE_STATUSES array + STATUS_BADGE_CLASSES (blue) + STATUS_LETTER ("R"). Updated calculateStatus: step 2b now returns "AWAITING_REVIEW" (was "MISSING") when reviewStatus !== APPROVED. Updated the MISSING definition to no longer mention review.
+  - status-config.ts: added AWAITING_REVIEW to the ComplianceStatus type + COMPLIANCE_STATUSES + APPLICABLE_STATUSES. Added the AWAITING_REVIEW entry to STATUS_CONFIG (label "Awaiting Review", colorToken "var(--status-review)", icon Clock, definition explaining it's a Registrar action item not a compliance gap). Updated the MISSING definition to "No document has been filed for this type, or a previously-filed document was disposed under retention rules."
+  - vocabulary.ts: added AWAITING_REVIEW to the ComplianceStatus type + COMPLIANCE_STATUS_CONFIG (label "Awaiting Review", icon Clock, blue cell/dot, same definition as status-config.ts). Updated the MISSING definition.
+  - globals.css: added --status-review (blue, oklch(0.60 0.15 250) light / 0.68 0.15 250 dark) — a distinct color so AWAITING_REVIEW is visually distinguishable from EXPIRING (gold) and MISSING (grey).
+  - prisma/schema.prisma: added `awaitingReview Int @default(0)` to ComplianceSnapshot (with @default(0) so old rows don't break). Ran prisma db push + generate.
+- Updated dashboard metrics + snapshot:
+  - metrics.ts: added AWAITING_REVIEW to ComplianceCounts interface + tallyComplianceCounts initializer + all 3 ComplianceCounts object literals (tally, columnTotals, rowTotals). Updated computeComplianceRate to include AWAITING_REVIEW in the denominator. Updated getUnionsWithNonCompliance to include AWAITING_REVIEW. Updated getExpiryForecast to exclude AWAITING_REVIEW (its expiry date isn't meaningful until approved).
+  - snapshot.ts: added awaitingReview to tallyMatrix return type + the tally loop + the rateDenominator calculation. Updated both the create + update calls to write awaitingReview to the DB.
+- Updated UI components:
+  - compliance.tsx: added AWAITING_REVIEW to StatusFilter type + the local STATUS_CONFIG (blue cell/dot, Clock icon). Added "Awaiting Review only" to the filter dropdown. Added Clock to the lucide-react imports.
+  - compare.tsx: added AWAITING_REVIEW to STATUS_LETTER ("R") + STATUS_COLORS (blue).
+  - report-html.ts: added AWAITING_REVIEW to STATUS_COLORS (blue hex: #cce5ff/#004085/#b8daff) for the PDF report.
+  - rules/preview/route.ts: added AWAITING_REVIEW to STATUS_RANK (3, between OVERDUE and MISSING).
+- Updated tests (14 fixes across 7 test files):
+  - dashboard-heatmap: 5→6 statuses
+  - dashboard-status-config: 4→5 tile statuses, added AWAITING_REVIEW definition test, rewrote MISSING definition test (no longer mentions PENDING/REJECTED)
+  - dashboard-status-filter: 4→5 filterable statuses, includes AWAITING_REVIEW
+  - dashboard-tooltips: MISSING definition now matches filed/disposed (not PENDING/REJECTED)
+  - dashboard-nav: rewrote MISSING definition test + added AWAITING_REVIEW definition test
+  - dashboard-mutation: 4→5 tiles, updated sorted-status-array assertion
+  - dashboard-snapshot: added awaitingReview: 0 to expectedCounts + all counts assertions, updated rateDenominator assertion
+- All 608 tests pass. ESLint clean. TypeScript clean (except pre-existing DigestItem errors in compliance-digest/route.ts, unrelated to this change). Backed up (299 files).
+
+Stage Summary:
+- "Awaiting Review" is now its own visible compliance status (blue, Clock icon, "R" in the Compare grid). Documents that are PENDING or REJECTED review no longer show as "Missing" — they show as "Awaiting Review", making clear the union has done their part and the Registrar needs to act.
+- "Missing" now means what it says: no document filed, or a disposed document. The definition no longer mentions review.
+- The compliance rate denominator includes AWAITING_REVIEW (the document type IS required, the union just hasn't gotten approval yet) — so pending reviews lower the rate, but the matrix shows them distinctly so the Registrar can see their review backlog.
+- The snapshot DB schema now stores awaitingReview (with @default(0) for backward compat with old rows).
+- All surfaces updated: dashboard KPI tiles, compliance matrix legend + filter, compare grid, PDF report, rule-preview rank, help glossary, public glossary.

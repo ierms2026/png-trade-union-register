@@ -4,6 +4,7 @@ import {
   XCircle,
   FileQuestion,
   Ban,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,11 +25,12 @@ import {
 // components do not hardcode hex color codes.
 // =============================================================================
 
-/** The 5 compliance statuses, matching the compliance calculator's output. */
+/** The compliance statuses, matching the compliance calculator's output. */
 export type ComplianceStatus =
   | "COMPLIANT"
   | "EXPIRING"
   | "OVERDUE"
+  | "AWAITING_REVIEW"
   | "MISSING"
   | "NOT_APPLICABLE";
 
@@ -104,6 +106,7 @@ export const COMPLIANCE_STATUSES: ComplianceStatus[] = [
   "COMPLIANT",
   "EXPIRING",
   "OVERDUE",
+  "AWAITING_REVIEW",
   "MISSING",
   "NOT_APPLICABLE",
 ];
@@ -112,11 +115,18 @@ export const COMPLIANCE_STATUSES: ComplianceStatus[] = [
  * Statuses that count toward the compliance rate denominator.
  * NOT_APPLICABLE is excluded from both numerator and denominator
  * (per computeUnionScore in calculator.ts).
+ *
+ * AWAITING_REVIEW IS included in the denominator — the document type IS
+ * required, the union just hasn't gotten approval yet. This means a pending
+ * review lowers the compliance rate (it's not compliant yet), but the
+ * matrix shows it as a distinct status (not folded into MISSING) so the
+ * Registrar can see their review backlog.
  */
 export const APPLICABLE_STATUSES: ComplianceStatus[] = [
   "COMPLIANT",
   "EXPIRING",
   "OVERDUE",
+  "AWAITING_REVIEW",
   "MISSING",
 ];
 
@@ -168,12 +178,19 @@ export const STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
     icon: XCircle,
     definition: "Document filed and approved, but renewal date has passed.",
   },
+  AWAITING_REVIEW: {
+    label: "Awaiting Review",
+    colorToken: "var(--status-review)",
+    icon: Clock,
+    definition:
+      "Document has been uploaded by the union but the Registrar has not yet approved it (or has rejected it). The union has done their part — this is not a gap in compliance, it's an item on the Registrar's desk.",
+  },
   MISSING: {
     label: "Missing",
     colorToken: "var(--status-missing)",
     icon: FileQuestion,
     definition:
-      "No document filed, document disposed, or document awaiting Registrar review (PENDING/REJECTED).",
+      "No document has been filed for this type, or a previously-filed document was disposed under retention rules. The union needs to file a new document.",
   },
   NOT_APPLICABLE: {
     label: "N/A",

@@ -155,6 +155,7 @@ function expectedCounts() {
     compliant: 2,
     expiring: 1,
     overdue: 1,
+    awaitingReview: 0,
     missing: 2,
     rateNumerator: 2,
     rateDenominator: 6,
@@ -210,7 +211,7 @@ describe("compliance snapshot — chunk 4.2a", () => {
       const counts = tallyMatrix(matrix);
       expect(counts.rateNumerator).toBe(counts.compliant);
       expect(counts.rateDenominator).toBe(
-        counts.compliant + counts.expiring + counts.overdue + counts.missing,
+        counts.compliant + counts.expiring + counts.overdue + counts.awaitingReview + counts.missing,
       );
     });
   });
@@ -293,7 +294,7 @@ describe("compliance snapshot — chunk 4.2a", () => {
       expect(r2.action).toBe("updated");
       // Counts reflect the NEW state (3 more MISSING cells)
       expect(r2.counts).toEqual({
-        compliant: 2, expiring: 1, overdue: 1, missing: 5,
+        compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 5,
         rateNumerator: 2, rateDenominator: 9,
       });
       // Verify only ONE row exists, with the updated counts
@@ -515,7 +516,7 @@ describe("compliance snapshot — chunk 4.2a", () => {
       //            MISSING=3 (was 2, gained union-A's Annual Return as MISSING).
       // EXPIRING/OVERDUE unchanged.
       expect(r.counts).toEqual({
-        compliant: 1, expiring: 1, overdue: 1, missing: 3,
+        compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 3,
         rateNumerator: 1, rateDenominator: 6,
       });
 

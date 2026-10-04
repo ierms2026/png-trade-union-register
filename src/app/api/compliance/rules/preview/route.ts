@@ -97,8 +97,9 @@ const STATUS_RANK: Record<ComplianceStatus, number> = {
   COMPLIANT: 0,
   EXPIRING: 1,
   OVERDUE: 2,
-  MISSING: 3,
-  NOT_APPLICABLE: 4,
+  AWAITING_REVIEW: 3,
+  MISSING: 4,
+  NOT_APPLICABLE: 5,
 };
 
 export async function POST(req: NextRequest) {

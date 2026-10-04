@@ -161,11 +161,11 @@ describe("compliance heatmap — rendering", () => {
     }
   });
 
-  it("legend shows all 5 statuses including zero-count, labels only (no counts)", () => {
+  it("legend shows all 6 statuses including zero-count, labels only (no counts)", () => {
     // The component renders COMPLIANCE_STATUSES (all 5) in the legend.
     // Verify the constant includes NOT_APPLICABLE.
     expect(COMPLIANCE_STATUSES).toContain("NOT_APPLICABLE");
-    expect(COMPLIANCE_STATUSES).toHaveLength(5);
+    expect(COMPLIANCE_STATUSES).toHaveLength(6);
 
     // Each status has a label in STATUS_CONFIG
     for (const status of COMPLIANCE_STATUSES) {

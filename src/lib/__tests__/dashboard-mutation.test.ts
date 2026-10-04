@@ -195,12 +195,12 @@ describe("mutation test — status change propagates to all widgets", () => {
     }
   });
 
-  it("tiles always have exactly 4 entries (the applicable statuses)", () => {
+  it("tiles always have exactly 5 entries (the applicable statuses, including AWAITING_REVIEW)", () => {
     const cells = makeFixtureCells();
     const { tiles } = getWidgetValues(cells);
-    expect(tiles).toHaveLength(4);
+    expect(tiles).toHaveLength(5);
     expect(tiles.map((t) => t.status).sort()).toEqual(
-      ["COMPLIANT", "EXPIRING", "MISSING", "OVERDUE"],
+      ["AWAITING_REVIEW", "COMPLIANT", "EXPIRING", "MISSING", "OVERDUE"],
     );
   });
 });
@@ -561,8 +561,8 @@ describe("composition bar — segment widths match counts as percentages", () =>
     expect(segments[0].status).toBe("COMPLIANT");
     expect(segments[0].widthPct).toBe(100);
 
-    // Legend tiles: all 4 statuses including zero-count OVERDUE
-    expect(allTiles).toHaveLength(4);
+    // Legend tiles: all 5 applicable statuses including zero-count OVERDUE
+    expect(allTiles).toHaveLength(5);
     const overdueTile = allTiles.find((t) => t.status === "OVERDUE")!;
     expect(overdueTile.count).toBe(0);
     expect(overdueTile.widthPct).toBe(0);
@@ -588,7 +588,7 @@ describe("composition bar — segment widths match counts as percentages", () =>
     const { denominator, segments, allTiles } = getSegments(cells);
     expect(denominator).toBe(0);
     expect(segments).toHaveLength(0); // no visible segments
-    expect(allTiles).toHaveLength(4); // legend still shows all 4 at count 0
+    expect(allTiles).toHaveLength(5); // legend still shows all 5 at count 0
     for (const tile of allTiles) {
       expect(tile.widthPct).toBe(0);
       expect(Number.isNaN(tile.widthPct)).toBe(false);

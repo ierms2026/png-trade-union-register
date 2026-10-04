@@ -1,5 +1,5 @@
 {
-  "backedUpAt": "2026-10-04T23:22:22.658Z",
+  "backedUpAt": "2026-10-04T23:56:50.879Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.21.0",
   "fileCount": 299,
@@ -114,9 +114,9 @@
     },
     {
       "path": "src/app/api/compliance/rules/preview/route.ts",
-      "checksum": "8a3197711fcc885ec0d4b229bf568556192aadf7e394de7e716994f0fd86b4cb",
-      "size": 10565,
-      "mtime": "2026-08-19T03:56:54.000Z"
+      "checksum": "75add3a186a33a1ad8af448294c32686b96cb9085e7fd1bc3f65108901218f54",
+      "size": 10587,
+      "mtime": "2026-10-04T23:55:19.477Z"
     },
     {
       "path": "src/app/api/compliance/rules/route.ts",
@@ -570,9 +570,9 @@
     },
     {
       "path": "src/app/globals.css",
-      "checksum": "69baa66d513e02fc0df8c2f7e80c784544ce90f2a0e88d46b0080f8208136913",
-      "size": 8718,
-      "mtime": "2026-09-22T04:45:00.000Z"
+      "checksum": "5850b13353388d7a3f6108cc4714ead7b7c77c1afe64e84cb53b9dda8f634ab7",
+      "size": 8836,
+      "mtime": "2026-10-04T23:49:50.732Z"
     },
     {
       "path": "src/app/layout.tsx",
@@ -756,15 +756,15 @@
     },
     {
       "path": "src/components/app/views/compare.tsx",
-      "checksum": "cb7f59e50bb37b11a910c2a146718742f749d523989c1e8de5a8d3e14dd4c2c1",
-      "size": 8965,
-      "mtime": "2026-08-26T04:58:12.000Z"
+      "checksum": "1c3379bf2c2d3e5d15a5f91ff685870ecbb792029e8167d40061a5eeaa84a18c",
+      "size": 9113,
+      "mtime": "2026-10-04T23:54:31.344Z"
     },
     {
       "path": "src/components/app/views/compliance.tsx",
-      "checksum": "b45d7ee8c8402c3c869d08d734f2ba0a75fc3f323d563353956abc506da9ea00",
-      "size": 17236,
-      "mtime": "2026-10-04T21:50:53.874Z"
+      "checksum": "240656bde5ac59dc3e4bda59eb6f6a816d869319b13a2a681376a2c8547b0bb5",
+      "size": 17538,
+      "mtime": "2026-10-04T23:54:21.517Z"
     },
     {
       "path": "src/components/app/views/configure-rules.tsx",
@@ -1230,9 +1230,9 @@
     },
     {
       "path": "src/lib/__tests__/dashboard-heatmap.test.ts",
-      "checksum": "210e892f6df6dd3e191995ba15b3810e9c2c01481d2bcc16ea7b95bd2665f7f8",
+      "checksum": "793858ed829be3c1b4afa6cb7d1105db3856d166a1628be95e5fdcd4fbfaf3c0",
       "size": 12833,
-      "mtime": "2026-09-04T04:16:59.000Z"
+      "mtime": "2026-10-04T23:49:01.725Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-layout.test.ts",
@@ -1254,33 +1254,33 @@
     },
     {
       "path": "src/lib/__tests__/dashboard-mutation.test.ts",
-      "checksum": "be972b39069e517b6f9f0760d6fb002d9591e1f7955423bda5e7e429f1959e79",
-      "size": 44636,
-      "mtime": "2026-09-04T03:31:22.000Z"
+      "checksum": "be4254f2aaf1246af416c058209fb1087c4fcdfa7771a9120bc6e41cf2431082",
+      "size": 44693,
+      "mtime": "2026-10-04T23:51:50.782Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-nav.test.ts",
-      "checksum": "d07372040fdee840dac4978384f2b6e474685a59cc973c5bc29654608a77fd9c",
-      "size": 39136,
-      "mtime": "2026-10-04T23:10:38.529Z"
+      "checksum": "5a54b713a04898822f8bf431c55ed2dbb114c17071088fa0890fd8d2d52958d5",
+      "size": 39595,
+      "mtime": "2026-10-04T23:50:02.341Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-snapshot.test.ts",
-      "checksum": "baea51bbf4fd6e95aa395a0c33f537bef36841855b63cd5a9b14ec51f9325eec",
-      "size": 43323,
-      "mtime": "2026-09-27T22:08:58.000Z"
+      "checksum": "9853f79d24d8bc5b460f17fc58fb60b7fd46ec8a8667338c8734746288b6245d",
+      "size": 43408,
+      "mtime": "2026-10-04T23:52:53.281Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-status-config.test.ts",
-      "checksum": "b25feec47fadaff3e9817a0555f289432e05bc713e72303b52776243001768eb",
-      "size": 11886,
-      "mtime": "2026-09-06T22:43:19.000Z"
+      "checksum": "3a50a71d714de549d669ab4216d7176f133bd280141f1b0b25e4d30aab06e15e",
+      "size": 12658,
+      "mtime": "2026-10-04T23:49:20.498Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-status-filter.test.ts",
-      "checksum": "567e61ace19804c366842a085239566a2eb7737d5ec8ef1a27248161e2bf05a0",
-      "size": 2151,
-      "mtime": "2026-09-03T00:13:34.000Z"
+      "checksum": "c2c5190416172f9fc27114941f42868903ab790d6cb2144f790ceb120f08460a",
+      "size": 2239,
+      "mtime": "2026-10-04T23:50:23.737Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-status-guard.test.ts",
@@ -1290,9 +1290,9 @@
     },
     {
       "path": "src/lib/__tests__/dashboard-tooltips.test.ts",
-      "checksum": "ad873002d4067924d90d31b8977d4c89dc5a3fc35e9de26f3c24d2386b05e236",
-      "size": 15663,
-      "mtime": "2026-09-06T22:43:19.000Z"
+      "checksum": "049a3b5a1dbd168fadac88a460112cad1d13b417a0b6a0a211663abc0019dc47",
+      "size": 15648,
+      "mtime": "2026-10-04T23:50:15.014Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-trend.test.ts",
@@ -1428,9 +1428,9 @@
     },
     {
       "path": "src/lib/compliance/calculator.ts",
-      "checksum": "4d967bc1c5e453836a28b637de33b0ff3d6b7cddabdc8894e5acee9709f319b9",
-      "size": 19268,
-      "mtime": "2026-09-02T01:52:27.000Z"
+      "checksum": "6721af51785b9d43ed37cab5ec47b4bac214e4f7eac87e418e27b3e4d06e5c8d",
+      "size": 20499,
+      "mtime": "2026-10-04T23:44:08.987Z"
     },
     {
       "path": "src/lib/compliance/matrix.ts",
@@ -1440,9 +1440,9 @@
     },
     {
       "path": "src/lib/compliance/report-html.ts",
-      "checksum": "1f31e17074b647f47bcf0f4f719ce1f7aaa71e4780c7a2838b77ad79028548fe",
-      "size": 16208,
-      "mtime": "2026-10-04T21:50:56.200Z"
+      "checksum": "7c7071d03cc92d46c997f295ad261b54aeeb88fa1a167b3ebf29c4642f616601",
+      "size": 16286,
+      "mtime": "2026-10-04T23:55:30.716Z"
     },
     {
       "path": "src/lib/csv.ts",
@@ -1476,9 +1476,9 @@
     },
     {
       "path": "src/lib/dashboard/metrics.ts",
-      "checksum": "5f651ef25d5e21a75666517fd0b5ce5df1ea77ff19a262dd73caccef092a3e62",
-      "size": 22900,
-      "mtime": "2026-09-06T22:43:19.000Z"
+      "checksum": "9cfd291275da2c627046dbb399530d00ceb3868ecf71801b98a34499f0935161",
+      "size": 23935,
+      "mtime": "2026-10-04T23:46:06.376Z"
     },
     {
       "path": "src/lib/dashboard/nav-structure.ts",
@@ -1488,15 +1488,15 @@
     },
     {
       "path": "src/lib/dashboard/snapshot.ts",
-      "checksum": "dd3a2db86b9e3f7bdc47ea1cf22fa7832054d6f36071c8aa81a1a33078563534",
-      "size": 28579,
-      "mtime": "2026-09-27T22:08:58.000Z"
+      "checksum": "300e8ff2b3e619a943e7a0ff59e6f247cb554f662eceebf127b2a3284c6d1f93",
+      "size": 28999,
+      "mtime": "2026-10-04T23:46:49.408Z"
     },
     {
       "path": "src/lib/dashboard/status-config.ts",
-      "checksum": "69fc9c9b425d7b9ed2987c0453e38db9a765bde1d02eac8d479b18255fda44d1",
-      "size": 10260,
-      "mtime": "2026-09-06T22:43:20.000Z"
+      "checksum": "7fb164a46a7b658a6fae4f2482da276fc342f1715fa6dc03e0a6d6e77787ada6",
+      "size": 11073,
+      "mtime": "2026-10-04T23:49:55.556Z"
     },
     {
       "path": "src/lib/dashboard/status-filter.ts",
@@ -1506,9 +1506,9 @@
     },
     {
       "path": "src/lib/dashboard/vocabulary.ts",
-      "checksum": "e9f930d58d7f5dedf0d6fa8726b47e951c57b5bdada6fc1b104425fd95e2add8",
-      "size": 20489,
-      "mtime": "2026-10-04T22:32:39.941Z"
+      "checksum": "de109d78a7c8b0b53d2d5f6e092cab6493c2bb776de8fc1675d896df8cf57b6a",
+      "size": 21023,
+      "mtime": "2026-10-04T23:44:55.458Z"
     },
     {
       "path": "src/lib/db.ts",
@@ -1614,9 +1614,9 @@
     },
     {
       "path": "prisma/schema.prisma",
-      "checksum": "3bae8dad43be499f3431e07fe2bd054b9f4f6a2404234c2f653139eabb4ccf82",
-      "size": 23116,
-      "mtime": "2026-10-04T22:32:20.129Z"
+      "checksum": "6cc88b0fc4bc97433f4db461cea29083e7ecac6b606fbc85dec947c1acfae5f1",
+      "size": 23209,
+      "mtime": "2026-10-04T23:46:39.440Z"
     },
     {
       "path": "prisma/seed-demo.ts",

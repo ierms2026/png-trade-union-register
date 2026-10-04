@@ -410,9 +410,10 @@ model ComplianceSnapshot {
   compliant        Int
   expiring         Int
   overdue          Int
+  awaitingReview   Int      @default(0) // Added post-launch; old rows default to 0.
   missing          Int
   // Compliance rate numerator (COMPLIANT count) and denominator (COMPLIANT
-  // + EXPIRING + OVERDUE + MISSING). NOT_APPLICABLE excluded from both.
+  // + EXPIRING + OVERDUE + AWAITING_REVIEW + MISSING). NOT_APPLICABLE excluded.
   rateNumerator    Int
   rateDenominator  Int
   // Live config at capture time — JSON object:

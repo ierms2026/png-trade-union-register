@@ -124,18 +124,31 @@ describe("status-config", () => {
       expect(isApplicableStatus("NOT_APPLICABLE")).toBe(false);
     });
 
-    it("getTileStatuses returns the 4 applicable statuses", () => {
+    it("getTileStatuses returns the 5 applicable statuses (excludes NOT_APPLICABLE)", () => {
       const tiles = getTileStatuses();
-      expect(tiles).toHaveLength(4);
+      expect(tiles).toHaveLength(5);
       expect(tiles).not.toContain("NOT_APPLICABLE");
+      expect(tiles).toContain("AWAITING_REVIEW");
     });
   });
 
   describe("definition accuracy (per chunk 0.1 audit)", () => {
-    it("MISSING definition mentions PENDING/REJECTED review", () => {
+    it("AWAITING_REVIEW definition mentions the review queue / Registrar", () => {
+      // AWAITING_REVIEW is the new status for documents that are PENDING or
+      // REJECTED review. The definition should make clear this is a Registrar
+      // action item, not a gap in compliance.
+      const def = STATUS_CONFIG.AWAITING_REVIEW.definition;
+      expect(def.toLowerCase()).toMatch(/registrar|review/);
+    });
+
+    it("MISSING definition mentions filing / disposed (NOT review)", () => {
+      // After the AWAITING_REVIEW split, MISSING should NO LONGER mention
+      // PENDING/REJECTED — those are now AWAITING_REVIEW. MISSING is now
+      // only about "no document filed" or "disposed".
       const def = STATUS_CONFIG.MISSING.definition;
-      expect(def.toLowerCase()).toContain("pending");
-      expect(def.toLowerCase()).toContain("rejected");
+      expect(def.toLowerCase()).toMatch(/filed|disposed/);
+      expect(def.toLowerCase()).not.toContain("pending");
+      expect(def.toLowerCase()).not.toContain("rejected");
     });
 
     it("NOT_APPLICABLE definition mentions rule.required", () => {

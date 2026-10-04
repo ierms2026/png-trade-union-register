@@ -56,6 +56,7 @@ const STATUS_LETTER: Record<string, string> = {
   COMPLIANT: "C",
   EXPIRING: "E",
   OVERDUE: "O",
+  AWAITING_REVIEW: "R",
   MISSING: "M",
   NOT_APPLICABLE: "N/A",
 };
@@ -64,6 +65,7 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLIANT: "bg-chart-3/15 text-chart-3 border-chart-3/30",
   EXPIRING: "bg-accent/15 text-accent-foreground border-accent/30",
   OVERDUE: "bg-destructive/10 text-destructive border-destructive/30",
+  AWAITING_REVIEW: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900",
   MISSING: "bg-muted text-muted-foreground border-border",
   NOT_APPLICABLE: "bg-muted/50 text-muted-foreground border-border",
 };

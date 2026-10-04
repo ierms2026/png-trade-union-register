@@ -148,6 +148,7 @@ export function tallyMatrix(
   compliant: number;
   expiring: number;
   overdue: number;
+  awaitingReview: number;
   missing: number;
   rateNumerator: number;
   rateDenominator: number;
@@ -155,14 +156,16 @@ export function tallyMatrix(
   let compliant = 0;
   let expiring = 0;
   let overdue = 0;
+  let awaitingReview = 0;
   let missing = 0;
   for (const row of matrix.unions) {
     for (const cell of row.scores) {
       switch (cell.status) {
-        case "COMPLIANT": compliant++; break;
-        case "EXPIRING":  expiring++;  break;
-        case "OVERDUE":   overdue++;   break;
-        case "MISSING":   missing++;   break;
+        case "COMPLIANT":       compliant++;       break;
+        case "EXPIRING":        expiring++;        break;
+        case "OVERDUE":         overdue++;         break;
+        case "AWAITING_REVIEW": awaitingReview++;  break;
+        case "MISSING":         missing++;         break;
         // NOT_APPLICABLE excluded from BOTH numerator and denominator (per
         // computeUnionScore in calculator.ts and the rate definition in
         // metrics.ts computeComplianceRate).
@@ -170,8 +173,10 @@ export function tallyMatrix(
     }
   }
   const rateNumerator = compliant;
-  const rateDenominator = compliant + expiring + overdue + missing;
-  return { compliant, expiring, overdue, missing, rateNumerator, rateDenominator };
+  // AWAITING_REVIEW is included in the denominator — the document type IS
+  // required, the union just hasn't gotten approval yet.
+  const rateDenominator = compliant + expiring + overdue + awaitingReview + missing;
+  return { compliant, expiring, overdue, awaitingReview, missing, rateNumerator, rateDenominator };
 }
 
 /**
@@ -244,6 +249,7 @@ export async function ensureSnapshotForToday(
         compliant: counts.compliant,
         expiring: counts.expiring,
         overdue: counts.overdue,
+        awaitingReview: counts.awaitingReview,
         missing: counts.missing,
         rateNumerator: counts.rateNumerator,
         rateDenominator: counts.rateDenominator,
@@ -268,6 +274,7 @@ export async function ensureSnapshotForToday(
         compliant: counts.compliant,
         expiring: counts.expiring,
         overdue: counts.overdue,
+        awaitingReview: counts.awaitingReview,
         missing: counts.missing,
         rateNumerator: counts.rateNumerator,
         rateDenominator: counts.rateDenominator,

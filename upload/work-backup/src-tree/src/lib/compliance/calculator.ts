@@ -53,20 +53,25 @@ import type { ComplianceRule, Document, DocumentVersion } from "@prisma/client";
  * function below encodes this precedence.
  *
  * Business meaning of each value:
- *   - COMPLIANT      : Doc filed, renewal date is >90 days away.
- *                      Green badge.
- *   - EXPIRING       : Doc filed, renewal date is within 90 days.
- *                      Yellow badge. The 90-day window gives the union
- *                      time to re-file before going overdue.
- *   - OVERDUE        : Doc filed, renewal date has passed.
- *                      Red badge. The union is legally non-compliant.
- *   - MISSING        : No doc filed, OR the doc was disposed.
- *                      Gray badge. Distinguishable from "not required".
- *   - NOT_APPLICABLE : The ComplianceRule says this doc type isn't
- *                      required for any union (e.g. Welfare Fund is
- *                      required only for unions with >50 members).
- *                      Slate badge. Excluded from BOTH numerator AND
- *                      denominator of the per-union compliance score.
+ *   - COMPLIANT         : Doc filed, approved, renewal date is >90 days away.
+ *                         Green badge.
+ *   - EXPIRING          : Doc filed, approved, renewal date is within 90 days.
+ *                         Yellow badge. The 90-day window gives the union
+ *                         time to re-file before going overdue.
+ *   - OVERDUE           : Doc filed, approved, renewal date has passed.
+ *                         Red badge. The union is legally non-compliant.
+ *   - AWAITING_REVIEW   : Doc has been uploaded but the Registrar hasn't
+ *                         approved it yet (reviewStatus = PENDING or
+ *                         REJECTED). Blue badge. The union has done their
+ *                         job — this is NOT a gap in compliance, it's an
+ *                         item on the Registrar's desk.
+ *   - MISSING           : No doc filed, OR the doc was disposed. Gray badge.
+ *                         This is a TRUE gap — the union needs to file.
+ *   - NOT_APPLICABLE    : The ComplianceRule says this doc type isn't
+ *                         required for any union (e.g. Welfare Fund is
+ *                         required only for unions with >50 members).
+ *                         Slate badge. Excluded from BOTH numerator AND
+ *                         denominator of the per-union compliance score.
  *
  * Listed as a string union (not a TS enum) so:
  *   - The values are nominal strings that serialize directly to JSON
@@ -81,11 +86,12 @@ export type ComplianceStatus =
   | "COMPLIANT"
   | "EXPIRING"
   | "OVERDUE"
+  | "AWAITING_REVIEW"
   | "MISSING"
   | "NOT_APPLICABLE";
 
 /**
- * The 5 statuses, in canonical display order. Used by UI badge selectors
+ * The 6 statuses, in canonical display order. Used by UI badge selectors
  * and the Compliance Matrix column rendering. Kept in this file (not a
  * separate constants file) because it's tightly coupled to the
  * ComplianceStatus type above — if you change one, you change the other.
@@ -94,6 +100,7 @@ export const COMPLIANCE_STATUSES: ComplianceStatus[] = [
   "COMPLIANT",
   "EXPIRING",
   "OVERDUE",
+  "AWAITING_REVIEW",
   "MISSING",
   "NOT_APPLICABLE",
 ];
@@ -215,11 +222,12 @@ export function computeExpiryDate(filedAt: Date, renewalYears: number): Date {
  * Algorithm (per spec, in order):
  *   1. If `!rule.required`           → NOT_APPLICABLE
  *   2. If `!document` or disposedAt  → MISSING
- *   3. filedAt = latestVersion.uploadedAt
- *   4. expiryDate = filedAt + renewalYears
- *   5. If expiryDate < now          → OVERDUE
- *   6. If expiryDate ≤ now + 90 days → EXPIRING
- *   7. Else                          → COMPLIANT
+ *   3. If reviewStatus !== APPROVED  → AWAITING_REVIEW (PENDING or REJECTED)
+ *   4. filedAt = latestVersion.uploadedAt
+ *   5. expiryDate = filedAt + renewalYears
+ *   6. If expiryDate < now          → OVERDUE
+ *   7. If expiryDate ≤ now + 90 days → EXPIRING
+ *   8. Else                          → COMPLIANT
  *
  * EDGE CASES (defensive — these shouldn't happen in practice but the
  * calculator must not throw on bad input):
@@ -257,12 +265,19 @@ export function calculateStatus(
     return "MISSING";
   }
 
-  // 2b. MISSING if the document is not APPROVED (PENDING or REJECTED).
-  //     Review workflow (Option A): an un-reviewed upload doesn't count
-  //     toward compliance. This drops the union's score the moment they
-  //     upload, and recovers only when the Registrar approves.
+  // 2b. AWAITING_REVIEW if the document is not APPROVED (PENDING or REJECTED).
+  //     This is the key split from the old behavior: previously, PENDING/
+  //     REJECTED documents were folded into MISSING, which was misleading —
+  //     the union HAD uploaded, the document was just waiting for the
+  //     Registrar's review. Now it gets its own visible status so:
+  //       - The union sees "Awaiting Review" (blue), not "Missing" (gray)
+  //       - The Registrar sees their review backlog in the compliance matrix
+  //       - Inspectors can distinguish true gaps from pending reviews
+  //     AWAITING_REVIEW counts toward the rate denominator (it's an
+  //     applicable status — the document type IS required) but NOT the
+  //     numerator (the doc isn't compliant yet).
   if (document.reviewStatus !== "APPROVED") {
-    return "MISSING";
+    return "AWAITING_REVIEW";
   }
 
   // 3. filedAt = the moment the latest version was uploaded.
@@ -355,6 +370,11 @@ export const STATUS_BADGE_CLASSES: Record<
     text: "text-red-700",
     dot: "bg-red-500",
   },
+  AWAITING_REVIEW: {
+    badge: "bg-blue-100 text-blue-800 border-blue-200",
+    text: "text-blue-700",
+    dot: "bg-blue-500",
+  },
   MISSING: {
     badge: "bg-gray-100 text-gray-800 border-gray-200",
     text: "text-gray-700",
@@ -380,6 +400,7 @@ export const STATUS_LETTER: Record<ComplianceStatus, string> = {
   COMPLIANT: "C",
   EXPIRING: "E",
   OVERDUE: "O",
+  AWAITING_REVIEW: "R",
   MISSING: "M",
   NOT_APPLICABLE: "N/A",
 };
