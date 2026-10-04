@@ -26,12 +26,11 @@ import { NotificationsSkeleton } from "@/components/app/skeletons";
 import { ScrollToTop } from "@/components/app/scroll-to-top";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { GlobalSearch } from "@/components/app/global-search";
+import { parseStaffLinkUrl, getRoleLabel, getNotificationTypeLabel } from "@/lib/dashboard/vocabulary";
 import {
-  NAV_STRUCTURE,
   getNavForRole,
-  findGroupForRoute,
+  findDestination,
   type NavGroup,
-  type NavDestination,
   type StaffRole,
 } from "@/lib/dashboard/nav-structure";
 
@@ -48,13 +47,31 @@ interface Notification { id: string; type: string; title: string; body: string; 
 
 interface Crumb { label: string; view?: string }
 
-function buildBreadcrumbs(activeView: string, _role: AuthUser["role"]): Crumb[] {
+function buildBreadcrumbs(activeView: string, role: AuthUser["role"]): Crumb[] {
+  // Special-case views that aren't in the nav structure
   if (activeView === "account-security") return [{ label: "Home", view: "dashboard" }, { label: "Account Security" }];
+  if (activeView === "search") return [{ label: "Home", view: "dashboard" }, { label: "Search" }];
+  if (activeView === "document-detail") return [{ label: "Home", view: "dashboard" }, { label: "Documents", view: "documents" }, { label: "Document Details" }];
   // 6.3: breadcrumbs use the nav structure. The group label becomes a
   // crumb for dropdown children (e.g. Compliance > Rules); direct links
   // + the dashboard have no group crumb.
-  const group = findGroupForRoute(activeView);
-  if (!group) return [{ label: "Home", view: "dashboard" }, { label: activeView }];
+  //
+  // ROLE FILTERING: we look up the group in the role-filtered nav
+  // (getNavForRole), NOT in the full NAV_STRUCTURE. This prevents a user
+  // from seeing a crumb for a group they don't have access to — e.g. an
+  // OFFICER who lands on ?view=audit via deep link won't see "Admin" as
+  // a crumb (they'd just see "Home > Audit"). The full NAV_STRUCTURE's
+  // findGroupForRoute would happily return the Admin group regardless of
+  // role; the role-filtered version respects the user's permissions.
+  const navForRole = getNavForRole(role as StaffRole);
+  const group = navForRole.find((g) => g.destinations.some((d) => d.route === activeView)) ?? null;
+  if (!group) {
+    // The active route isn't in the user's role-filtered nav. Fall back to
+    // "Home > <canonical label>" using the destination's label if we can
+    // find it in the full NAV_STRUCTURE; otherwise use the raw route.
+    const dest = findDestination(activeView);
+    return [{ label: "Home", view: "dashboard" }, { label: dest?.label ?? activeView }];
+  }
   const dest = group.destinations.find((d) => d.route === activeView)!;
   const trail: Crumb[] = [{ label: "Home", view: "dashboard" }];
   // If the group has 2+ destinations (dropdown), add the group label as a
@@ -238,7 +255,7 @@ function NavDropdown({ group, activeView, onNavigate, hasActiveChild }: NavDropd
   );
 }
 
-interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view: string) => void; children: ReactNode; }
+interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view: string, params?: { unionId?: string; query?: string; documentId?: string }) => void; children: ReactNode; }
 
 export function AppShell({ user, activeView, onNavigate, children }: AppShellProps) {
   // REPRESENTATIVE users are redirected to /portal before reaching here,
@@ -267,7 +284,14 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
     try {
       await fetch(`/api/notifications/${id}/read`, { method: "PATCH", credentials: "include" });
       refetchNotifs();
-      if (linkUrl) onNavigate(linkUrl.replace(/^\//, ""));
+      if (linkUrl) {
+        // Use the audience-aware staff parser — only honors /?view=X,
+        // ignores /portal?view=X. This prevents a portal link from
+        // silently landing on the Dashboard (the staff app has no
+        // "contact" view, so onNavigate("contact") would fall through).
+        const view = parseStaffLinkUrl(linkUrl);
+        if (view) onNavigate(view);
+      }
     } catch { toast.error("Failed to mark notification as read."); }
   }
   async function markAllRead() {
@@ -322,7 +346,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="hidden text-xs md:inline-flex">{user.role}</Badge>
+            <Badge variant="outline" className="hidden text-xs md:inline-flex">{getRoleLabel(user.role)}</Badge>
             {/* Chunk 6: search button — opens the Cmd+K palette. Also opens on Cmd+K/Ctrl+K. */}
             <Button
               variant="outline"
@@ -375,7 +399,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
                       {group.items.map((n) => (
                         <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-1 p-3" onClick={() => markAsRead(n.id, n.linkUrl)}>
                           <div className="flex w-full items-center gap-2">
-                            <span className="text-xs font-medium uppercase text-muted-foreground">{n.type}</span>
+                            <span className="text-xs font-medium uppercase text-muted-foreground">{getNotificationTypeLabel(n.type)}</span>
                             <span className="ml-auto text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleDateString()}</span>
                           </div>
                           <p className="text-sm font-medium leading-tight">{n.title}</p>
@@ -395,7 +419,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel><div className="flex flex-col"><span className="text-sm font-medium">{user.email}</span><span className="text-xs text-muted-foreground">{user.role}{user.twoFactorEnabled && " · 2FA on"}</span></div></DropdownMenuLabel>
+                <DropdownMenuLabel><div className="flex flex-col"><span className="text-sm font-medium">{user.email}</span><span className="text-xs text-muted-foreground">{getRoleLabel(user.role)}{user.twoFactorEnabled && " · 2FA on"}</span></div></DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onNavigate("account-security")}><Shield className="mr-2 h-4 w-4" />Account Security</DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -437,7 +461,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
       <GlobalSearch
         open={searchOpen}
         onOpenChange={setSearchOpen}
-        onNavigate={(view) => onNavigate(view)}
+        onNavigate={(view, params) => onNavigate(view, params)}
         userRole={user.role}
       />
     </div>

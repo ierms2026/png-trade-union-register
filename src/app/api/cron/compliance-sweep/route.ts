@@ -5,6 +5,7 @@ import { Role, NotificationType, WebhookEventType } from "@prisma/client";
 import { createNotificationForUsers } from "@/lib/notifications";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import { dispatchEvent } from "@/lib/webhooks/dispatcher";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // POST /api/cron/compliance-sweep
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
         title,
         body,
         dedupKey,
-        linkUrl: `/compliance`,
+        linkUrl: staffLinkUrl("compliance"),
       });
       if (results[0]?.created) {
         notificationsCreated++;
@@ -240,7 +241,7 @@ export async function POST(req: NextRequest) {
                 title: `Non-Compliance task assigned: ${issue.documentType} — ${issue.unionName}`,
                 body: `A Non-Compliance task has been assigned to you. The ${issue.documentType} for ${issue.unionName} is OVERDUE. Please initiate enforcement protocols.`,
                 dedupKey: `task:auto-assigned:${issue.unionId}:${issue.documentType}:${weekKey}`,
-                linkUrl: "/?view=tasks",
+                linkUrl: staffLinkUrl("tasks"),
               });
             }
           }

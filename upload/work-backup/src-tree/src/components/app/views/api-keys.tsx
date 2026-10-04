@@ -37,11 +37,13 @@ interface ApiKey {
 
 const ALLOWED_SCOPES = [
   "unions:read",
+  "unions:read:pii",
   "unions:write",
   "documents:read",
   "documents:write",
   "compliance:read",
   "audit:read",
+  "webhooks:manage",
 ];
 
 export function ApiKeysView() {

@@ -54,7 +54,7 @@ export function LegislationView() {
       const body = editingId ? { id: editingId, ...formData } : formData;
       const res = await fetch("/api/legislation", { method, headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(body) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to save."); }
-      toast.success(editingId ? "Legislation updated." : "Legislation added.");
+      toast.success(editingId ? "Resource updated." : "Resource added.");
       setShowForm(false); refetch();
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to save."); }
     finally { setSaving(false); }
@@ -76,8 +76,8 @@ export function LegislationView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Resources Library</h1>
-          <p className="text-sm text-muted-foreground">Manage acts, regulations, and amendments.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Resources</h1>
+          <p className="text-sm text-muted-foreground">Manage acts, regulations, articles, and amendments.</p>
         </div>
         <Button onClick={handleAdd} className="gap-2"><Plus className="h-4 w-4" />Add Resource</Button>
       </div>
@@ -116,13 +116,13 @@ export function LegislationView() {
           ))}
         </div>
       ) : (
-        <Card><CardContent className="py-12"><EmptyState icon={Scale} title="No legislation entries" description="Click 'Add Legislation' to add the first entry." /></CardContent></Card>
+        <Card><CardContent className="py-12"><EmptyState icon={Scale} title="No resources" description="Click 'Add Resource' to add the first entry." /></CardContent></Card>
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Legislation" : "Add Legislation"}</DialogTitle>
+            <DialogTitle>{editingId ? "Edit Resource" : "Add Resource"}</DialogTitle>
             <DialogDescription>{editingId ? "Update this entry." : "Add a new act or regulation."}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

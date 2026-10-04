@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity, NotificationType, ReviewStatus } from "@prisma/client";
 import { createNotificationForUsers } from "@/lib/notifications";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import { hasPdfMagicBytes, validatePdfIntegrity } from "@/lib/file-validation";
 import { checkArchival } from "@/lib/document-archive";
 import {
@@ -184,10 +185,30 @@ export async function POST(
       { status: 400 },
     );
   }
-  // Validate `documentType` — non-empty string
+  // Validate `documentType` — non-empty string + must match a ComplianceRule
   if (!documentType || typeof documentType !== "string" || documentType.trim().length === 0) {
     return NextResponse.json(
       { error: "Missing or invalid 'documentType'. Expected a non-empty string." },
+      { status: 400 },
+    );
+  }
+  // Server-side validation: the documentType must match an existing ComplianceRule.
+  // The UI dropdown is also fed by ComplianceRule, so this is defense-in-depth
+  // against API callers who bypass the UI.
+  const trimmedDocType = documentType.trim();
+  const rule = await db.complianceRule.findUnique({
+    where: { documentType: trimmedDocType },
+    select: { id: true },
+  });
+  if (!rule) {
+    const allRules = await db.complianceRule.findMany({
+      select: { documentType: true },
+      orderBy: { documentType: "asc" },
+    });
+    return NextResponse.json(
+      {
+        error: `Unknown document type "${trimmedDocType}". Allowed types: ${allRules.map((r) => r.documentType).join(", ")}.`,
+      },
       { status: 400 },
     );
   }
@@ -416,7 +437,7 @@ export async function POST(
           title: notifTitle,
           body: notifBody,
           dedupKey: `review:${documentId}:${versionNumber}:${registrar.id}`,
-          linkUrl: `/reviews`,
+          linkUrl: staffLinkUrl("reviews"),
         });
       }
       await db.auditLog.create({

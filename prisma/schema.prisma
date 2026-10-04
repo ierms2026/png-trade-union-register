@@ -41,6 +41,12 @@ model User {
   // true — users receive email notifications unless they explicitly opt
   // out in Account Security settings.
   emailNotificationsEnabled Boolean   @default(true)
+  // SMS + WhatsApp notification fields. Referenced by notifications.ts +
+  // me/preferences/route.ts. Defaults to false (opt-in).
+  phone                        String?
+  phoneVerifiedAt              DateTime?
+  smsNotificationsEnabled      Boolean @default(false)
+  whatsappNotificationsEnabled Boolean @default(false)
   // Session 4: password reset flow — token generated at create time or on
   // admin reset, expires after a window. The set-password route consumes
   // the token + the user's chosen password (NEVER accepted in the admin
@@ -319,6 +325,10 @@ model Notification {
   readAt       DateTime?
   emailSentAt  DateTime?
   emailError   String?
+  // SMS/WhatsApp delivery tracking — referenced by notifications.ts but
+  // were missing from the schema, causing PrismaClientValidationError.
+  smsSentAt    DateTime?
+  smsError     String?
   createdAt    DateTime         @default(now())
 
   // FK relation — added in Chunk 5. Cascade delete: when a User is deleted,

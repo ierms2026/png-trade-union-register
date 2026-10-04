@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
       unionName: true,
       registrationNo: true,
       status: true,
+      updatedAt: true,
     },
     orderBy: { unionName: "asc" },
     take: 100, // cap at 100 results — the public search shouldn't dump the whole DB

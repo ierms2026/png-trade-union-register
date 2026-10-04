@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/prisma";
 import { Role, NotificationType } from "@prisma/client";
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
       title: subject,
       body: `${recipientTotal} compliance issue${recipientTotal !== 1 ? "s" : ""} requiring attention. ${recipientOverdue.length} overdue, ${recipientExpiring30.length} expiring within 30 days, ${recipientExpiring90.length} expiring within 90 days.`,
       dedupKey,
-      linkUrl: "/compliance",
+      linkUrl: staffLinkUrl("compliance"),
     });
 
     // Send the email directly (with the rich HTML digest template)

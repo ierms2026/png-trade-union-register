@@ -1,5 +1,6 @@
 "use client";
 
+import { getRoleLabel } from "@/lib/dashboard/vocabulary";
 import { useState, type FormEvent } from "react";
 import { Users, Plus, Shield, KeyRound, Loader2, UserCog, Copy, Check, MailWarning } from "lucide-react";
 import { toast } from "sonner";
@@ -164,7 +165,7 @@ function UserRow({ user, onUpdated }: { user: User; onUpdated: () => void }) {
         <div>
           <div className="flex items-center gap-2">
             <p className="font-medium">{user.email}</p>
-            <Badge variant="outline" className="text-xs">{user.role}</Badge>
+            <Badge variant="outline" className="text-xs">{getRoleLabel(user.role)}</Badge>
             {user.disabled && <Badge variant="destructive" className="text-xs">Disabled</Badge>}
             {user.twoFactorEnabled && (
               <Badge variant="secondary" className="text-xs">
@@ -549,7 +550,7 @@ function ResetPasswordDialog({ user, open, onClose, onReset }: ResetPasswordDial
                 <div>
                   <p className="text-sm font-medium">{user.email}</p>
                   <p className="text-xs text-muted-foreground">
-                    {user.role}
+                    {getRoleLabel(user.role)}
                     {user.twoFactorEnabled && " · 2FA enabled"}
                     {user.disabled && " · disabled"}
                   </p>

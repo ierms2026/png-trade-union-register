@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { staffLinkUrl, portalLinkUrl } from "@/lib/dashboard/vocabulary";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import {
@@ -118,7 +119,7 @@ export async function POST(
           title: `Contact-info update rejected`,
           body: `Your contact-info update for ${request.union.unionName} was rejected. Reason: ${reason}`,
           dedupKey: `contact-update-rejected:${request.id}`,
-          linkUrl: `/portal?view=contact`,
+          linkUrl: portalLinkUrl("contact"),
         });
       }
       await db.auditLog.create({

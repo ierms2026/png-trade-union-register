@@ -7,6 +7,7 @@ import { Role, Severity, NotificationType, ReviewStatus, WebhookEventType } from
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { createNotificationForUsers } from "@/lib/notifications";
 import { hasPdfMagicBytes, validatePdfIntegrity } from "@/lib/file-validation";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import {
   checkRateLimit,
   rateLimitedResponse,
@@ -157,6 +158,24 @@ export async function POST(
       { status: 400, headers: rlHeaders },
     );
   }
+  // Server-side validation: must match an existing ComplianceRule.
+  const trimmedDocType = documentType.trim();
+  const v1Rule = await db.complianceRule.findUnique({
+    where: { documentType: trimmedDocType },
+    select: { id: true },
+  });
+  if (!v1Rule) {
+    const allRules = await db.complianceRule.findMany({
+      select: { documentType: true },
+      orderBy: { documentType: "asc" },
+    });
+    return NextResponse.json(
+      {
+        error: `Unknown document type "${trimmedDocType}". Allowed types: ${allRules.map((r) => r.documentType).join(", ")}.`,
+      },
+      { status: 400, headers: rlHeaders },
+    );
+  }
   if (!title || typeof title !== "string" || title.trim().length === 0) {
     return NextResponse.json(
       { error: "Missing or invalid 'title'. Expected a non-empty string." },
@@ -299,7 +318,7 @@ export async function POST(
           title: `${existingUnion.unionName}: ${documentType.trim()} submitted via API`,
           body: `Version ${versionNumber} of "${documentType.trim()}" was submitted by ${user.email} via the v1 API. Please review it in the Review Queue.`,
           dedupKey: `review:${documentId}:${versionNumber}:${registrar.id}`,
-          linkUrl: `/reviews`,
+          linkUrl: staffLinkUrl("reviews"),
         });
       }
       await db.auditLog.create({

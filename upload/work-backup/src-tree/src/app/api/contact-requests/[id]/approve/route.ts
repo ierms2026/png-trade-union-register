@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { staffLinkUrl, portalLinkUrl } from "@/lib/dashboard/vocabulary";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import {
@@ -109,7 +110,7 @@ export async function POST(
           title: `Contact-info update approved`,
           body: `Your contact-info update for ${request.union.unionName} was approved by the Registrar. The changes are now live.`,
           dedupKey: `contact-update-approved:${request.id}`,
-          linkUrl: `/portal?view=contact`,
+          linkUrl: portalLinkUrl("contact"),
         });
       }
       await db.auditLog.create({

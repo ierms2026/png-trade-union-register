@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -16,6 +17,7 @@ import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { DocumentPreviewModal } from "@/components/app/document-preview-modal";
+import { REVIEW_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // Reviews view — pending document review queue for the Registrar.
@@ -98,9 +100,18 @@ export function ReviewsView() {
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <h3 className="font-medium">{item.documentType}</h3>
                       <Badge variant="outline" className="text-xs">v{item.versionNumber}</Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        <Clock className="mr-1 h-3 w-3" />Pending
-                      </Badge>
+                      <TooltipProvider delayDuration={0}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="cursor-help text-xs">
+                              <Clock className="mr-1 h-3 w-3" />Pending
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            {REVIEW_STATUS_CONFIG.PENDING.definition}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{item.unionName} ({item.registrationNo})</p>
                     <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">

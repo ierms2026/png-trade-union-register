@@ -1,5 +1,6 @@
 import { CheckCircle2, Pause, XCircle, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { getUnionStatusLabel } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // StatusBadge — renders a union status badge with an icon.
@@ -33,7 +34,7 @@ export function StatusBadge({ status }: { status: UnionStatus }) {
   return (
     <Badge variant={config.variant} className={`gap-1 ${config.className}`}>
       <Icon className="h-3 w-3" />
-      {status}
+      {getUnionStatusLabel(status as "ACTIVE" | "SUSPENDED" | "DEREGISTERED")}
     </Badge>
   );
 }

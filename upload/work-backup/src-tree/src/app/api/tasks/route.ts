@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity, NotificationType } from "@prisma/client";
@@ -225,7 +226,7 @@ export async function POST(req: NextRequest) {
         title: `New task assigned: ${task.title}`,
         body: `Assigned by ${user.email}. Priority: ${task.priority}.`,
         dedupKey: `task:assigned:${task.id}`,
-        linkUrl: "/?view=tasks",
+        linkUrl: staffLinkUrl("tasks"),
       });
     }
   }

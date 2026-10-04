@@ -66,7 +66,7 @@ export async function GET() {
     return NextResponse.json(entries);
   } catch (err) {
     console.error("[legislation] Failed to read legislation.json:", err);
-    return NextResponse.json({ error: "Legislation library not available." }, { status: 500 });
+    return NextResponse.json({ error: "Resources library not available." }, { status: 500 });
   }
 }
 

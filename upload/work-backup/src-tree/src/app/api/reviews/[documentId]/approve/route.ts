@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity, ReviewStatus, NotificationType } from "@prisma/client";
@@ -106,7 +107,7 @@ export async function POST(
           `for ${existing.union.unionName} has been approved by the Registrar. ` +
           `It now counts toward your union's compliance score.`,
         dedupKey: `review:approved:${documentId}:${latest.versionNumber}:${latest.uploadedById}`,
-        linkUrl: `/unions`,
+        linkUrl: staffLinkUrl("unions"),
       });
     }
   }

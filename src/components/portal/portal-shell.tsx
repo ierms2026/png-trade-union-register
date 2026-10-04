@@ -21,6 +21,7 @@ import { useFetch } from "@/components/app/use-fetch";
 import { NotificationsSkeleton } from "@/components/app/skeletons";
 import { ScrollToTop } from "@/components/app/scroll-to-top";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { parsePortalLinkUrl, getNotificationTypeLabel } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // PortalShell — chunk 5 (Union self-service portal).
@@ -105,10 +106,11 @@ export function PortalShell({
       await fetch(`/api/notifications/${id}/read`, { method: "PATCH", credentials: "include" });
       refetchNotifs();
       if (linkUrl) {
-        // linkUrl values from notifications are like "/portal?view=documents"
-        // — extract the view param.
-        const match = linkUrl.match(/[?&]view=([^&]+)/);
-        if (match) onNavigate(decodeURIComponent(match[1]));
+        // Use the audience-aware portal parser — only honors /portal?view=X,
+        // ignores /?view=X. This prevents a staff link from silently
+        // landing on the portal dashboard (the portal has no "tasks" view).
+        const view = parsePortalLinkUrl(linkUrl);
+        if (view) onNavigate(view);
       }
     } catch {
       toast.error("Failed to mark notification as read.");
@@ -219,7 +221,7 @@ export function PortalShell({
                           >
                             <div className="flex w-full items-center gap-2">
                               <span className="text-xs font-medium uppercase text-muted-foreground">
-                                {n.type}
+                                {getNotificationTypeLabel(n.type)}
                               </span>
                               <span className="ml-auto text-[10px] text-muted-foreground">
                                 {new Date(n.createdAt).toLocaleDateString()}

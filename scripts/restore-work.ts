@@ -1,129 +1,43 @@
 #!/usr/bin/env node
 // =============================================================================
-// restore-work.ts — restore the source tree from upload/work-backup/
+// scripts/restore-work.ts — convenience wrapper.
 //
-// Run this at the START of a session, after the platform has reverted the
-// workspace to its snapshot state. It:
-//   1. Reads MANIFEST.json from upload/work-backup/
-//   2. Copies each backed-up file back into the source tree
-//   3. Runs `prisma db push` to apply the restored schema
-//   4. Restarts the dev server
+// The REAL script lives at upload/work-backup/scripts/restore-work.ts (which
+// is outside the snapshot path and survives session rehydration). This file
+// is just a shorter path so users can type:
 //
-// Usage:  npx tsx upload/work-backup/scripts/restore-work.ts
+//   npx tsx scripts/restore-work.ts
+//
+// instead of the longer canonical path. The canonical script calls its
+// main() at module load, so importing it is sufficient to run the restore.
+//
+// WHY A WRAPPER INSTEAD OF A SYMLINK:
+//   The build environment doesn't allow creating symlinks via the tooling,
+//   and a wrapper achieves the same UX (one short command) without that
+//   limitation. The canonical script is the source of truth — edit there,
+//   not here. If the canonical script's path ever changes, update the
+//   import path below.
+//
+// WHAT HAPPENS ON SESSION REVERT:
+//   scripts/ is inside the snapshot path, so this wrapper gets wiped on
+//   every session revert. But the backup script captures the canonical
+//   script's content into the manifest (it follows the import), and
+//   restore-work.ts writes that content back to scripts/restore-work.ts
+//   as a real file (not a wrapper) on the next restore. So after the
+//   first restore, both paths work — the canonical path because it
+//   always did, and scripts/restore-work.ts because it now contains the
+//   actual script content.
+//
+// USAGE NOTE:
+//   At the very start of a fresh session (after the platform has reverted
+//   the workspace), this wrapper does NOT yet exist — the snapshot wiped
+//   it. Use the canonical path for that first restore:
+//
+//     npx tsx upload/work-backup/scripts/restore-work.ts
+//
+//   That restore writes scripts/restore-work.ts back as a real file with
+//   the canonical content, so subsequent restores within the same session
+//   can use the shorter `npx tsx scripts/restore-work.ts` path.
 // =============================================================================
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import crypto from "node:crypto";
-import { execSync } from "node:child_process";
-
-const PROJECT_ROOT = "/home/z/my-project";
-const BACKUP_ROOT = path.join(PROJECT_ROOT, "upload", "work-backup");
-
-interface ManifestEntry {
-  path: string;
-  checksum: string;
-  size: number;
-  mtime: string;
-}
-
-interface Manifest {
-  backedUpAt: string;
-  prismaVersion: string;
-  nodeVersion: string;
-  fileCount: number;
-  files: ManifestEntry[];
-}
-
-async function sha256(filePath: string): Promise<string> {
-  const buf = await fs.readFile(filePath);
-  return crypto.createHash("sha256").update(buf).digest("hex");
-}
-
-async function main() {
-  const startedAt = new Date();
-  console.log(`[restore-work] Starting at ${startedAt.toISOString()}`);
-
-  // --- 1. Load manifest ---
-  const manifestPath = path.join(BACKUP_ROOT, "MANIFEST.json");
-  let manifest: Manifest;
-  try {
-    const raw = await fs.readFile(manifestPath, "utf8");
-    manifest = JSON.parse(raw);
-  } catch (err) {
-    console.error(`[restore-work] No backup found at ${manifestPath}.`);
-    console.error(`[restore-work] Run backup-work.ts first (at the end of a work batch).`);
-    process.exit(1);
-  }
-
-  console.log(`[restore-work] Backup from ${manifest.backedUpAt} (${manifest.fileCount} files)`);
-
-  // --- 2. Restore each file ---
-  let restored = 0;
-  let skipped = 0;
-  let failed = 0;
-
-  for (const entry of manifest.files) {
-    const src = path.join(BACKUP_ROOT, "src-tree", entry.path);
-    const dest = path.join(PROJECT_ROOT, entry.path);
-
-    try {
-      // Verify the backup file's checksum matches the manifest
-      const srcChecksum = await sha256(src);
-      if (srcChecksum !== entry.checksum) {
-        console.warn(`[restore-work] CHECKSUM MISMATCH on ${entry.path} — skipping`);
-        failed++;
-        continue;
-      }
-
-      // Check if the destination already matches (skip if unchanged)
-      try {
-        const destChecksum = await sha256(dest);
-        if (destChecksum === entry.checksum) {
-          skipped++;
-          continue;
-        }
-      } catch {
-        // Destination doesn't exist — proceed with restore
-      }
-
-      // Create parent directories + copy
-      await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.copyFile(src, dest);
-      restored++;
-    } catch (err) {
-      console.warn(`[restore-work] Failed to restore ${entry.path}:`, err);
-      failed++;
-    }
-  }
-
-  console.log(`[restore-work] Restored: ${restored}, skipped (unchanged): ${skipped}, failed: ${failed}`);
-
-  // --- 3. Apply Prisma schema + regenerate client ---
-  console.log(`[restore-work] Running prisma db push + generate...`);
-  try {
-    execSync("npx prisma db push --accept-data-loss 2>&1", { cwd: PROJECT_ROOT, stdio: "inherit" });
-    execSync("npx prisma generate 2>&1", { cwd: PROJECT_ROOT, stdio: "inherit" });
-    console.log(`[restore-work] ✓ Prisma schema applied + client regenerated`);
-  } catch (err) {
-    console.warn(`[restore-work] Prisma push failed — the schema may already be in sync.`);
-  }
-
-  // --- 4. Restart the dev server ---
-  console.log(`[restore-work] Restarting dev server...`);
-  try {
-    execSync("pkill -f next-server 2>/dev/null; pkill -f 'next dev' 2>/dev/null; sleep 2", { stdio: "inherit" });
-    execSync("setsid bash -c 'bun run dev > /tmp/dev.log 2>&1 &'", { cwd: PROJECT_ROOT, stdio: "inherit" });
-    console.log(`[restore-work] Dev server restarted. Wait ~12s for it to be ready.`);
-  } catch (err) {
-    console.warn(`[restore-work] Could not restart dev server automatically — run \`bun run dev\` manually.`);
-  }
-
-  console.log(`[restore-work] ✓ Done. Restored ${restored} files from backup taken ${manifest.backedUpAt}.`);
-  console.log(`[restore-work] Check the dashboard at http://localhost:3000/ in ~12 seconds.`);
-}
-
-main().catch((err) => {
-  console.error("[restore-work] FAILED:", err);
-  process.exit(1);
-});
+import "../upload/work-backup/scripts/restore-work.ts";

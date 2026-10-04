@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { ScrollText, Search, ChevronDown, ChevronRight, Filter, FileDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,20 @@ import { EmptyState } from "@/components/app/empty-state";
 // =============================================================================
 // Audit view — filterable table with expandable before/after JSON diff.
 //
-// FILTERS:
-//   - entityType, action, actor, startDate, endDate
-//   - Pagination via page + limit
+// URL-AWARE FILTERS:
+//   All filter state (?entityType, ?action, ?actor, ?startDate, ?endDate,
+//   ?page) is synced to the URL. This means:
+//     - Refresh keeps the filters (the URL is read on mount)
+//     - Back/Forward preserves the filters (popstate re-reads the URL)
+//     - Sharing a URL reproduces the exact filtered view
+//     - Bookmarks work (the URL captures the full filter state)
 //
-// EXPANDABLE ROWS:
-//   Each row has a expand/collapse toggle. When expanded, shows the
-//   beforeJson + afterJson side-by-side for diff inspection.
+// The filter INPUTS update local state immediately (for responsive UX). The
+// URL is only pushed when the user clicks "Apply filters" or "Clear" — so
+// typing in a filter box doesn't create a history entry per keystroke.
+//
+// Page changes (Previous/Next) push to the URL immediately — each page is
+// a history entry, so Back returns to the previous page.
 // =============================================================================
 
 interface AuditEntry {
@@ -52,19 +59,76 @@ function formatJson(json: string | null): string {
   }
 }
 
+/** Read audit filter state from the URL search params. */
+function readAuditFiltersFromUrl(urlParams: URLSearchParams) {
+  return {
+    entityType: urlParams.get("entityType") ?? "",
+    action: urlParams.get("action") ?? "",
+    actor: urlParams.get("actor") ?? "",
+    startDate: urlParams.get("startDate") ?? "",
+    endDate: urlParams.get("endDate") ?? "",
+    page: parseInt(urlParams.get("page") ?? "1", 10) || 1,
+  };
+}
+
+/** Read the initial filter state from the URL (for lazy useState initializer). */
+function readInitialAuditFilters() {
+  if (typeof window === "undefined") {
+    return { entityType: "", action: "", actor: "", startDate: "", endDate: "", page: 1 };
+  }
+  return readAuditFiltersFromUrl(new URLSearchParams(window.location.search));
+}
+
 export function AuditView() {
-  // Filter state
-  const [entityType, setEntityType] = useState("");
-  const [action, setAction] = useState("");
-  const [actor, setActor] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [page, setPage] = useState(1);
+  // --- Initialize filter state from the URL on mount -----------------------
+  // We use lazy initializers (useState(() => ...)) to read the URL on the
+  // FIRST render only. This avoids the "setState in effect" anti-pattern
+  // + avoids a flash of the default filters before the URL is read.
+  //
+  // This makes refresh + shared links reproduce the exact filtered view:
+  //   /?view=audit&action=user_login  →  action filter pre-filled
+  //   /?view=audit&page=3             →  starts on page 3
+  const initial = readInitialAuditFilters();
+  const [entityType, setEntityType] = useState(initial.entityType);
+  const [action, setAction] = useState(initial.action);
+  const [actor, setActor] = useState(initial.actor);
+  const [startDate, setStartDate] = useState(initial.startDate);
+  const [endDate, setEndDate] = useState(initial.endDate);
+  const [page, setPage] = useState(initial.page);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // --- Listen for Back/Forward + pushState ---------------------------------
+  // When the URL changes (via browser Back/Forward, or another component
+  // pushing a new URL), re-read the audit filter params and update state.
+  // This keeps the view in sync with the URL — the URL is the source of
+  // truth.
+  useEffect(() => {
+    function handleUrlChange() {
+      const urlParams = new URLSearchParams(window.location.search);
+      // Only react if we're still on the audit view. If the URL changed
+      // to a different view, this component is about to unmount — skip
+      // the state update to avoid an unnecessary refetch.
+      const view = urlParams.get("view");
+      if (view !== "audit") return;
+      const filters = readAuditFiltersFromUrl(urlParams);
+      setEntityType(filters.entityType);
+      setAction(filters.action);
+      setActor(filters.actor);
+      setStartDate(filters.startDate);
+      setEndDate(filters.endDate);
+      setPage(filters.page);
+    }
+    window.addEventListener("popstate", handleUrlChange);
+    window.addEventListener("urlchange", handleUrlChange);
+    return () => {
+      window.removeEventListener("popstate", handleUrlChange);
+      window.removeEventListener("urlchange", handleUrlChange);
+    };
+  }, []);
 
   const limit = 20;
 
-  // Build the query string
+  // Build the API query string from the current filter state.
   const params = new URLSearchParams();
   if (entityType) params.set("entityType", entityType);
   if (action) params.set("action", action);
@@ -80,17 +144,57 @@ export function AuditView() {
 
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
+  // --- Push the current filter state to the URL ----------------------------
+  // Called by "Apply filters" + "Clear". Builds a URL with ?view=audit +
+  // all non-empty filter params, then pushes it. The pushState monkey-patch
+  // in page.tsx dispatches `urlchange`, which triggers our listener above —
+  // but since the state already matches, it's a no-op.
+  const pushFiltersToUrl = useCallback(() => {
+    const url = new URL(window.location.origin + "/");
+    url.searchParams.set("view", "audit");
+    if (entityType) url.searchParams.set("entityType", entityType);
+    if (action) url.searchParams.set("action", action);
+    if (actor) url.searchParams.set("actor", actor);
+    if (startDate) url.searchParams.set("startDate", startDate);
+    if (endDate) url.searchParams.set("endDate", endDate);
+    if (page > 1) url.searchParams.set("page", String(page));
+    window.history.pushState({}, "", url.toString());
+  }, [entityType, action, actor, startDate, endDate, page]);
+
   function handleFilterSubmit(e: FormEvent) {
     e.preventDefault();
     setPage(1);
-    refetch();
+    // Push to URL after page is set to 1. We use a setTimeout(0) to ensure
+    // the state update has flushed before reading it in pushFiltersToUrl.
+    // (React batches state updates; the pushFiltersToUrl callback reads
+    // the current state via its dependency array, so it will have the
+    // updated page=1 on the next render. But we want to push NOW, not on
+    // the next render. So we defer to the next tick.)
+    setTimeout(() => pushFiltersToUrl(), 0);
+  }
+
+  function handleClear() {
+    setEntityType(""); setAction(""); setActor(""); setStartDate(""); setEndDate(""); setPage(1);
+    // Push a clean ?view=audit URL (no filter params).
+    setTimeout(() => {
+      const url = new URL(window.location.origin + "/");
+      url.searchParams.set("view", "audit");
+      window.history.pushState({}, "", url.toString());
+    }, 0);
+  }
+
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
+    // Push the new page to the URL immediately — each page is a history
+    // entry, so Back returns to the previous page.
+    setTimeout(() => pushFiltersToUrl(), 0);
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Audit</h1>
           <p className="text-sm text-muted-foreground">
             Complete record of all system actions. Filterable by entity, action, actor, and date range.
           </p>
@@ -138,9 +242,7 @@ export function AuditView() {
                 <Search className="mr-2 h-4 w-4" />
                 Apply filters
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => {
-                setEntityType(""); setAction(""); setActor(""); setStartDate(""); setEndDate(""); setPage(1);
-              }}>
+              <Button type="button" variant="outline" size="sm" onClick={handleClear}>
                 Clear
               </Button>
             </div>
@@ -160,11 +262,11 @@ export function AuditView() {
               Showing {(page - 1) * limit + 1}–{Math.min(page * limit, data.total)} of {data.total} entries
             </span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => handlePageChange(page - 1)}>
                 Previous
               </Button>
               <span className="flex items-center px-2 text-xs">Page {page} of {totalPages}</span>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => handlePageChange(page + 1)}>
                 Next
               </Button>
             </div>

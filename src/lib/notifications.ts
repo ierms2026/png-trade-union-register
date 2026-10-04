@@ -2,6 +2,7 @@ import { db } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { sendSMS, truncateForSms } from "@/lib/sms";
 import { NotificationType } from "@prisma/client";
+import { resolveLinkUrlForEmail, inferLinkAudience } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // Notification helper — the single entry point for creating notifications.
@@ -107,11 +108,13 @@ export async function createNotification(
   let emailError: string | null = null;
 
   if (emailNotificationsEnabled) {
+    const absoluteLinkUrl = resolveLinkUrlForEmail(linkUrl, "http://localhost:3000") ?? undefined;
+    const audience = inferLinkAudience(linkUrl);
     const emailResult = await sendEmail({
       to: userEmail,
       subject: title,
-      html: renderEmailTemplate(title, body, linkUrl),
-      text: `${title}\n\n${body}\n${linkUrl ? `\nView: ${linkUrl}` : ""}`,
+      html: renderEmailTemplate(title, body, absoluteLinkUrl, audience),
+      text: `${title}\n\n${body}${absoluteLinkUrl ? `\nView: ${absoluteLinkUrl}` : ""}`,
     });
     emailSent = emailResult.success;
     emailError = emailResult.success ? null : (emailResult.error || "Unknown error");
@@ -130,7 +133,8 @@ export async function createNotification(
 
   // --- 4. Send WhatsApp (if enabled + phone provided) ---
   if (whatsappNotificationsEnabled && phone) {
-    const waBody = `${title}\n\n${body}${linkUrl ? `\n\nView: ${linkUrl}` : ""}`;
+    const absoluteLinkUrl = resolveLinkUrlForEmail(linkUrl, "http://localhost:3000");
+    const waBody = `${title}\n\n${body}${absoluteLinkUrl ? `\n\nView: ${absoluteLinkUrl}` : ""}`;
     const waResult = await sendSMS({ to: phone, body: waBody, whatsapp: true });
     // If SMS was also sent, we keep both results. The smsSentAt tracks the
     // last SMS-channel attempt (WhatsApp is technically a separate channel
@@ -177,10 +181,19 @@ export async function createNotification(
  * external stylesheets. The template is intentionally simple — plain
  * white background, system font, a header bar, the body text, and a
  * link button.
+ *
+ * The link button label adapts to the audience: "View in Dashboard" for
+ * staff notifications, "View in Portal" for portal notifications.
  */
-function renderEmailTemplate(title: string, body: string, linkUrl?: string): string {
+function renderEmailTemplate(
+  title: string,
+  body: string,
+  linkUrl?: string,
+  audience?: "staff" | "portal",
+): string {
+  const buttonLabel = audience === "portal" ? "View in Portal" : "View in Dashboard";
   const linkButton = linkUrl
-    ? `<a href="${linkUrl}" style="display:inline-block;margin-top:16px;padding:10px 24px;background:#1a1a2e;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;">View in Dashboard</a>`
+    ? `<a href="${linkUrl}" style="display:inline-block;margin-top:16px;padding:10px 24px;background:#1a1a2e;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;">${escapeHtml(buttonLabel)}</a>`
     : "";
 
   return `<!DOCTYPE html>

@@ -1,5 +1,6 @@
 "use client";
 
+import { getUnionStatusLabel } from "@/lib/dashboard/vocabulary";
 import {
   CheckCircle2, AlertTriangle, Clock, FileText, ListTodo,
   TrendingUp, Calendar, ArrowRight, Upload, Contact as AddressBook,
@@ -80,7 +81,7 @@ export function PortalDashboardView({
         <h1 className="text-3xl font-bold tracking-tight">{data.union.unionName}</h1>
         <p className="text-sm text-muted-foreground">
           Registration No. {data.union.registrationNo} · Status:{" "}
-          <span className="font-medium">{data.union.status}</span>
+          <span className="font-medium">{getUnionStatusLabel(data.union.status as "ACTIVE" | "SUSPENDED" | "DEREGISTERED")}</span>
         </p>
       </div>
 

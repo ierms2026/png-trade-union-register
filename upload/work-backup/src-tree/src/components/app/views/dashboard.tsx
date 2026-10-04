@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, Plus, Upload, ListTodo, ScrollText, ArrowRight, FileDown } from "lucide-react";
+import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, ArrowRight, FileDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { STATUS_CONFIG, getTileStatuses, COMPLIANCE_STATUSES, EXPIRING_WINDOW_DA
 import { type ComplianceCounts, getRequiredVsOnFileByType, sumOnFile, type RequiredVsOnFileEntry, NEEDS_ATTENTION_CAP, getUnionDocMatrix, type UnionDocMatrix, type ComplianceCell, type UnionSummary, getExpiryForecast, type ExpiryForecast, type ForecastBucket } from "@/lib/dashboard/metrics";
 import { formatDueDate, formatAbsolute, formatEventRelative } from "@/lib/dashboard/date-utils";
 import { complianceFilterUrl, complianceUnfilteredUrl, unionsListUrl } from "@/lib/dashboard/dashboard-links";
+import { getQuickActions, type StaffRole } from "@/lib/dashboard/nav-structure";
 import {
   hasSufficientHistory,
   sliceTrendToWindow,
@@ -1471,40 +1472,45 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
         </p>
       </div>
 
-      {/* === Row 1: Quick Actions (unchanged, full width) === */}
-      {/* Quick Actions — role-gated per NAV_ITEMS in app-shell.tsx */}
+      {/* === Row 1: Quick Actions (full width) === */}
+      {/* Quick Actions — derived from NAV_STRUCTURE via getQuickActions.
+          One source of truth: the destinations + their quickAction metadata
+          live in nav-structure.ts. The dashboard just renders whatever
+          getQuickActions returns for the current role. No hard-coded role
+          checks or button definitions here — those would drift from the
+          nav the moment someone adds a destination without updating this
+          block. */}
       {onNavigate && (
         <div data-testid="quick-actions" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {(user.role === "REGISTRAR" || user.role === "INSPECTOR") && (
-            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("unions")}>
-              <Plus className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">Register Union</span>
-            </Button>
-          )}
-          {(user.role === "REGISTRAR" || user.role === "OFFICER") && (
-            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate(user.role === "OFFICER" ? "my-union" : "unions")}>
-              <Upload className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">Upload Document</span>
-            </Button>
-          )}
-          {(user.role === "REGISTRAR" || user.role === "OFFICER") && (
-            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("tasks")}>
-              <ListTodo className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">Create Task</span>
-            </Button>
-          )}
-          {(user.role === "REGISTRAR" || user.role === "INSPECTOR") && (
-            <Button variant="outline" className="h-auto flex-col gap-1 py-3" onClick={() => onNavigate("audit")}>
-              <ScrollText className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">View Audit Log</span>
-            </Button>
-          )}
-          <a href="/reports/compliance" target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" className="h-auto w-full flex-col gap-1 py-3">
-              <FileText className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">Compliance Report</span>
-            </Button>
-          </a>
+          {getQuickActions(user.role as StaffRole).map((action) => {
+            const Icon = action.icon;
+            if (action.kind === "external" && action.href) {
+              return (
+                <a
+                  key={`qa-${action.route}`}
+                  href={action.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="outline" className="h-auto w-full flex-col gap-1 py-3">
+                    <Icon className="h-5 w-5 text-primary" />
+                    <span className="text-xs font-medium">{action.label}</span>
+                  </Button>
+                </a>
+              );
+            }
+            return (
+              <Button
+                key={`qa-${action.route}`}
+                variant="outline"
+                className="h-auto flex-col gap-1 py-3"
+                onClick={() => onNavigate(action.route)}
+              >
+                <Icon className="h-5 w-5 text-primary" />
+                <span className="text-xs font-medium">{action.label}</span>
+              </Button>
+            );
+          })}
         </div>
       )}
 

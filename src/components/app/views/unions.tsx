@@ -1,7 +1,8 @@
 "use client";
+import { getUnionStatusLabel } from "@/lib/dashboard/vocabulary";
 import Link from "next/link";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import {
   Building2,
   Upload,
@@ -148,11 +149,21 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
                 <CardDescription className="mt-1 flex items-center gap-2">
                   <span>Reg. No: {selectedUnion.registrationNo}</span>
                   <Badge variant={selectedUnion.status === "ACTIVE" ? "default" : "secondary"}>
-                    {selectedUnion.status}
+                    {getUnionStatusLabel(selectedUnion.status as "ACTIVE" | "SUSPENDED" | "DEREGISTERED")}
                   </Badge>
                 </CardDescription>
               </div>
               <div className="flex gap-2">
+                <Link
+                  href={`/unions/${selectedUnion.registrationNo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button size="sm" variant="ghost">
+                    <Globe className="mr-2 h-4 w-4" />
+                    View public record
+                  </Button>
+                </Link>
                 <Button
                   size="sm"
                   variant="outline"
@@ -320,7 +331,11 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
               <span>Union Name</span><span>Reg. No.</span><span className="text-center">Documents</span><span className="text-center">Status</span><span />
             </div>
             {filteredUnions.map((u) => (
-              <Link key={u.id} href={`/unions/${u.registrationNo}`} className="grid w-full grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30 border-l-2 border-solid border-l-transparent hover:border-l-accent">
+              <div
+                key={u.id}
+                onClick={() => setSelectedUnionId(u.id)}
+                className="grid w-full cursor-pointer grid-cols-[1fr_140px_100px_120px_24px] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/30 border-l-2 border-solid border-l-transparent hover:border-l-accent"
+              >
                 <div className="min-w-0">
                   <p className="truncate font-medium">{u.unionName}</p>
                   <p className="truncate text-xs text-muted-foreground sm:hidden">{u.registrationNo} · {u.documents.length} doc{u.documents.length !== 1 ? "s" : ""}</p>
@@ -329,7 +344,7 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
                 <span className="hidden text-center text-sm text-muted-foreground sm:inline">{u.documents.length}</span>
                 <span className="hidden text-center sm:flex sm:justify-center"><StatusBadge status={u.status} /></span>
                 <ChevronRight className="hidden h-4 w-4 justify-self-end text-muted-foreground sm:block" />
-              </Link>
+              </div>
             ))}
           </CardContent>
         </Card>
@@ -835,10 +850,14 @@ function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded }: Up
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Sync the doc type when the default changes (e.g., user clicks "New version" on a specific doc)
-  useState(() => {
+  // Fetch compliance rules for the document-type dropdown
+  const { data: complianceData } = useFetch<{ documentTypes: string[] }>("/api/compliance");
+  const documentTypes = complianceData?.documentTypes ?? [];
+
+  // Sync the doc type when the default changes
+  useEffect(() => {
     if (defaultDocType) setDocumentType(defaultDocType);
-  });
+  }, [defaultDocType]);
 
   async function handleUpload(e: FormEvent) {
     e.preventDefault();
@@ -890,13 +909,17 @@ function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded }: Up
         </DialogHeader>
         <form onSubmit={handleUpload} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="docType">Document Type</Label>
-            <Input
-              id="docType"
-              value={documentType}
-              onChange={(e) => setDocumentType(e.target.value)}
-              placeholder="e.g. Constitution, Financial Return"
-            />
+            <Label>Document Type</Label>
+            <Select value={documentType} onValueChange={setDocumentType} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a document type" />
+              </SelectTrigger>
+              <SelectContent>
+                {documentTypes.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>

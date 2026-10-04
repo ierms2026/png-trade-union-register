@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { FieldError } from "@/components/app/field-error";
+import { ForgotPasswordForm } from "@/components/app/forgot-password-form";
 import { validateEmail, validateRequired, isValid } from "@/lib/validation";
 
 interface LoginResponse {
@@ -20,7 +21,13 @@ interface LoginResponse {
 interface Props { onBackToPortal: () => void; }
 
 export function LoginForm({ onBackToPortal }: Props) {
-  const [step, setStep] = useState<"password" | "2fa">("password");
+  // The login screen has three sub-states:
+  //   - "password": email + password form (the default)
+  //   - "2fa":      6-digit TOTP code form (after password verifies)
+  //   - "forgot":   self-service "Forgot password?" form
+  // All three share the same chrome (coat-of-arms header, "Back to Public
+  // Portal" footer). Only the card body changes.
+  const [step, setStep] = useState<"password" | "2fa" | "forgot">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -59,6 +66,14 @@ export function LoginForm({ onBackToPortal }: Props) {
 
   function backToPassword() { setStep("password"); setOtp(""); setChallengeToken(""); setErrors({}); }
 
+  // --- "Forgot password?" sub-screen delegates to its own component --------
+  // The ForgotPasswordForm owns its own state (email, loading, submitted,
+  // rate-limited). We just give it an onBackToLogin callback that returns
+  // the user to the password step here.
+  if (step === "forgot") {
+    return <ForgotPasswordForm onBackToLogin={backToPassword} />;
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
@@ -72,7 +87,20 @@ export function LoginForm({ onBackToPortal }: Props) {
             <CardContent>
               <form onSubmit={handlePasswordSubmit} className="space-y-4">
                 <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus /><FieldError error={errors.email} /></div>
-                <div className="space-y-2"><Label htmlFor="password">Password</Label><Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /><FieldError error={errors.password} /></div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => { setErrors({}); setStep("forgot"); }}
+                      className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+                  <FieldError error={errors.password} />
+                </div>
                 <Button type="submit" className="w-full" disabled={loading}>{loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : "Sign in"}</Button>
               </form>
             </CardContent>

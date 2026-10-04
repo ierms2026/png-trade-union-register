@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Severity } from "@prisma/client";
+import { Role, Severity } from "@prisma/client";
 import {
   checkRateLimit,
   rateLimitedResponse,
@@ -43,8 +43,9 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // --- 2. Officer scoping — can only access their own union's docs ---------
-  if (user.role === "OFFICER" && user.assignedUnionId !== unionId) {
+  // --- 2. Officer/Representative scoping — can only access their own union's docs ---
+  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only download documents from your own union." },
       { status: 403 },

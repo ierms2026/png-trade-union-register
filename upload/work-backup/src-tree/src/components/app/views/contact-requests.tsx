@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Contact as AddressBook, CheckCircle2, XCircle, Loader2, Clock, History,
 } from "lucide-react";
@@ -64,7 +64,64 @@ const STATUS_FILTERS = [
 ] as const;
 
 export function ContactRequestsView() {
-  const [statusFilter, setStatusFilter] = useState<string>("PENDING");
+  // --- URL-aware status filter -------------------------------------------
+  // The filter (?status=) is synced to the URL so that:
+  //   - Refresh keeps the filter (read on mount via lazy initializer)
+  //   - Back/Forward preserves the filter (popstate re-reads the URL)
+  //   - Sharing a URL reproduces the exact filtered view
+  //
+  // The default is "PENDING" (the most useful filter for Registrars). If
+  // the URL has ?status=APPROVED, the view initializes to "APPROVED".
+  //
+  // We use a lazy initializer (useState(() => ...)) to read the URL on the
+  // FIRST render only. This avoids the "setState in effect" anti-pattern
+  // + avoids a flash of the default filter before the URL is read.
+  const [statusFilter, setStatusFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "PENDING";
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlStatus = urlParams.get("status");
+    if (urlStatus && STATUS_FILTERS.some((f) => f.value === urlStatus)) {
+      return urlStatus;
+    }
+    return "PENDING";
+  });
+
+  // Listen for Back/Forward + pushState — re-read the filter from the URL.
+  useEffect(() => {
+    function handleUrlChange() {
+      const urlParams = new URLSearchParams(window.location.search);
+      // Only react if we're still on the contact-requests view.
+      const view = urlParams.get("view");
+      if (view !== "contact-requests") return;
+      const urlStatus = urlParams.get("status");
+      if (urlStatus && STATUS_FILTERS.some((f) => f.value === urlStatus)) {
+        setStatusFilter(urlStatus);
+      } else {
+        // No ?status= in the URL → default to PENDING.
+        setStatusFilter("PENDING");
+      }
+    }
+    window.addEventListener("popstate", handleUrlChange);
+    window.addEventListener("urlchange", handleUrlChange);
+    return () => {
+      window.removeEventListener("popstate", handleUrlChange);
+      window.removeEventListener("urlchange", handleUrlChange);
+    };
+  }, []);
+
+  // When the user changes the filter via the dropdown, push the new value
+  // to the URL. This makes the filter shareable + Back/Forward work.
+  function handleStatusChange(newStatus: string) {
+    setStatusFilter(newStatus);
+    const url = new URL(window.location.origin + "/");
+    url.searchParams.set("view", "contact-requests");
+    if (newStatus !== "PENDING") {
+      // Only add ?status= if it's not the default (keeps URLs clean).
+      url.searchParams.set("status", newStatus);
+    }
+    window.history.pushState({}, "", url.toString());
+  }
+
   const { data, loading, error, refetch } = useFetch<{ requests: ContactRequest[] }>(
     `/api/contact-requests?status=${statusFilter}`,
   );
@@ -99,12 +156,12 @@ export function ContactRequestsView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Contact Update Requests</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Contact Updates</h1>
           <p className="text-sm text-muted-foreground">
             Review contact-info changes submitted by union representatives
           </p>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>

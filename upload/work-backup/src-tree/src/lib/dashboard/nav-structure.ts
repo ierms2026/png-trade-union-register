@@ -1,57 +1,87 @@
 // =============================================================================
-// Nav Structure — chunk 6.3. The single source of truth for the staff
-// dashboard's navigation structure.
+// Nav Structure — the SINGLE SOURCE OF TRUTH for the staff dashboard's
+// navigation, search palette, quick actions, + breadcrumbs.
 //
-// HOME: `src/lib/dashboard/nav-structure.ts`. Lives in the dashboard lib
-// tree alongside status-config.ts + activity-config.ts. The nav component
-// (`src/components/app/app-shell.tsx`) imports `getNavForRole` + types from
-// here and renders the structure — zero destination strings hardcoded in
-// JSX (grep guard).
+// STRUCTURE: 8 top-level groups, 19 destinations:
 //
-// STRUCTURE: 5 top-level items, 3 with dropdowns (13 destinations total —
-// the spec said 12, but `my-union` is a 13th item that maps to the same
-// view as `unions` via `page.tsx`'s switch. Per the spec's "Do not delete
-// destinations", all 13 are kept).
+//   Dashboard     (direct link, all roles)
+//   Unions        (dropdown: Unions, My Union, Documents, Compare)
+//   Compliance    (dropdown: Compliance, Rules)
+//   Tasks         (direct link, all roles)
+//   Calendar      (direct link, all roles)
+//   Work Queues   (dropdown: Review Queue, Contact Updates, Retention Queue)
+//   Search        (direct link, all roles)
+//   Admin         (dropdown: Audit, Users, Security, API Keys, Webhooks, Resources)
 //
-//   Dashboard    (direct link, all roles)
-//   Unions       (dropdown: Unions, My Union, Compare)
-//   Compliance   (dropdown: Compliance, Rules, Review Queue)
-//   Tasks        (direct link, REGISTRAR + OFFICER)
-//   Admin        (dropdown: Calendar, Audit, Users, Security, API Keys)
+// All 19 destinations are reachable in ≤2 clicks.
 //
-// All 13 destinations are reachable in ≤2 clicks: top-level direct = 1
-// click; dropdown child = 2 clicks (open dropdown + click child). The
-// reachability test in `dashboard-nav.test.ts` walks the structure and
-// asserts this.
+// =============================================================================
 //
-// ROLE GATING: each destination carries a `roles` array. `getNavForRole`
-// filters: a group is shown if ANY of its destinations is available to
-// the role; a dropdown's available destinations are filtered to the role.
-// A group with NO available destinations is hidden entirely (e.g. an
-// OFFICER sees no "Admin" group — none of its children are OFFICER-
-// accessible).
+// ONE SOURCE OF TRUTH — WHAT THIS FILE OWNS
+// -----------------------------------------------------------------------------
+// Every UI surface that lists destinations must read from NAV_STRUCTURE (or a
+// helper derived from it). Hard-coded destination lists elsewhere are a bug —
+// they drift. Specifically:
 //
-// DEEP-LINK PRESERVATION: the `route` field for each destination is
-// byte-identical to the pre-6.3 `NAV_ITEMS[].id` strings. The deep-link
-// test asserts this against the pre-chunk inventory recorded in the 6.3
-// handoff.
+//   1. TOP NAV (app-shell.tsx HorizontalNav)        → reads getNavForRole(role)
+//   2. CMD+K PALETTE (global-search.tsx)            → reads getPaletteEntries(role)
+//   3. DASHBOARD QUICK ACTIONS (dashboard.tsx)      → reads getQuickActions(role)
+//   4. BREADCRUMBS (app-shell.tsx buildBreadcrumbs) → reads getNavForRole(role)
+//                                                      + findGroupForRoute()
 //
-// LINKS MODULE COINCIDENCE: per the 6.3 spec, "The links module is for
-// coinciding destinations only; do not wire nav into the filter contract."
-// The nav's Compliance link is the plain Compliance page (no status
-// filter) — it does NOT use `complianceFilterUrl` from `dashboard-links.ts`.
-// The links module's `complianceFilterUrl` is for the KPI cards' drill-
-// through (4.1), not for nav.
+// CANONICAL LABELS — ONE NAME PER DESTINATION
+// -----------------------------------------------------------------------------
+// Each destination has ONE `label`. That label is used in the menu, the
+// palette, the breadcrumb, and (where applicable) the page heading. Older
+// copies of these names (e.g. "Compliance Matrix", "Security Dashboard",
+// "Audit Log", "Resources Library", "Legislation") are kept ONLY in the
+// `aliases` array so the palette's fuzzy-search still matches them — they
+// are NEVER shown to the user. This means renaming a destination is a
+// one-line edit here, and every surface updates at once.
+//
+// The `vocabulary.ts` `VIEW_TITLES` map mirrors these labels for view
+// headings. If you rename a destination here, update `VIEW_TITLES` too —
+// there's a test in `dashboard-nav.test.ts` that fails if they drift.
 // =============================================================================
 
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
   ListTodo, Calendar, ScrollText, Users, Shield, Key, FileCheck, Home,
-  Scale, Contact as AddressBook, type LucideIcon,
+  Scale, Contact as AddressBook, Webhook, FileText, Plus, Upload, Search,
+  Archive, ClipboardList, HelpCircle, type LucideIcon,
 } from "lucide-react";
 
 /** The three staff roles. Matches AuthUser["role"] in app-shell.tsx. */
 export type StaffRole = "REGISTRAR" | "INSPECTOR" | "OFFICER";
+
+/**
+ * Quick-action descriptor. A destination with `quickAction` set appears as a
+ * button in the dashboard's Quick Actions row. Two kinds:
+ *
+ *   - `{ kind: "navigate" }` — clicking the button calls onNavigate(route).
+ *       Used for actions whose primary purpose is "jump to this view" (e.g.
+ *       "Register Union" jumps to the unions view).
+ *   - `{ kind: "external", href }` — clicking opens `href` in a new tab.
+ *       Used for the Compliance Report (lives at /reports/compliance, outside
+ *       the SPA router).
+ *
+ * The label + icon come from the destination itself — quick actions don't
+ * override them. This keeps the quick-action button visually consistent
+ * with the menu item for the same destination.
+ *
+ * ROLE GATING: the destination's `roles` array still applies. A quick action
+ * only appears for users whose role is in `roles`. The dashboard doesn't
+ * need its own role checks — getQuickActions(role) filters automatically.
+ *
+ * `shortLabel` (optional): the quick-action button has less horizontal room
+ * than the menu, so a destination can specify a shorter verb-style label
+ * for the button (e.g. "Register Union" instead of "Unions", "Upload
+ * Document" instead of "Documents"). If omitted, the destination's `label`
+ * is used.
+ */
+export type QuickAction =
+  | { kind: "navigate"; shortLabel?: string }
+  | { kind: "external"; href: string; shortLabel?: string };
 
 /**
  * A single nav destination. The `route` is the string passed to
@@ -60,14 +90,31 @@ export type StaffRole = "REGISTRAR" | "INSPECTOR" | "OFFICER";
  * (deep-link preservation).
  */
 export interface NavDestination {
-  /** The label shown in the nav. */
+  /**
+   * The CANONICAL label — used in the menu, palette, breadcrumb, and (where
+   * applicable) the page heading. ONE name per destination; do not surface
+   * aliases to the user.
+   */
   label: string;
   /** The route string (passed to onNavigate). Byte-identical to pre-6.3 ids. */
   route: string;
-  /** Lucide icon component for the dropdown item. */
+  /** Lucide icon component for the dropdown item / palette row / quick action. */
   icon: LucideIcon;
   /** Roles that can see this destination. */
   roles: StaffRole[];
+  /**
+   * Optional aliases — old names for this destination that the palette's
+   * fuzzy-search should still match. NEVER shown to the user; only used for
+   * matching. E.g. `["Compliance Matrix", "Legislation"]` for the
+   * "Compliance" / "Resources" destinations.
+   */
+  aliases?: string[];
+  /**
+   * Optional quick-action descriptor. If set, this destination appears as a
+   * button in the dashboard's Quick Actions row (role-gated by `roles`).
+   * See QuickAction for the two kinds.
+   */
+  quickAction?: QuickAction;
 }
 
 /**
@@ -97,32 +144,19 @@ export interface NavGroup {
 }
 
 /**
- * The complete nav structure. 5 top-level groups, 13 destinations.
+ * The complete nav structure. 8 top-level groups, 19 destinations.
+ * Ordered left-to-right in the top nav.
  *
- * The order is the reading order (left-to-right in the top nav). Groups
- * are ordered by:
- *   1. Dashboard (always first — the home)
- *   2. Registry oversight (Unions group: Unions, My Union, Compare)
- *   3. Compliance (Compliance group: Compliance, Rules, Review Queue)
- *   4. Productivity (Tasks — direct link, no dropdown)
- *   5. Admin (Calendar, Audit, Users, Security, API Keys)
- *
- * This order matches the pre-6.3 NAV_ITEMS order (which was: Dashboard,
- * Unions, My Union, Compliance, Rules, Compare, Tasks, Review Queue,
- * Calendar, Audit, Users, Security, API Keys) — the grouping preserves
- * the relative order within each group.
+ * LABEL DISCIPLINE: each destination's `label` is the canonical name. The
+ * palette, breadcrumbs, and page headings all use it. Aliases (where
+ * present) are search-only — never displayed.
  */
 export const NAV_STRUCTURE: NavGroup[] = [
   {
     label: "Dashboard",
     icon: LayoutDashboard,
     destinations: [
-      {
-        label: "Dashboard",
-        route: "dashboard",
-        icon: LayoutDashboard,
-        roles: ["REGISTRAR", "INSPECTOR", "OFFICER"],
-      },
+      { label: "Dashboard", route: "dashboard", icon: LayoutDashboard, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"] },
     ],
     route: "dashboard",
   },
@@ -130,112 +164,78 @@ export const NAV_STRUCTURE: NavGroup[] = [
     label: "Unions",
     icon: Building2,
     destinations: [
-      {
-        label: "Unions",
-        route: "unions",
-        icon: Building2,
-        roles: ["REGISTRAR", "INSPECTOR"],
-      },
-      {
-        label: "My Union",
-        route: "my-union",
-        icon: Home,
-        roles: ["OFFICER"],
-      },
-      {
-        label: "Compare",
-        route: "compare",
-        icon: GitCompare,
-        roles: ["REGISTRAR", "INSPECTOR"],
-      },
+      { label: "Unions", route: "unions", icon: Building2, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Register Union"], quickAction: { kind: "navigate", shortLabel: "Register Union" } },
+      { label: "My Union", route: "my-union", icon: Home, roles: ["OFFICER"], quickAction: { kind: "navigate", shortLabel: "Upload Document" } },
+      { label: "Documents", route: "documents", icon: FileText, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Upload Document"], quickAction: { kind: "navigate", shortLabel: "Upload Document" } },
+      { label: "Compare", route: "compare", icon: GitCompare, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Compare Unions"] },
     ],
   },
   {
     label: "Compliance",
     icon: CheckCircle2,
     destinations: [
-      {
-        label: "Compliance",
-        route: "compliance",
-        icon: CheckCircle2,
-        roles: ["REGISTRAR", "INSPECTOR", "OFFICER"],
-      },
-      {
-        label: "Rules",
-        route: "configure-rules",
-        icon: Settings2,
-        roles: ["REGISTRAR"],
-      },
-      {
-        label: "Review Queue",
-        route: "reviews",
-        icon: FileCheck,
-        roles: ["REGISTRAR"],
-      },
-      {
-        label: "Contact Updates",
-        route: "contact-requests",
-        icon: AddressBook,
-        roles: ["REGISTRAR"],
-      },
+      { label: "Compliance", route: "compliance", icon: CheckCircle2, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Compliance Matrix", "Compliance Status"] },
+      { label: "Rules", route: "configure-rules", icon: Settings2, roles: ["REGISTRAR"], aliases: ["Configure Rules"] },
     ],
   },
   {
     label: "Tasks",
     icon: ListTodo,
     destinations: [
-      {
-        label: "Tasks",
-        route: "tasks",
-        icon: ListTodo,
-        roles: ["REGISTRAR", "INSPECTOR", "OFFICER"],
-      },
+      { label: "Tasks", route: "tasks", icon: ListTodo, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Create Task"], quickAction: { kind: "navigate", shortLabel: "Create Task" } },
     ],
     route: "tasks",
+  },
+  {
+    label: "Calendar",
+    icon: Calendar,
+    destinations: [
+      { label: "Calendar", route: "calendar", icon: Calendar, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"] },
+    ],
+    route: "calendar",
+  },
+  {
+    label: "Work Queues",
+    icon: ClipboardList,
+    destinations: [
+      { label: "Review Queue", route: "reviews", icon: FileCheck, roles: ["REGISTRAR"] },
+      { label: "Contact Updates", route: "contact-requests", icon: AddressBook, roles: ["REGISTRAR"], aliases: ["Contact Update Requests"] },
+      { label: "Retention Queue", route: "retention", icon: Archive, roles: ["REGISTRAR"], aliases: ["Retention"] },
+    ],
+  },
+  {
+    label: "Search",
+    icon: Search,
+    destinations: [
+      { label: "Search", route: "search", icon: Search, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Search Documents"] },
+    ],
+    route: "search",
   },
   {
     label: "Admin",
     icon: Shield,
     destinations: [
-      {
-        label: "Calendar",
-        route: "calendar",
-        icon: Calendar,
-        roles: ["REGISTRAR", "INSPECTOR", "OFFICER"],
-      },
-      {
-        label: "Audit",
-        route: "audit",
-        icon: ScrollText,
-        roles: ["REGISTRAR", "INSPECTOR"],
-      },
-      {
-        label: "Users",
-        route: "users",
-        icon: Users,
-        roles: ["REGISTRAR"],
-      },
-      {
-        label: "Security",
-        route: "security",
-        icon: Shield,
-        roles: ["REGISTRAR"],
-      },
-      {
-        label: "API Keys",
-        route: "api-keys",
-        icon: Key,
-        roles: ["REGISTRAR"],
-      },
-      {
-        label: "Resources",
-        route: "legislation",
-        icon: Scale,
-        roles: ["REGISTRAR"],
-      },
+      { label: "Audit", route: "audit", icon: ScrollText, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Audit Log"], quickAction: { kind: "navigate", shortLabel: "View Audit Log" } },
+      { label: "Users", route: "users", icon: Users, roles: ["REGISTRAR"] },
+      { label: "Security", route: "security", icon: Shield, roles: ["REGISTRAR"], aliases: ["Security Dashboard"] },
+      { label: "API Keys", route: "api-keys", icon: Key, roles: ["REGISTRAR"] },
+      { label: "Webhooks", route: "webhooks", icon: Webhook, roles: ["REGISTRAR"] },
+      { label: "Resources", route: "legislation", icon: Scale, roles: ["REGISTRAR"], aliases: ["Resources Library", "Legislation", "Legislation Library"] },
     ],
   },
+  {
+    label: "Help",
+    icon: HelpCircle,
+    destinations: [
+      { label: "Help & Guide", route: "help", icon: HelpCircle, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Guide", "Glossary", "Status Glossary"] },
+    ],
+    route: "help",
+  },
 ];
+
+// =============================================================================
+// Helpers — single source of truth for nav, palette, quick actions, breadcrumbs
+// =============================================================================
 
 /**
  * Filter the nav structure to the destinations available to a given role.
@@ -250,6 +250,9 @@ export const NAV_STRUCTURE: NavGroup[] = [
  *   if 2+, render dropdown).
  *
  * Pure: no I/O, no side effects. Pass a role, get the filtered structure.
+ *
+ * Used by: app-shell.tsx (top nav + breadcrumbs), global-search.tsx
+ * (palette navigation group), dashboard.tsx (quick actions).
  */
 export function getNavForRole(role: StaffRole): NavGroup[] {
   return NAV_STRUCTURE.map((group) => ({
@@ -264,7 +267,7 @@ export function getNavForRole(role: StaffRole): NavGroup[] {
  * route. Used by the route smoke test + reachability test in
  * `dashboard-nav.test.ts`.
  *
- * Returns 13 routes (the complete inventory, regardless of role). The
+ * Returns 19 routes (the complete inventory, regardless of role). The
  * tests use this to assert every route resolves in `page.tsx`'s switch
  * + is reachable in ≤2 clicks.
  */
@@ -274,7 +277,8 @@ export function getAllRoutes(): string[] {
 
 /**
  * Find the group that contains a given route. Used by the nav component
- * to highlight the parent group when a child route is active.
+ * to highlight the parent group when a child route is active, and by the
+ * breadcrumb builder to add a group crumb for dropdown children.
  *
  * Returns the group, or null if the route isn't in any group (e.g. the
  * `account-security` route, which is reachable only via the user menu,
@@ -285,6 +289,20 @@ export function findGroupForRoute(route: string): NavGroup | null {
     if (group.destinations.some((d) => d.route === route)) {
       return group;
     }
+  }
+  return null;
+}
+
+/**
+ * Find a specific destination by route. Returns null if not found.
+ *
+ * Used by the breadcrumb builder to read the canonical label, and by
+ * the palette to read aliases for fuzzy matching.
+ */
+export function findDestination(route: string): NavDestination | null {
+  for (const group of NAV_STRUCTURE) {
+    const dest = group.destinations.find((d) => d.route === route);
+    if (dest) return dest;
   }
   return null;
 }
@@ -306,3 +324,149 @@ export function clicksToReach(route: string): number {
   // Dropdown child (group with 2+ destinations) = 2 clicks.
   return group.destinations.length === 1 ? 1 : 2;
 }
+
+// =============================================================================
+// Palette entries — derived from NAV_STRUCTURE, filtered by role.
+// -----------------------------------------------------------------------------
+// Used by global-search.tsx's "Navigation" group. Each entry carries the
+// destination's canonical label + icon + route + any aliases (for fuzzy
+// matching). The palette component builds the cmdk `value` string from
+// these — no hard-coded list in the palette file.
+// =============================================================================
+
+export interface PaletteEntry {
+  /** The destination's canonical route (passed to onNavigate). */
+  route: string;
+  /** The destination's canonical label (shown in the palette row). */
+  label: string;
+  /** The destination's icon. */
+  icon: LucideIcon;
+  /** Old names for fuzzy-match purposes. Never shown to the user. */
+  aliases: string[];
+  /** The group label — used as a secondary hint in the palette row. */
+  groupLabel: string;
+}
+
+/**
+ * Return every destination visible to `role`, as palette entries.
+ *
+ * The palette shows destinations from ALL visible groups in one flat list
+ * (cmdk groups them by group label if it wants, but the data is flat).
+ * `my-union` and `unions` are mutually exclusive by role — the palette
+ * doesn't need to special-case them; the role filter handles it.
+ */
+export function getPaletteEntries(role: StaffRole): PaletteEntry[] {
+  return getNavForRole(role).flatMap((group) =>
+    group.destinations.map((dest) => ({
+      route: dest.route,
+      label: dest.label,
+      icon: dest.icon,
+      aliases: dest.aliases ?? [],
+      groupLabel: group.label,
+    })),
+  );
+}
+
+// =============================================================================
+// Quick actions — derived from NAV_STRUCTURE, filtered by role.
+// -----------------------------------------------------------------------------
+// Used by dashboard.tsx's Quick Actions row. A destination appears as a
+// quick action iff it has `quickAction` set AND the user's role is in
+// `roles`. The dashboard reads this list and renders one button per entry.
+// =============================================================================
+
+export interface QuickActionEntry {
+  /** The destination's canonical route. For `external` actions, this is unused. */
+  route: string;
+  /** The label shown on the button. Uses `quickAction.shortLabel` if set, else `label`. */
+  label: string;
+  /** The destination's icon. */
+  icon: LucideIcon;
+  /** The action kind — navigate (SPA) or external (new tab). */
+  kind: "navigate" | "external";
+  /** For `external` actions, the URL to open in a new tab. Unused for `navigate`. */
+  href?: string;
+}
+
+/**
+ * Return every quick action visible to `role`, in NAV_STRUCTURE order.
+ *
+ * The dashboard renders these in a 4-column grid. The order matches the
+ * nav structure (Dashboard group first, then Unions, etc.), so the
+ * quick-action row visually echoes the menu order. Destinations without
+ * `quickAction` set are skipped.
+ *
+ * EXTERNAL ACTIONS: the Compliance Report is the one external quick action.
+ * It lives at /reports/compliance (a Server Component route, outside the
+ * SPA router), so it can't use onNavigate — it opens in a new tab instead.
+ */
+export function getQuickActions(role: StaffRole): QuickActionEntry[] {
+  const entries: QuickActionEntry[] = [];
+  for (const group of NAV_STRUCTURE) {
+    for (const dest of group.destinations) {
+      if (!dest.quickAction) continue;
+      if (!dest.roles.includes(role)) continue;
+      const label = dest.quickAction.shortLabel ?? dest.label;
+      if (dest.quickAction.kind === "navigate") {
+        entries.push({ route: dest.route, label, icon: dest.icon, kind: "navigate" });
+      } else {
+        entries.push({ route: dest.route, label, icon: dest.icon, kind: "external", href: dest.quickAction.href });
+      }
+    }
+  }
+  // --- Extra quick actions that aren't nav destinations --------------------
+  // The Compliance Report is a printable Server Component route at
+  // /reports/compliance — it's not in the SPA router's switch, so it can't
+  // be a NAV_STRUCTURE destination. But it's still a dashboard quick action
+  // for all staff roles (Registrar, Inspector, Officer can all view the
+  // report — different content per role, but the route is the same).
+  //
+  // Defined here so the dashboard's quick-action row has ONE source of
+  // truth: getQuickActions(role) returns both nav-derived actions AND
+  // these extras. The dashboard doesn't keep its own list.
+  for (const extra of EXTRA_QUICK_ACTIONS) {
+    if (!extra.roles.includes(role)) continue;
+    entries.push({
+      route: extra.route,
+      label: extra.label,
+      icon: extra.icon,
+      kind: "external",
+      href: extra.href,
+    });
+  }
+  return entries;
+}
+
+/**
+ * Extra quick actions that aren't nav destinations. These live outside the
+ * SPA router (e.g. /reports/compliance is a Server Component route that
+ * opens in a new tab). They're declared here so getQuickActions() is the
+ * single source of truth for the dashboard's quick-action row — the
+ * dashboard doesn't keep a separate list.
+ *
+ * If you add a new printable report or external tool that should appear as
+ * a quick action, add it here. Don't add it to the dashboard component —
+ * that re-introduces the drift problem.
+ */
+interface ExtraQuickAction {
+  /** Stable identifier (not a route — used for React keys). */
+  route: string;
+  /** The label shown on the button. */
+  label: string;
+  /** The icon shown on the button. */
+  icon: LucideIcon;
+  /** The URL to open in a new tab. */
+  href: string;
+  /** Roles that can see this action. */
+  roles: StaffRole[];
+}
+
+const EXTRA_QUICK_ACTIONS: ExtraQuickAction[] = [
+  {
+    route: "compliance-report",
+    label: "Compliance Report",
+    icon: FileText,
+    href: "/reports/compliance",
+    roles: ["REGISTRAR", "INSPECTOR", "OFFICER"],
+  },
+];

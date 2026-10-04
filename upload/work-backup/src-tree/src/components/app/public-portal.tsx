@@ -4,23 +4,26 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Building2, Search, FileText, ExternalLink, Scale, LogIn,
+  Building2, Search, FileText, ExternalLink, Scale, LogIn, HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/app/status-badge";
+import { RegistrarContactInfo } from "@/components/app/registrar-contact-info";
+import { StatusGlossary, type GlossaryEntry } from "@/components/app/status-glossary";
+import { UNION_STATUS_CONFIG, COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 import { useFetch } from "@/components/app/use-fetch";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 
-interface PublicUnion { id: string; unionName: string; registrationNo: string; status: string; }
+interface PublicUnion { id: string; unionName: string; registrationNo: string; status: string; updatedAt: string; }
 interface LegislationEntry { id: string; title: string; shortTitle: string; year: number; jurisdiction: string; category: string; summary: string; url: string; lastUpdated: string; }
 interface Props { onStaffLogin: () => void; }
 
 export function PublicPortal({ onStaffLogin }: Props) {
-  const [tab, setTab] = useState<"search" | "legislation">("search");
+  const [tab, setTab] = useState<"search" | "legislation" | "help">("search");
   const [searchQuery, setSearchQuery] = useState("");
   const { data: allUnions, loading: unionsLoading, error: unionsError } = useFetch<{ unions: PublicUnion[] }>("/api/public/unions");
   const { data: legislation, loading: legLoading, error: legError } = useFetch<LegislationEntry[]>("/api/legislation");
@@ -33,7 +36,12 @@ export function PublicPortal({ onStaffLogin }: Props) {
   })();
 
   function renderHero() {
-    const lastUpdated = allUnions ? new Date().toLocaleDateString("en-PG", { year: "numeric", month: "long", day: "numeric" }) : null;
+    // Calculate the real "last updated" date from the most recent union
+    // updatedAt timestamp — not today's date.
+    const all = allUnions?.unions ?? [];
+    const lastUpdated = all.length > 0
+      ? new Date(Math.max(...all.map((u) => new Date(u.updatedAt).getTime()))).toLocaleDateString("en-PG", { year: "numeric", month: "long", day: "numeric" })
+      : null;
     return (
       <div className="space-y-4 text-center">
         <div className="flex items-center justify-center gap-3">
@@ -95,7 +103,7 @@ export function PublicPortal({ onStaffLogin }: Props) {
     return (
       <div className="space-y-4">
         <div className="space-y-2 text-center">
-          <h2 className="text-lg font-semibold">Resources Library</h2>
+          <h2 className="text-lg font-semibold">Resources</h2>
           <p className="text-sm text-muted-foreground">Acts and regulations governing trade unions in Papua New Guinea.</p>
         </div>
         {legLoading ? <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (<Card key={i}><CardContent className="space-y-2 p-4"><div className="h-5 w-2/3 animate-pulse rounded bg-muted" /><div className="h-4 w-full animate-pulse rounded bg-muted" /></CardContent></Card>))}</div>
@@ -103,7 +111,72 @@ export function PublicPortal({ onStaffLogin }: Props) {
         : legislation && legislation.length > 0 ? (<div className="space-y-3">{legislation.map((entry) => (
           <Card key={entry.id}><CardContent className="p-4"><div className="flex items-start justify-between gap-4"><div className="flex-1"><div className="mb-1 flex items-center gap-2"><h3 className="font-medium">{entry.title}</h3><Badge variant="outline" className="text-xs">{entry.category}</Badge></div><p className="mb-2 text-sm text-muted-foreground">{entry.summary}</p><p className="text-xs text-muted-foreground">{entry.jurisdiction} · {entry.year} · Last updated {new Date(entry.lastUpdated).toLocaleDateString()}</p></div><Button asChild size="sm" variant="outline"><a href={entry.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1 h-3 w-3" />View PDF</a></Button></div></CardContent></Card>
         ))}</div>)
-        : <EmptyState icon={Scale} title="No legislation available" description="The legislation library is empty. Please check back later." />}
+        : <EmptyState icon={Scale} title="No resources available" description="The resources library is empty. Please check back later." />}
+      </div>
+    );
+  }
+
+  function renderHelp() {
+    // Build glossary entries from the canonical status configs (single source
+    // of truth in vocabulary.ts). The public glossary uses plainLanguage
+    // (everyday wording) as the primary text + the formal definition as a
+    // secondary detail.
+    const unionStatusEntries: GlossaryEntry[] = Object.values(UNION_STATUS_CONFIG).map((cfg) => ({
+      label: cfg.label,
+      icon: cfg.icon,
+      tone: cfg.className,
+      definition: cfg.definition,
+      plainLanguage: cfg.plainLanguage,
+    }));
+
+    // Compliance statuses — shown without NOT_APPLICABLE (not relevant to the
+    // public; it's an internal config concept). Use COMPLIANCE_STATUS_CONFIG
+    // from vocabulary.ts (which mirrors status-config.ts but with the same
+    // plain-language definitions).
+    const complianceEntries: GlossaryEntry[] = Object.entries(COMPLIANCE_STATUS_CONFIG)
+      .filter(([key]) => key !== "NOT_APPLICABLE")
+      .map(([, cfg]) => ({
+        label: cfg.label,
+        icon: cfg.icon,
+        tone: cfg.cell,
+        definition: cfg.definition,
+      }));
+
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <h2 className="text-lg font-semibold">What These Terms Mean</h2>
+          <p className="text-sm text-muted-foreground">
+            A short guide to the words used on this register. If you see a term you don&apos;t recognise, check here.
+          </p>
+        </div>
+
+        <StatusGlossary
+          title="Union Statuses"
+          description="The status shown next to each union on the register."
+          entries={unionStatusEntries}
+          showPlainLanguage
+        />
+
+        <StatusGlossary
+          title="Compliance Statuses"
+          description="How the Registrar tracks whether each union has filed the documents it needs to file."
+          entries={complianceEntries}
+        />
+
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <HelpCircle className="mt-0.5 h-5 w-5 shrink-0 text-accent-foreground" />
+              <div className="text-sm text-muted-foreground">
+                <p className="mb-1 font-medium text-foreground">Still unsure?</p>
+                <p>
+                  If a term on this register doesn&apos;t make sense, or you have a question about a specific union, contact the Office of The Industrial Registrar — details are in the footer below.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -116,24 +189,29 @@ export function PublicPortal({ onStaffLogin }: Props) {
             <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={32} height={26} className="h-8 w-auto" />
             <div><p className="text-sm font-semibold leading-tight">Register of Trade Unions</p><p className="text-xs text-muted-foreground">Office of The Industrial Registrar · Papua New Guinea</p></div>
           </div>
-          <Button variant="outline" size="sm" className="border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40" onClick={onStaffLogin}><LogIn className="mr-2 h-4 w-4" />Staff Login</Button>
+          <Button variant="outline" size="sm" className="border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40" onClick={onStaffLogin}><LogIn className="mr-2 h-4 w-4" />Sign In</Button>
         </div>
         <div className="h-1.5 bg-accent" />
       </header>
       <div className="border-b bg-card">
         <div className="mx-auto flex max-w-4xl gap-1 px-4">
           <button onClick={() => setTab("search")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "search" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Register</button>
-          <button onClick={() => setTab("legislation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "legislation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Resources Library</button>
+          <button onClick={() => setTab("legislation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "legislation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Resources</button>
+          <button onClick={() => setTab("help")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "help" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Help</button>
         </div>
       </div>
       <main className="mx-auto max-w-4xl space-y-10 p-4 py-10">
         {renderHero()}
-        {tab === "search" ? renderSearch() : renderLegislation()}
+        {tab === "search" ? renderSearch() : tab === "legislation" ? renderLegislation() : renderHelp()}
       </main>
       <footer className="border-t bg-card">
-        <div className="mx-auto max-w-4xl space-y-2 px-4 py-6 text-center text-xs text-muted-foreground">
+        <div className="mx-auto max-w-4xl space-y-3 px-4 py-6 text-center text-xs text-muted-foreground">
           <p className="font-medium">Office of The Industrial Registrar</p>
           <p>PNG Department of Labour &amp; Industrial Relations</p>
+          {/* Contact details — only rendered if at least one is configured
+              via NEXT_PUBLIC_REGISTRAR_* env vars. The compact variant shows
+              them as a single inline line, separated by middle dots. */}
+          <RegistrarContactInfo variant="compact" className="text-xs" />
           <p className="text-muted-foreground/70">© {new Date().getFullYear()} Independent State of Papua New Guinea · All rights reserved</p>
           <p className="text-muted-foreground/70">This register is published in accordance with the Industrial Organizations Act. For enquiries, contact the Office of The Industrial Registrar.</p>
         </div>

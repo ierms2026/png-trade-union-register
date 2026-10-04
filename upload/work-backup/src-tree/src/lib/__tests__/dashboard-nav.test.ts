@@ -52,45 +52,60 @@ const PRE_CHUNK_ROUTES = [
   "dashboard",
   "unions",
   "my-union",
+  "documents",
   "compliance",
   "configure-rules",
   "compare",
   "tasks",
+  "search",
   "reviews",
+  "retention",
   "contact-requests",
   "calendar",
   "audit",
   "users",
   "security",
   "api-keys",
+  "webhooks",
   "legislation",
 ] as const;
 
+// POST-CHUNK ADDITIONS: routes added after chunk 6.3 by later work.
+// These are intentional additions to the nav structure, not pre-chunk routes.
+// Listed here so the deep-link preservation test can distinguish "pre-chunk
+// routes that must be preserved" from "new routes that are allowed to be
+// added". The test below asserts that the only new routes are in this list.
+const POST_CHUNK_ADDITIONS = ["help"] as const;
+
 describe("nav-structure — NAV_STRUCTURE config (chunk 6.3)", () => {
-  it("has exactly 5 top-level groups (the spec's target)", () => {
-    expect(NAV_STRUCTURE).toHaveLength(5);
+  it("has exactly 9 top-level groups", () => {
+    expect(NAV_STRUCTURE).toHaveLength(9);
   });
 
-  it("the 5 groups are: Dashboard, Unions, Compliance, Tasks, Admin", () => {
+  it("the 9 groups are: Dashboard, Unions, Compliance, Tasks, Calendar, Work Queues, Search, Admin, Help", () => {
     expect(NAV_STRUCTURE.map((g) => g.label)).toEqual([
       "Dashboard",
       "Unions",
       "Compliance",
       "Tasks",
+      "Calendar",
+      "Work Queues",
+      "Search",
       "Admin",
+      "Help",
     ]);
   });
 
-  it("2 groups are direct links (Dashboard, Tasks); 3 are dropdowns (Unions, Compliance, Admin)", () => {
+  it("6 groups are direct links (Dashboard, Tasks, Calendar, Search, Help); 3 are dropdowns (Unions, Compliance, Work Queues, Admin)", () => {
     const directLinks = NAV_STRUCTURE.filter((g) => g.destinations.length === 1);
     const dropdowns = NAV_STRUCTURE.filter((g) => g.destinations.length > 1);
-    expect(directLinks.map((g) => g.label)).toEqual(["Dashboard", "Tasks"]);
-    expect(dropdowns.map((g) => g.label)).toEqual(["Unions", "Compliance", "Admin"]);
+    expect(directLinks.map((g) => g.label)).toEqual(["Dashboard", "Tasks", "Calendar", "Search", "Help"]);
+    expect(dropdowns.map((g) => g.label)).toEqual(["Unions", "Compliance", "Work Queues", "Admin"]);
   });
 
-  it("all 15 destinations are present (13 original + legislation + contact-requests)", () => {
+  it("all 20 destinations are present in NAV_STRUCTURE", () => {
     const allRoutes = getAllRoutes();
-    expect(allRoutes).toHaveLength(15);
+    expect(allRoutes).toHaveLength(20);
   });
 
   it("every destination has a non-empty label + route + icon + roles array", () => {
@@ -114,11 +129,13 @@ describe("nav-structure — deep-link preservation (DONE WHEN criterion)", () =>
     }
   });
 
-  it("NAV_STRUCTURE introduces NO new routes (only the pre-chunk 15)", () => {
+  it("NAV_STRUCTURE introduces NO new routes beyond the allowed post-chunk additions", () => {
     const allRoutes = getAllRoutes();
     const preChunkSet = new Set(PRE_CHUNK_ROUTES);
+    const allowedAdditions = new Set<string>(POST_CHUNK_ADDITIONS);
     const newRoutes = allRoutes.filter((r) => !preChunkSet.has(r as typeof PRE_CHUNK_ROUTES[number]));
-    expect(newRoutes, `no new routes; found: ${newRoutes.join(", ")}`).toEqual([]);
+    const unexpected = newRoutes.filter((r) => !allowedAdditions.has(r));
+    expect(unexpected, `unexpected new routes: ${unexpected.join(", ")}`).toEqual([]);
   });
 
   it("every route is unique within NAV_STRUCTURE (no duplicates)", () => {
@@ -144,25 +161,33 @@ describe("nav-structure — ≤2-click reachability (DONE WHEN criterion)", () =
     expect(clicksToReach("dashboard")).toBe(0);
   });
 
-  it("direct-link destinations (Tasks) are 1 click", () => {
-    expect(clicksToReach("tasks")).toBe(1);
-  });
-
   it("dropdown children are 2 clicks (open dropdown + click child)", () => {
     // Unions group children
     expect(clicksToReach("unions")).toBe(2);
     expect(clicksToReach("my-union")).toBe(2);
+    expect(clicksToReach("documents")).toBe(2);
     expect(clicksToReach("compare")).toBe(2);
     // Compliance group children
     expect(clicksToReach("compliance")).toBe(2);
     expect(clicksToReach("configure-rules")).toBe(2);
+    // Work Queues group children
     expect(clicksToReach("reviews")).toBe(2);
+    expect(clicksToReach("contact-requests")).toBe(2);
+    expect(clicksToReach("retention")).toBe(2);
     // Admin group children
-    expect(clicksToReach("calendar")).toBe(2);
     expect(clicksToReach("audit")).toBe(2);
     expect(clicksToReach("users")).toBe(2);
     expect(clicksToReach("security")).toBe(2);
     expect(clicksToReach("api-keys")).toBe(2);
+    expect(clicksToReach("webhooks")).toBe(2);
+    expect(clicksToReach("legislation")).toBe(2);
+  });
+
+  it("direct links are 1 click", () => {
+    expect(clicksToReach("dashboard")).toBe(0); // you're already there
+    expect(clicksToReach("tasks")).toBe(1);
+    expect(clicksToReach("calendar")).toBe(1);
+    expect(clicksToReach("search")).toBe(1);
   });
 
   it("a route not in nav (e.g. account-security) returns Infinity (not reachable via nav)", () => {
@@ -213,59 +238,42 @@ describe("nav-structure — route smoke test (DONE WHEN criterion)", () => {
 });
 
 describe("nav-structure — getNavForRole (role filtering)", () => {
-  it("REGISTRAR sees all 5 groups (15 destinations accessible — my-union is OFFICER-only)", () => {
+  it("REGISTRAR sees all 9 groups (20 destinations accessible — my-union is OFFICER-only)", () => {
     const nav = getNavForRole("REGISTRAR");
-    expect(nav).toHaveLength(5);
+    expect(nav).toHaveLength(9);
     const allRoutes = nav.flatMap((g) => g.destinations.map((d) => d.route));
-    expect(allRoutes).toHaveLength(14); // all 15 minus my-union
+    expect(allRoutes).toHaveLength(19); // all 20 minus my-union
     expect(allRoutes).not.toContain("my-union");
   });
 
-  it("INSPECTOR sees Dashboard, Unions (Unions + Compare), Compliance, Tasks, Admin (Calendar + Audit) — Inspectors now have Tasks access", () => {
+  it("INSPECTOR sees Dashboard, Unions, Compliance, Tasks, Calendar, Search, Admin (Audit), Help", () => {
     const nav = getNavForRole("INSPECTOR");
-    // Inspector now sees 5 groups (Tasks was added to INSPECTOR role gating).
-    expect(nav).toHaveLength(5);
-    expect(nav.map((g) => g.label)).toEqual(["Dashboard", "Unions", "Compliance", "Tasks", "Admin"]);
-    // Unions dropdown: Unions + Compare (NOT My Union — OFFICER only)
+    expect(nav).toHaveLength(8);
+    expect(nav.map((g) => g.label)).toEqual(["Dashboard", "Unions", "Compliance", "Tasks", "Calendar", "Search", "Admin", "Help"]);
     const unionsGroup = nav.find((g) => g.label === "Unions")!;
-    expect(unionsGroup.destinations.map((d) => d.route)).toEqual(["unions", "compare"]);
-    // Admin dropdown: Calendar + Audit only (NOT Users/Security/API Keys/Legislation — REGISTRAR only)
+    expect(unionsGroup.destinations.map((d) => d.route)).toEqual(["unions", "documents", "compare"]);
     const adminGroup = nav.find((g) => g.label === "Admin")!;
-    expect(adminGroup.destinations.map((d) => d.route)).toEqual(["calendar", "audit"]);
+    expect(adminGroup.destinations.map((d) => d.route)).toEqual(["audit"]);
   });
 
-  it("OFFICER sees Dashboard, Unions (My Union only), Compliance, Tasks, Admin (Calendar only) — 5 groups but different children", () => {
+  it("OFFICER sees Dashboard, Unions (My Union + Documents), Compliance, Tasks, Calendar, Search, Help", () => {
     const nav = getNavForRole("OFFICER");
-    expect(nav).toHaveLength(5);
-    expect(nav.map((g) => g.label)).toEqual(["Dashboard", "Unions", "Compliance", "Tasks", "Admin"]);
-    // Unions dropdown: My Union only (NOT Unions/Compare — INSPECTOR+REGISTRAR)
+    expect(nav).toHaveLength(7);
+    expect(nav.map((g) => g.label)).toEqual(["Dashboard", "Unions", "Compliance", "Tasks", "Calendar", "Search", "Help"]);
     const unionsGroup = nav.find((g) => g.label === "Unions")!;
-    expect(unionsGroup.destinations.map((d) => d.route)).toEqual(["my-union"]);
-    // Compliance dropdown: Compliance only (NOT Rules/Review Queue — REGISTRAR only)
+    expect(unionsGroup.destinations.map((d) => d.route)).toEqual(["my-union", "documents"]);
     const complianceGroup = nav.find((g) => g.label === "Compliance")!;
     expect(complianceGroup.destinations.map((d) => d.route)).toEqual(["compliance"]);
-    // Admin dropdown: Calendar only (NOT Audit — INSPECTAR+REGISTRAR; NOT Users/Security/API Keys — REGISTRAR only)
-    const adminGroup = nav.find((g) => g.label === "Admin")!;
-    expect(adminGroup.destinations.map((d) => d.route)).toEqual(["calendar"]);
   });
 
-  it("a group with only 1 available destination (OFFICER's Unions = My Union only) is still a dropdown (group has 2+ destinations in the full structure)", () => {
-    // The OFFICER's Unions group has only My Union (1 destination). The
-    // nav component renders it as a dropdown because the GROUP has 2+
-    // destinations in NAV_STRUCTURE (the role filter narrows it to 1).
-    // This is a known edge case: an OFFICER sees a "Unions ▾" dropdown
-    // with only "My Union" inside. The alternative (render as direct
-    // link) would require knowing the role at the group level, which
-    // the config doesn't carry. The current behavior is acceptable:
-    // the dropdown has 1 item, which is still ≤2 clicks.
+  it("a group with 2 available destinations (OFFICER's Unions = My Union + Documents) is a dropdown", () => {
+    // The OFFICER's Unions group has My Union + Documents (2 destinations).
+    // The nav component renders it as a dropdown (2+ destinations = dropdown,
+    // 1 destination = direct link).
     const nav = getNavForRole("OFFICER");
     const unionsGroup = nav.find((g) => g.label === "Unions")!;
-    expect(unionsGroup.destinations).toHaveLength(1);
-    // The nav component checks `destinations.length` AFTER role filtering.
-    // For OFFICER's Unions: 1 → renders as direct link (the nav
-    // component's `isDirectLink = group.destinations.length === 1`).
-    // This is the correct behavior: the OFFICER's Unions group becomes
-    // a direct link to My Union.
+    expect(unionsGroup.destinations).toHaveLength(2);
+    expect(unionsGroup.destinations.map((d) => d.route)).toEqual(["my-union", "documents"]);
   });
 });
 
@@ -494,5 +502,224 @@ describe("app-shell.tsx — fit at 1280px (DONE WHEN criterion)", () => {
     // Per spec: "no truncation." The nav items use `flex-shrink-0` so
     // they don't shrink below their content width.
     expect(appShellSource).toContain("flex-shrink-0");
+  });
+});
+
+// =============================================================================
+// One source of truth — palette + quick actions + VIEW_TITLES all derive
+// from NAV_STRUCTURE. These tests lock in that contract so the four
+// surfaces (menu, palette, quick actions, breadcrumbs) can't drift again.
+// =============================================================================
+
+import {
+  getPaletteEntries,
+  getQuickActions,
+  findDestination,
+} from "../dashboard/nav-structure";
+import { VIEW_TITLES } from "../dashboard/vocabulary";
+
+describe("nav-structure — one source of truth (palette + quick actions + view titles)", () => {
+  it("getPaletteEntries returns every destination visible to the role (REGISTRAR sees 19)", () => {
+    // REGISTRAR sees all 20 minus my-union (OFFICER-only) = 19.
+    const entries = getPaletteEntries("REGISTRAR");
+    expect(entries).toHaveLength(19);
+    // Every entry has the canonical label, route, icon, + groupLabel.
+    for (const e of entries) {
+      expect(e.label).toBeTruthy();
+      expect(e.route).toBeTruthy();
+      expect(e.icon).toBeDefined();
+      expect(e.groupLabel).toBeTruthy();
+      expect(Array.isArray(e.aliases)).toBe(true);
+    }
+    // Spot-check a few canonical labels (post-rename).
+    const labels = entries.map((e) => e.label);
+    expect(labels).toContain("Compliance");
+    expect(labels).toContain("Audit");
+    expect(labels).toContain("Security");
+    expect(labels).toContain("Resources");
+    expect(labels).toContain("Retention Queue");
+    // The OLD names must NOT appear as labels (they're aliases only).
+    expect(labels).not.toContain("Compliance Matrix");
+    expect(labels).not.toContain("Audit Log");
+    expect(labels).not.toContain("Security Dashboard");
+    expect(labels).not.toContain("Legislation");
+    expect(labels).not.toContain("Retention");
+  });
+
+  it("getPaletteEntries for OFFICER omits Admin + Work Queues destinations", () => {
+    const entries = getPaletteEntries("OFFICER");
+    const routes = entries.map((e) => e.route);
+    // OFFICER has no access to Admin group OR Work Queues group.
+    expect(routes).not.toContain("audit");
+    expect(routes).not.toContain("users");
+    expect(routes).not.toContain("reviews");
+    expect(routes).not.toContain("retention");
+    expect(routes).not.toContain("legislation");
+    // OFFICER DOES see my-union (REGISTRAR/INSPECTOR don't).
+    expect(routes).toContain("my-union");
+  });
+
+  it("getPaletteEntries for INSPECTOR includes Audit but not other Admin destinations", () => {
+    const entries = getPaletteEntries("INSPECTOR");
+    const routes = entries.map((e) => e.route);
+    expect(routes).toContain("audit");
+    expect(routes).not.toContain("users");
+    expect(routes).not.toContain("security");
+    expect(routes).not.toContain("legislation");
+  });
+
+  it("palette aliases include old names for backward-compatible fuzzy matching", () => {
+    const entries = getPaletteEntries("REGISTRAR");
+    const compliance = entries.find((e) => e.route === "compliance")!;
+    expect(compliance.aliases).toContain("Compliance Matrix");
+    const resources = entries.find((e) => e.route === "legislation")!;
+    expect(resources.aliases).toContain("Legislation");
+    expect(resources.aliases).toContain("Resources Library");
+    const audit = entries.find((e) => e.route === "audit")!;
+    expect(audit.aliases).toContain("Audit Log");
+  });
+
+  it("getQuickActions returns navigate + external actions for REGISTRAR", () => {
+    const actions = getQuickActions("REGISTRAR");
+    // REGISTRAR sees: Register Union, Upload Document, Create Task, View Audit Log
+    // (4 navigate actions) + Compliance Report (1 external action) = 5 total.
+    expect(actions.length).toBeGreaterThanOrEqual(5);
+    const navigateActions = actions.filter((a) => a.kind === "navigate");
+    const externalActions = actions.filter((a) => a.kind === "external");
+    expect(navigateActions.length).toBe(4);
+    expect(externalActions.length).toBe(1);
+    expect(externalActions[0].href).toBe("/reports/compliance");
+    // Verify the navigate action labels use shortLabel where set.
+    const labels = navigateActions.map((a) => a.label);
+    expect(labels).toContain("Register Union");
+    expect(labels).toContain("Create Task");
+    expect(labels).toContain("View Audit Log");
+  });
+
+  it("getQuickActions for OFFICER omits Registrar-only actions", () => {
+    const actions = getQuickActions("OFFICER");
+    const labels = actions.map((a) => a.label);
+    // OFFICER sees: Upload Document (via my-union), Create Task, Compliance Report.
+    // OFFICER does NOT see: Register Union (Registrar/Inspector), View Audit Log (Registrar/Inspector).
+    expect(labels).toContain("Upload Document");
+    expect(labels).toContain("Create Task");
+    expect(labels).toContain("Compliance Report");
+    expect(labels).not.toContain("Register Union");
+    expect(labels).not.toContain("View Audit Log");
+  });
+
+  it("VIEW_TITLES mirrors NAV_STRUCTURE labels (no drift)", () => {
+    // Every destination in NAV_STRUCTURE must have a VIEW_TITLES entry
+    // with the SAME label. This is the contract that prevents the page
+    // heading from drifting from the menu item.
+    for (const group of NAV_STRUCTURE) {
+      for (const dest of group.destinations) {
+        const title = VIEW_TITLES[dest.route];
+        expect(
+          title,
+          `VIEW_TITLES["${dest.route}"] must equal NAV_STRUCTURE label "${dest.label}"`,
+        ).toBe(dest.label);
+      }
+    }
+  });
+
+  it("VIEW_TITLES includes special-case routes not in NAV_STRUCTURE", () => {
+    // These routes aren't in the nav but still need a page heading.
+    expect(VIEW_TITLES["account-security"]).toBe("Account Security");
+    expect(VIEW_TITLES["document-detail"]).toBe("Document Details");
+  });
+
+  it("findDestination returns the canonical label for a route", () => {
+    expect(findDestination("compliance")?.label).toBe("Compliance");
+    expect(findDestination("legislation")?.label).toBe("Resources");
+    expect(findDestination("retention")?.label).toBe("Retention Queue");
+    expect(findDestination("nonexistent")).toBeNull();
+  });
+});
+
+// =============================================================================
+// Help layer — status definitions + glossary contract.
+//
+// These tests lock in that every status has a plain-language definition
+// (for tooltips + the glossary), and that the Help guide destination is
+// reachable + correctly labeled.
+// =============================================================================
+
+import {
+  UNION_STATUS_CONFIG,
+  REVIEW_STATUS_CONFIG,
+  COMPLIANCE_STATUS_CONFIG,
+} from "../dashboard/vocabulary";
+import { parseViewParam } from "../dashboard/dashboard-links";
+// VIEW_TITLES is already imported above — reusing it.
+
+describe("help layer — status definitions (single source of truth)", () => {
+  it("every union status has a non-empty definition + plainLanguage summary", () => {
+    // The public glossary uses plainLanguage as the primary text + definition
+    // as the secondary detail. Both must be present for every union status.
+    for (const [key, cfg] of Object.entries(UNION_STATUS_CONFIG)) {
+      expect(cfg.definition, `${key}: definition must be non-empty`).toBeTruthy();
+      expect(cfg.definition!.length, `${key}: definition must be substantive`).toBeGreaterThan(20);
+      expect(cfg.plainLanguage, `${key}: plainLanguage must be non-empty`).toBeTruthy();
+      expect(cfg.plainLanguage!.length, `${key}: plainLanguage must be substantive`).toBeGreaterThan(10);
+    }
+  });
+
+  it("every review status has a non-empty definition", () => {
+    // The Reviews view + Help glossary surface these definitions as tooltips.
+    for (const [key, cfg] of Object.entries(REVIEW_STATUS_CONFIG)) {
+      expect(cfg.definition, `${key}: definition must be non-empty`).toBeTruthy();
+      expect(cfg.definition!.length, `${key}: definition must be substantive`).toBeGreaterThan(20);
+    }
+  });
+
+  it("every compliance status has a non-empty definition", () => {
+    // The Dashboard + Compliance legend + Help glossary surface these.
+    for (const [key, cfg] of Object.entries(COMPLIANCE_STATUS_CONFIG)) {
+      expect(cfg.definition, `${key}: definition must be non-empty`).toBeTruthy();
+      expect(cfg.definition.length, `${key}: definition must be substantive`).toBeGreaterThan(20);
+    }
+  });
+
+  it("the MISSING definition mentions review (PENDING/REJECTED documents count as Missing)", () => {
+    // This is the key "surprises people" case from the brief: a document
+    // awaiting approval is NOT compliant — it's Missing. The definition
+    // must make this clear so staff don't chase a union for a document
+    // that's only awaiting approval.
+    expect(COMPLIANCE_STATUS_CONFIG.MISSING.definition).toMatch(/review|pending|approved/i);
+  });
+});
+
+describe("help layer — Help guide destination", () => {
+  it("the 'help' route is in NAV_STRUCTURE", () => {
+    expect(getAllRoutes()).toContain("help");
+  });
+
+  it("the 'help' route is in VIEW_TITLES with the canonical label", () => {
+    // The page heading must match the nav item label (one-source-of-truth contract).
+    const dest = findDestination("help");
+    expect(dest, "help destination must exist in NAV_STRUCTURE").not.toBeNull();
+    expect(VIEW_TITLES["help"]).toBe(dest!.label);
+  });
+
+  it("the 'help' route is accepted by parseViewParam (URL routing works)", () => {
+    // So /?view=help works for refresh + sharing + Back/Forward.
+    expect(parseViewParam("help")).toBe("help");
+  });
+
+  it("the Help destination is visible to all staff roles", () => {
+    // The help layer is for everyone — Registrar, Inspector, Officer all
+    // need access to the glossary + role-based guide.
+    const dest = findDestination("help");
+    expect(dest!.roles).toContain("REGISTRAR");
+    expect(dest!.roles).toContain("INSPECTOR");
+    expect(dest!.roles).toContain("OFFICER");
+  });
+
+  it("the Help destination has 'Glossary' + 'Guide' as aliases for fuzzy search", () => {
+    // So typing "glossary" or "guide" in the Cmd+K palette finds the Help page.
+    const dest = findDestination("help");
+    expect(dest!.aliases).toContain("Glossary");
+    expect(dest!.aliases).toContain("Guide");
   });
 });

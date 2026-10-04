@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth/auth-guard";
+import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { toCsv, CSV_HEADERS } from "@/lib/csv";
 
 // =============================================================================
@@ -9,8 +9,9 @@ import { toCsv, CSV_HEADERS } from "@/lib/csv";
 // =============================================================================
 
 export async function GET(req: NextRequest) {
-  const user = await getAuthUser(req);
+  const user = await getAuthUserOrApiKey(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!hasScope(user, "unions:read")) return NextResponse.json({ error: "Your API key does not have the 'unions:read' scope." }, { status: 403 });
 
   const where = user.role === "OFFICER" && user.assignedUnionId
     ? { id: user.assignedUnionId }

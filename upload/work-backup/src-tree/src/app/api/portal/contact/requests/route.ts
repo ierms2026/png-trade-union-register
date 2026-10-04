@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { ContactUpdateStatus, Role, Severity, NotificationType } from "@prisma/client";
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
         title: `${union.unionName}: contact-info update requested`,
         body: `A union representative submitted a contact-info update for ${union.unionName} (${union.registrationNo}). Fields changed: ${changedFields.join(", ")}. Review it in the Contact Update Requests queue.`,
         dedupKey: `contact-update:${request.id}:${registrar.id}`,
-        linkUrl: `/contact-requests`,
+        linkUrl: staffLinkUrl("contact-requests"),
       });
     }
     await db.auditLog.create({

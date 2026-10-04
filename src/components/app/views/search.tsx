@@ -214,7 +214,7 @@ function ResultCard({ result, query }: { result: SearchResult; query: string }) 
               <span>· Uploaded {new Date(result.uploadedAt).toLocaleDateString()}</span>
             </div>
             <Link
-              href={`/?view=unions&union=${result.unionId}`}
+              href={`/?view=document-detail&id=${result.documentId}`}
               className="shrink-0 font-medium text-primary hover:underline"
             >
               View document →
@@ -234,26 +234,7 @@ function ResultCard({ result, query }: { result: SearchResult; query: string }) 
 // REJECTED with appropriate tints + icons.
 // =============================================================================
 
-const REVIEW_STATUS_CONFIG: Record<
-  "PENDING" | "APPROVED" | "REJECTED",
-  { label: string; icon: typeof Clock; tone: string }
-> = {
-  PENDING: {
-    label: "Pending Review",
-    icon: Clock,
-    tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
-  },
-  APPROVED: {
-    label: "Approved",
-    icon: CheckCircle2,
-    tone: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
-  },
-  REJECTED: {
-    label: "Rejected",
-    icon: XCircle,
-    tone: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
-  },
-};
+import { REVIEW_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
 function ReviewStatusBadge({ status }: { status: "PENDING" | "APPROVED" | "REJECTED" }) {
   const cfg = REVIEW_STATUS_CONFIG[status];

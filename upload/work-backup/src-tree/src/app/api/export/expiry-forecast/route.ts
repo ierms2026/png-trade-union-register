@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth/auth-guard";
+import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import { getExpiryForecast, type ComplianceCell } from "@/lib/dashboard/metrics";
 import { toCsv, CSV_HEADERS } from "@/lib/csv";
@@ -7,11 +7,18 @@ import { toCsv, CSV_HEADERS } from "@/lib/csv";
 // =============================================================================
 // GET /api/export/expiry-forecast — CSV export of all expiring + overdue docs
 // REGISTRAR/INSPECTOR: all unions. OFFICER: their union only.
+// Chunk 9: now accepts API keys with `compliance:read` scope.
 // =============================================================================
 
 export async function GET(req: NextRequest) {
-  const user = await getAuthUser(req);
+  const user = await getAuthUserOrApiKey(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!hasScope(user, "compliance:read")) {
+    return NextResponse.json(
+      { error: "Your API key does not have the 'compliance:read' scope." },
+      { status: 403 },
+    );
+  }
 
   const data = await fetchMatrixData();
   if (user.role === "OFFICER" && user.assignedUnionId) {

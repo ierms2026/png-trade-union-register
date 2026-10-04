@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { PrintButton } from "@/components/app/print-button";
 import { DocumentList } from "@/components/app/document-list";
 import { StatusBadge } from "@/components/app/status-badge";
+import { RegistrarContactInfo } from "@/components/app/registrar-contact-info";
 import type { Metadata } from "next";
 
 interface PageProps { params: Promise<{ registrationNo: string }>; }
@@ -53,7 +54,7 @@ export default async function UnionDetailPage({ params }: PageProps) {
           ) : (
             <div className="flex items-center gap-2">
               <Button asChild variant="ghost" size="sm"><Link href="/"><ArrowLeft className="mr-2 h-4 w-4" />Back to Register</Link></Button>
-              <Button asChild variant="default" size="sm"><Link href="/?login=1"><LogIn className="mr-2 h-4 w-4" />Staff Login</Link></Button>
+              <Button asChild variant="default" size="sm"><Link href="/?login=1"><LogIn className="mr-2 h-4 w-4" />Sign In</Link></Button>
             </div>
           )}
         </div>
@@ -106,7 +107,26 @@ export default async function UnionDetailPage({ params }: PageProps) {
           <DocumentList documents={union.documents} />
         </div>
 
-        <Card className="bg-muted/30 print-card"><CardContent className="py-4"><p className="text-xs text-muted-foreground">For enquiries regarding this union, contact the Office of The Industrial Registrar, PNG Department of Labour &amp; Industrial Relations.</p></CardContent></Card>
+        <Card className="bg-muted/30 print-card">
+          <CardContent className="py-4">
+            {/* Contact block — rendered only if at least one env var is set.
+                When configured, this turns the previous "contact the Office"
+                stub into a real, actionable enquiry card with phone / email /
+                address + office hours. When unconfigured, falls back to the
+                plain stub line so the page still reads cleanly. */}
+            <div className="no-print">
+              <RegistrarContactInfo variant="card" />
+              <p className="mt-3 text-xs text-muted-foreground">
+                For enquiries regarding this union, contact the Office of The Industrial Registrar, PNG Department of Labour &amp; Industrial Relations.
+              </p>
+            </div>
+            {/* Print-only: plain text, no icons. Keeps the printed extract
+                looking like an official document. */}
+            <p className="print-only text-xs text-muted-foreground">
+              For enquiries regarding this union, contact the Office of The Industrial Registrar, PNG Department of Labour &amp; Industrial Relations.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Print-only footer — official certification line */}
         <div className="print-only text-center mt-8 pt-4 border-t border-black">
@@ -117,9 +137,10 @@ export default async function UnionDetailPage({ params }: PageProps) {
       </main>
 
       <footer className="border-t bg-card">
-        <div className="mx-auto max-w-4xl space-y-2 px-4 py-6 text-center text-xs text-muted-foreground">
+        <div className="mx-auto max-w-4xl space-y-3 px-4 py-6 text-center text-xs text-muted-foreground">
           <p className="font-medium">Office of The Industrial Registrar</p>
           <p>PNG Department of Labour &amp; Industrial Relations</p>
+          <RegistrarContactInfo variant="compact" className="text-xs" />
           <p className="text-muted-foreground/70">© {new Date().getFullYear()} Independent State of Papua New Guinea · All rights reserved</p>
         </div>
       </footer>

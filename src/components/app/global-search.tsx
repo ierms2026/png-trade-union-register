@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   CommandDialog,
   CommandInput,
@@ -9,25 +9,16 @@ import {
   CommandGroup,
   CommandItem,
   CommandSeparator,
-  CommandShortcut,
 } from "@/components/ui/command";
 import {
   Building2,
   FileText,
   ListTodo,
-  ScrollText,
   Users,
-  LayoutDashboard,
-  CheckCircle2,
-  Settings2,
-  GitCompare,
-  Calendar,
-  Archive,
-  Shield,
-  Key,
   Search,
   Loader2,
 } from "lucide-react";
+import { getPaletteEntries, type PaletteEntry, type StaffRole } from "@/lib/dashboard/nav-structure";
 
 // =============================================================================
 // GlobalSearch — Cmd+K command palette.
@@ -69,31 +60,12 @@ interface UserEntry {
   role: string;
 }
 
-interface NavEntry {
-  id: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-}
 
-const ALL_NAV_ENTRIES: NavEntry[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "unions", label: "Unions / My Union", icon: Building2 },
-  { id: "compliance", label: "Compliance Matrix", icon: CheckCircle2 },
-  { id: "configure-rules", label: "Configure Rules", icon: Settings2 },
-  { id: "compare", label: "Compare Unions", icon: GitCompare },
-  { id: "tasks", label: "Tasks", icon: ListTodo },
-  { id: "calendar", label: "Calendar", icon: Calendar },
-  { id: "audit", label: "Audit Log", icon: ScrollText },
-  { id: "retention", label: "Retention Queue", icon: Archive },
-  { id: "users", label: "Users", icon: Users },
-  { id: "security", label: "Security Dashboard", icon: Shield },
-  { id: "api-keys", label: "API Keys", icon: Key },
-];
 
 interface GlobalSearchProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onNavigate: (view: string, params?: { unionId?: string }) => void;
+  onNavigate: (view: string, params?: { unionId?: string; query?: string; documentId?: string }) => void;
   userRole: string;
 }
 
@@ -190,29 +162,36 @@ export function GlobalSearch({ open, onOpenChange, onNavigate, userRole }: Globa
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Filter nav entries by role
-  const navEntries = ALL_NAV_ENTRIES.filter((entry) => {
-    if (userRole === "OFFICER") {
-      return ["dashboard", "unions", "compliance", "tasks", "calendar"].includes(entry.id);
-    }
-    if (userRole === "INSPECTOR") {
-      return ["dashboard", "unions", "compliance", "compare", "calendar", "audit", "retention"].includes(entry.id);
-    }
-    return true; // REGISTRAR sees all
-  });
+  // --- Navigation entries — derived from NAV_STRUCTURE (single source of
+  // truth). The role filter is handled by getPaletteEntries, so the palette
+  // can NEVER offer a destination the menu hides. Aliases are included in
+  // the cmdk `value` so old names (e.g. "Compliance Matrix", "Legislation")
+  // still match — but only the canonical label is shown to the user.
+  const navEntries = useMemo<PaletteEntry[]>(
+    () => getPaletteEntries(userRole as StaffRole),
+    [userRole],
+  );
 
   function handleSelect(value: string) {
     onOpenChange(false);
 
-    // Parse the value: "nav:dashboard" or "union:abc123" or "task:xyz" or "user:id"
-    // or "doc:<documentId>" (chunk 6) or "search:full" (chunk 6 — jump to /search)
-    const [type, id] = value.split(":");
+    // Parse the value: "nav:dashboard" or "union:abc123 extra text" or
+    // "doc:<documentId> <documentType> <unionName> <snippet>" etc.
+    // The type is before the first colon; the id is the first token after
+    // the colon (up to the first space). Extra text after the id is for
+    // cmdk's client-side filtering only — it's never used for navigation.
+    const colonIdx = value.indexOf(":");
+    const type = colonIdx >= 0 ? value.slice(0, colonIdx) : value;
+    const rest = colonIdx >= 0 ? value.slice(colonIdx + 1) : "";
+    const spaceIdx = rest.indexOf(" ");
+    const id = spaceIdx >= 0 ? rest.slice(0, spaceIdx) : rest;
 
     switch (type) {
       case "nav":
         onNavigate(id);
         break;
       case "union":
+        // Carry the unionId through so the union detail opens directly
         onNavigate("unions", { unionId: id });
         break;
       case "task":
@@ -222,13 +201,12 @@ export function GlobalSearch({ open, onOpenChange, onNavigate, userRole }: Globa
         onNavigate("users");
         break;
       case "doc":
-        // Navigate to the full search view with the current query — the
-        // user can see all results there, not just the top 5.
-        onNavigate("search");
+        // Navigate directly to the document detail page
+        onNavigate("document-detail", { documentId: id });
         break;
       case "search":
-        // "Search all documents for '<query>'" — jump to the full /search view
-        onNavigate("search");
+        // Carry the typed query through so the search page opens with results
+        onNavigate("search", { query: searchQuery });
         break;
     }
   }
@@ -296,18 +274,35 @@ export function GlobalSearch({ open, onOpenChange, onNavigate, userRole }: Globa
           </CommandGroup>
         )}
 
-        {/* Navigation */}
+        {/* Navigation — derived from NAV_STRUCTURE via getPaletteEntries.
+            The cmdk `value` includes the canonical label + all aliases so
+            old names (e.g. "Compliance Matrix", "Legislation") still match
+            fuzzy search. Only the canonical `entry.label` is rendered. */}
         <CommandGroup heading="Navigation">
           {navEntries.map((entry) => {
             const Icon = entry.icon;
+            // Build the cmdk value: "nav:<route> <label> <alias1> <alias2>..."
+            // The route is the first token (parsed by handleSelect); the
+            // rest is for cmdk's client-side fuzzy filter. Aliases are
+            // NEVER shown to the user — they're search-only.
+            const aliasText = entry.aliases.join(" ");
+            const value = `nav:${entry.route} ${entry.label} ${aliasText}`.trim();
             return (
               <CommandItem
-                key={entry.id}
-                value={`nav:${entry.id}`}
+                key={entry.route}
+                value={value}
                 onSelect={handleSelect}
               >
                 <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>{entry.label}</span>
+                <div className="flex min-w-0 flex-col">
+                  <span>{entry.label}</span>
+                  {/* Secondary hint: the group the destination lives under.
+                      Helps disambiguate when two destinations have similar
+                      labels (e.g. "Compliance" the page vs "Compliance" the
+                      group). Small + muted so it doesn't compete with the
+                      label. */}
+                  <span className="text-xs text-muted-foreground">{entry.groupLabel}</span>
+                </div>
               </CommandItem>
             );
           })}

@@ -1,5 +1,6 @@
 "use client";
 
+import { getRoleLabel } from "@/lib/dashboard/vocabulary";
 import { Shield, AlertTriangle, Lock, KeyRound, Users, Activity, Unlock } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -333,10 +334,10 @@ export function SecurityView() {
                 <div key={u.id} className="grid grid-cols-[1fr_120px_140px_80px] items-center gap-3 px-4 py-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-destructive/10"><Lock className="h-4 w-4 text-destructive" /></div>
-                    <div className="min-w-0"><p className="truncate font-medium">{u.email}</p><p className="text-xs text-muted-foreground sm:hidden">{u.role} · {u.failedLoginAttempts} failed</p></div>
+                    <div className="min-w-0"><p className="truncate font-medium">{u.email}</p><p className="text-xs text-muted-foreground sm:hidden">{getRoleLabel(u.role)} · {u.failedLoginAttempts} failed</p></div>
                   </div>
                   <div className="hidden items-center gap-1.5 sm:flex">
-                    <Badge variant="outline" className="text-xs">{u.role}</Badge>
+                    <Badge variant="outline" className="text-xs">{getRoleLabel(u.role)}</Badge>
                     {u.disabled && <Badge variant="destructive" className="text-xs">Disabled</Badge>}
                     {u.twoFactorEnabled && <Badge variant="secondary" className="text-xs">2FA</Badge>}
                   </div>
@@ -368,9 +369,9 @@ export function SecurityView() {
                 <div key={u.id} className="grid grid-cols-[1fr_120px_100px] items-center gap-3 px-4 py-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted"><Users className="h-4 w-4 text-muted-foreground" /></div>
-                    <div className="min-w-0"><p className="truncate font-medium">{u.email}</p><p className="text-xs text-muted-foreground sm:hidden">{u.role}</p></div>
+                    <div className="min-w-0"><p className="truncate font-medium">{u.email}</p><p className="text-xs text-muted-foreground sm:hidden">{getRoleLabel(u.role)}</p></div>
                   </div>
-                  <span className="hidden sm:inline"><Badge variant="outline" className="text-xs">{u.role}</Badge></span>
+                  <span className="hidden sm:inline"><Badge variant="outline" className="text-xs">{getRoleLabel(u.role)}</Badge></span>
                   <div className="flex justify-center sm:justify-end"><Badge variant="destructive">Disabled</Badge></div>
                 </div>
               ))}

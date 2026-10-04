@@ -74,26 +74,7 @@ interface ComplianceMatrixResponse {
   documentTypes: string[];
 }
 
-const REVIEW_STATUS_CONFIG: Record<
-  UnionDocument["reviewStatus"],
-  { label: string; icon: typeof Clock; tone: string }
-> = {
-  PENDING: {
-    label: "Pending Review",
-    icon: Clock,
-    tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
-  },
-  APPROVED: {
-    label: "Approved",
-    icon: CheckCircle2,
-    tone: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
-  },
-  REJECTED: {
-    label: "Rejected",
-    icon: XCircle,
-    tone: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
-  },
-};
+import { REVIEW_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
 export function PortalDocumentsView({ user }: { user: PortalUser }) {
   const { data, loading, error, refetch } = useFetch<{ documents: UnionDocument[] }>(

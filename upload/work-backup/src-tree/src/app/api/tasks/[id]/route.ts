@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, TaskStatus, Severity, NotificationType } from "@prisma/client";
@@ -242,7 +243,7 @@ export async function PATCH(
         title: `Task assigned to you: ${updated.title}`,
         body: `Assigned by ${user.email}. Priority: ${updated.priority}.`,
         dedupKey: `task:assigned:${updated.id}:${updated.assigneeId}`,
-        linkUrl: "/?view=tasks",
+        linkUrl: staffLinkUrl("tasks"),
       });
     }
   }

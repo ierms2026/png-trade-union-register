@@ -1,10 +1,11 @@
 "use client";
 
+import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 import { useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -16,6 +17,8 @@ import { useFetch } from "@/components/app/use-fetch";
 import { TableSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   ChartContainer,
   ChartTooltip,
@@ -69,6 +72,33 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
   const [filter, setFilter] = useState<StatusFilter>(
     (initialFilter as StatusFilter) || "ALL"
   );
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  async function handleGenerateReport() {
+    setGeneratingReport(true);
+    try {
+      const res = await fetch("/api/export/compliance-report", { credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to generate report.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `compliance-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Compliance report downloaded.");
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
 
   // --- Chart data: union status distribution (donut) ---
   // Uses design-system chart tokens + semantic status colors.
@@ -139,7 +169,22 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
             Live compliance status for every union × document type. Computed on every read — no caching.
           </p>
         </div>
-        <Select value={filter} onValueChange={(v) => setFilter(v as StatusFilter)}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGenerateReport}
+            disabled={generatingReport}
+            className="gap-2"
+          >
+            {generatingReport ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            Generate Report
+          </Button>
+          <Select value={filter} onValueChange={(v) => setFilter(v as StatusFilter)}>
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
@@ -152,16 +197,31 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
             <SelectItem value="NOT_APPLICABLE">N/A only</SelectItem>
           </SelectContent>
         </Select>
+        </div>
       </div>
 
-      {/* Legend — dots only, no text badges */}
+      {/* Legend — dots only, no text badges. Each item has a tooltip with
+          the canonical definition from COMPLIANCE_STATUS_CONFIG (single source
+          of truth — same definitions as the Dashboard + the Help glossary). */}
       <div className="flex flex-wrap gap-4">
         {Object.entries(STATUS_CONFIG).map(([status, cfg]) => {
+          const definition = COMPLIANCE_STATUS_CONFIG[status as keyof typeof COMPLIANCE_STATUS_CONFIG]?.definition;
           return (
-            <div key={status} className="flex items-center gap-2 text-xs">
-              <span className={`h-3 w-3 rounded-full ${cfg.dot}`} />
-              <span className="text-muted-foreground">{cfg.label}</span>
-            </div>
+            <TooltipProvider key={status} delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex cursor-help items-center gap-2 text-xs">
+                    <span className={`h-3 w-3 rounded-full ${cfg.dot}`} />
+                    <span className="text-muted-foreground">{cfg.label}</span>
+                  </div>
+                </TooltipTrigger>
+                {definition && (
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    {definition}
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           );
         })}
       </div>
@@ -273,7 +333,7 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
                 <tr key={row.unionId} className="border-b hover:bg-muted/30 hover:shadow-[inset_2px_0_0_0_oklch(0.74_0.15_85)]">
                   <td className="sticky left-0 z-10 bg-card px-4 py-3">
                     <p className="font-medium">{row.unionName}</p>
-                    <p className="text-xs text-muted-foreground">{row.status}</p>
+                    <p className="text-xs text-muted-foreground">{getComplianceStatusLabel(row.status as "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE")}</p>
                   </td>
                   {row.scores.map((cell) => {
                     const cfg = STATUS_CONFIG[cell.status];
