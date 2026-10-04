@@ -129,27 +129,43 @@ export const REVIEW_STATUS_CONFIG: Record<ReviewStatus, ReviewStatusConfig> = {
 };
 
 // =============================================================================
-// Task statuses (TODO / IN_PROGRESS / DONE / CANCELLED)
+// Task statuses — ALIGNED with the Prisma TaskStatus enum.
+//
+// The Prisma enum (prisma/schema.prisma) defines:
+//   PENDING | IN_PROGRESS | COMPLETED | CANCELLED
+//
+// This config MUST mirror those exact keys. The test in dashboard-nav.test.ts
+// ("TASK_STATUS_CONFIG keys match the Prisma TaskStatus enum") fails if they
+// drift — so a future enum change either updates this map or fails loudly.
+//
+// Previous versions of this map used TODO/DONE/CANCELLED (invented names that
+// didn't match the DB). That caused silent failures: a lookup with a real
+// status (PENDING/COMPLETED) found no match, and the raw enum value was shown
+// to users in capitals. The contract test prevents that from recurring.
 // =============================================================================
 
-export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "CANCELLED";
+export type TaskStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
-export const TASK_STATUS_CONFIG: Record<TaskStatus, { label: string; tone: string }> = {
-  TODO: {
+export const TASK_STATUS_CONFIG: Record<TaskStatus, { label: string; tone: string; definition: string }> = {
+  PENDING: {
     label: "To Do",
     tone: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300",
+    definition: "Task has been created but not yet started. This is the default state for new tasks.",
   },
   IN_PROGRESS: {
     label: "In Progress",
     tone: "bg-blue-100 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300",
+    definition: "Task is actively being worked on by the assignee.",
   },
-  DONE: {
+  COMPLETED: {
     label: "Done",
     tone: "bg-green-100 text-green-800 dark:bg-green-950/30 dark:text-green-300",
+    definition: "Task has been finished. Completed tasks stay on the list for audit history.",
   },
   CANCELLED: {
     label: "Cancelled",
     tone: "bg-muted text-muted-foreground",
+    definition: "Task has been cancelled and is no longer being worked on. The task stays on the list for audit history — it is not deleted.",
   },
 };
 

@@ -490,3 +490,44 @@ Stage Summary:
 - External document submissions enter the PENDING review queue (Registrar gate)
 - 10 new tests for webhook signing/verification + secret generation
 - 545 tests passing across 27 files
+
+---
+Task ID: finish-task-vocabulary
+Agent: main
+Task: Finish the vocabulary — align the task map with the real enum (PENDING/IN_PROGRESS/COMPLETED) + add a real CANCELLED state
+
+Work Log:
+- Audited the drift: vocabulary.ts TASK_STATUS_CONFIG used TODO/IN_PROGRESS/DONE/CANCELLED — only IN_PROGRESS matched the Prisma enum (PENDING/IN_PROGRESS/COMPLETED). TODO + DONE were invented names that didn't exist in the DB. The staff Tasks view had its own STATUS_CONFIG copy (correct values, separate list). The portal Tasks view had its own copy AND the wrong type (`status: "TODO" | "IN_PROGRESS" | "DONE" | "CANCELLED"`).
+- Added CANCELLED to the Prisma TaskStatus enum (prisma/schema.prisma). Ran `prisma db push` + `prisma generate`. Verified the generated client now exports CANCELLED: `Object.values(TaskStatus) = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']`.
+- Fixed TASK_STATUS_CONFIG in vocabulary.ts:
+  - Type changed from `"TODO" | "IN_PROGRESS" | "DONE" | "CANCELLED"` to `"PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"` (mirrors the real enum).
+  - Labels: PENDING → "To Do", IN_PROGRESS → "In Progress", COMPLETED → "Done", CANCELLED → "Cancelled".
+  - Added a `definition` field to each entry (for the Help glossary + future tooltips).
+  - Added a header comment explaining the alignment contract + the contract test that enforces it.
+- Added CANCELLED to the API's VALID_STATUSES array in src/app/api/tasks/[id]/route.ts. Updated the route's docstring to explain that CANCELLED is set explicitly via the Cancel button (not part of the click-to-cycle flow).
+- Updated staff Tasks view (src/components/app/views/tasks.tsx):
+  - Deleted the local STATUS_CONFIG copy (was a separate list with correct values but no definitions).
+  - Now reads labels from the shared TASK_STATUS_CONFIG.
+  - STATUS_CYCLE map now uses TaskStatus type. CANCELLED is deliberately excluded from the cycle — it's a separate action.
+  - Added a Cancel button (XCircle icon) with a confirm dialog. Cancelled tasks show a line-through title + muted styling. Clicking the cycle button on a cancelled task un-cancels it (moves back to PENDING).
+  - Added a STATUS_VARIANT map (PENDING → secondary, IN_PROGRESS → default, COMPLETED → outline, CANCELLED → outline) for the Button variant.
+- Updated portal Tasks view (src/components/portal/views/tasks.tsx):
+  - Deleted the local STATUS_CONFIG copy (had the wrong TODO/DONE/CANCELLED keys).
+  - Fixed the Task interface's status type from `"TODO" | "IN_PROGRESS" | "DONE" | "CANCELLED"` to `string` (the shared config handles the lookup).
+  - Now reads labels + tones from the shared TASK_STATUS_CONFIG.
+  - Fixed the sort logic to use COMPLETED (was DONE) + CANCELLED.
+  - Fixed the isOverdue check to use COMPLETED (was DONE).
+  - Cancelled tasks show a line-through title + muted styling (same as staff view).
+- Added 7 contract tests in dashboard-nav.test.ts:
+  - TASK_STATUS_CONFIG has exactly the same keys as the Prisma TaskStatus enum (sorted array comparison).
+  - Every entry has a non-empty label + tone + definition.
+  - PENDING → "To Do", IN_PROGRESS → "In Progress", COMPLETED → "Done", CANCELLED → "Cancelled".
+  - CANCELLED definition mentions audit/history (the audit-history contract).
+  - No invented names (TODO/DONE) remain in the config.
+- All 604 tests pass (was 597 → 604, +7 new). ESLint clean. TypeScript has one pre-existing error in src/app/api/tasks/route.ts:195 (unrelated to my changes — the `data` variable is typed as Record<string, unknown> which Prisma doesn't accept; this was present before my work). Backed up (299 files, zero skips).
+
+Stage Summary:
+- The task status vocabulary is now aligned with the real Prisma enum: PENDING/IN_PROGRESS/COMPLETED/CANCELLED with friendly labels (To Do / In Progress / Done / Cancelled).
+- One source of truth: both the staff Tasks view + the portal Tasks view read from the shared TASK_STATUS_CONFIG in vocabulary.ts. The local STATUS_CONFIG copies were deleted.
+- A real CANCELLED state: staff can cancel tasks via a dedicated Cancel button (XCircle icon, with confirm dialog). Cancelled tasks stay on the list for audit history (not deleted) and show a line-through title. Clicking the cycle button on a cancelled task un-cancels it.
+- A contract test prevents drift: if anyone adds/removes a TaskStatus enum value without updating TASK_STATUS_CONFIG (or vice versa), the test fails loudly.

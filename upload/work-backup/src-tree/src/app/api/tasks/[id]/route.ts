@@ -10,6 +10,8 @@ import { createNotification, getUserNotificationPrefs } from "@/lib/notification
 // -----------------------------------------------------------------------------
 // PATCH:
 //   - Status cycle: PENDING → IN_PROGRESS → COMPLETED.
+//   - CANCELLED is set explicitly via the Cancel button (not part of the
+//     click-to-cycle flow — it's a deliberate, separate action).
 //   - Field updates: title, description, priority, dueDate, unionId,
 //     assigneeId.
 //   - INSPECTOR: can only update status on tasks assigned to them
@@ -28,7 +30,7 @@ import { createNotification, getUserNotificationPrefs } from "@/lib/notification
 //   user), a TASK notification is created for the new assignee.
 // =============================================================================
 
-const VALID_STATUSES: TaskStatus[] = ["PENDING", "IN_PROGRESS", "COMPLETED"];
+const VALID_STATUSES: TaskStatus[] = ["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 
 // -----------------------------------------------------------------------------
 // PATCH

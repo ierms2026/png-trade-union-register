@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ListTodo, Plus, Trash2, Loader2, User } from "lucide-react";
+import { ListTodo, Plus, Trash2, Loader2, User, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,16 +27,21 @@ import {
 import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
+import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/dashboard/vocabulary";
 import { EmptyState } from "@/components/app/empty-state";
 
 // =============================================================================
 // Tasks view — task list with click-to-cycle status + create dialog.
 //
-// FEATURES:
-//   - List tasks (role-scoped: Officers see their union's + assigned tasks)
-//   - Click a task's status badge to cycle: PENDING → IN_PROGRESS → COMPLETED
-//   - Create new task (with assignee dropdown for Registrars)
-//   - Delete a task (Officers: own tasks only; Registrars: any)
+// STATUS LABELS: read from the shared TASK_STATUS_CONFIG in vocabulary.ts
+// (single source of truth — same labels as the portal Tasks view + the
+// Help glossary). The local STATUS_CONFIG copy was deleted to prevent drift.
+//
+// STATUS CYCLE: PENDING → IN_PROGRESS → COMPLETED → PENDING.
+// CANCELLED is NOT part of the click-to-cycle flow — it's a deliberate,
+// separate action via the "Cancel" button. This matches the brief: "I want
+// a real cancelled state as staff need to cancel tasks." Cancellation should
+// be intentional, not something you fall into by cycling.
 // =============================================================================
 
 interface Task {
@@ -62,16 +67,24 @@ interface Assignee {
   role: string;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  PENDING: { label: "Pending", variant: "secondary" },
-  IN_PROGRESS: { label: "In Progress", variant: "default" },
-  COMPLETED: { label: "Completed", variant: "outline" },
-};
-
-const STATUS_CYCLE: Record<string, string> = {
+// The click-to-cycle flow: PENDING → IN_PROGRESS → COMPLETED → PENDING.
+// CANCELLED is deliberately excluded — it's a separate action.
+const STATUS_CYCLE: Record<string, TaskStatus> = {
   PENDING: "IN_PROGRESS",
   IN_PROGRESS: "COMPLETED",
   COMPLETED: "PENDING",
+  // CANCELLED has no cycle target — a cancelled task stays cancelled until
+  // the user clicks the cycle button, which moves it back to PENDING.
+};
+
+// Map the shared TASK_STATUS_CONFIG to a Button variant for the status button.
+// The tone classes from TASK_STATUS_CONFIG are applied on top via the Badge
+// inside the button.
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  PENDING: "secondary",
+  IN_PROGRESS: "default",
+  COMPLETED: "outline",
+  CANCELLED: "outline",
 };
 
 export function TasksView() {
@@ -129,8 +142,13 @@ export function TasksView() {
 function TaskRow({ task, onUpdated }: { task: Task; onUpdated: () => void }) {
   const [updating, setUpdating] = useState(false);
 
+  // Cycle the status: PENDING → IN_PROGRESS → COMPLETED → PENDING.
+  // For CANCELLED tasks, cycling moves them back to PENDING (un-cancel).
   async function cycleStatus() {
-    const next = STATUS_CYCLE[task.status];
+    // If the task is CANCELLED, cycling moves it back to PENDING.
+    // Otherwise, use the STATUS_CYCLE map.
+    const next = task.status === "CANCELLED" ? "PENDING" : STATUS_CYCLE[task.status];
+    if (!next) return;
     setUpdating(true);
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
@@ -144,7 +162,35 @@ function TaskRow({ task, onUpdated }: { task: Task; onUpdated: () => void }) {
         toast.error(data.error || "Failed to update status.");
         return;
       }
-      toast.success(`Task moved to ${STATUS_CONFIG[next]?.label ?? next}.`);
+      toast.success(`Task moved to ${TASK_STATUS_CONFIG[next as TaskStatus]?.label ?? next}.`);
+      onUpdated();
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  // Cancel the task — a deliberate, separate action from the cycle.
+  // CANCELLED is a terminal state (the task stays on the list for audit
+  // history but is no longer being worked on). The user can un-cancel by
+  // clicking the cycle button, which moves the task back to PENDING.
+  async function handleCancel() {
+    if (!confirm("Cancel this task? Cancelled tasks stay on the list for audit history but are no longer being worked on.")) return;
+    setUpdating(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to cancel task.");
+        return;
+      }
+      toast.success("Task cancelled.");
       onUpdated();
     } catch {
       toast.error("Network error.");
@@ -172,7 +218,14 @@ function TaskRow({ task, onUpdated }: { task: Task; onUpdated: () => void }) {
     }
   }
 
-  const cfg = STATUS_CONFIG[task.status] ?? { label: task.status, variant: "outline" as const };
+  // Read the label + tone from the shared TASK_STATUS_CONFIG (single source
+  // of truth). Fall back to the raw status string if the status isn't in the
+  // map (shouldn't happen — the contract test enforces alignment — but the
+  // fallback prevents a crash if it does).
+  const statusCfg = TASK_STATUS_CONFIG[task.status as TaskStatus];
+  const statusLabel = statusCfg?.label ?? task.status;
+  const statusVariant = STATUS_VARIANT[task.status] ?? "outline";
+  const isCancelled = task.status === "CANCELLED";
 
   return (
     <Card>
@@ -180,8 +233,8 @@ function TaskRow({ task, onUpdated }: { task: Task; onUpdated: () => void }) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-medium">{task.title}</h3>
-              {task.priority === "HIGH" && (
+              <h3 className={`font-medium ${isCancelled ? "text-muted-foreground line-through" : ""}`}>{task.title}</h3>
+              {task.priority === "HIGH" && !isCancelled && (
                 <Badge variant="destructive" className="text-xs">High</Badge>
               )}
             </div>
@@ -208,19 +261,33 @@ function TaskRow({ task, onUpdated }: { task: Task; onUpdated: () => void }) {
           </div>
           <div className="flex flex-col items-end gap-2">
             <Button
-              variant={cfg.variant}
+              variant={statusVariant}
               size="sm"
               onClick={cycleStatus}
               disabled={updating}
               className="cursor-pointer"
-              title="Click to cycle status"
+              title={isCancelled ? "Click to un-cancel (move back to To Do)" : "Click to cycle status"}
             >
               {updating && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-              {cfg.label}
+              {statusLabel}
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDelete}>
-              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
+            <div className="flex gap-1">
+              {!isCancelled && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={handleCancel}
+                  disabled={updating}
+                  title="Cancel task"
+                >
+                  <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDelete} title="Delete task">
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </div>
           </div>
         </div>
       </CardContent>

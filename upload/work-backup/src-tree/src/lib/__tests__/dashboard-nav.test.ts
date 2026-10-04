@@ -723,3 +723,71 @@ describe("help layer — Help guide destination", () => {
     expect(dest!.aliases).toContain("Guide");
   });
 });
+
+// =============================================================================
+// Task status vocabulary — alignment with the Prisma TaskStatus enum.
+//
+// These tests lock in that TASK_STATUS_CONFIG in vocabulary.ts mirrors the
+// real Prisma TaskStatus enum (PENDING / IN_PROGRESS / COMPLETED / CANCELLED).
+//
+// Before this contract, the map used invented names (TODO / DONE) that didn't
+// match the DB — causing silent failures where a lookup with a real status
+// found no match and the raw enum value was shown to users in capitals.
+// The test fails if the map + enum ever drift again.
+// =============================================================================
+
+import { TASK_STATUS_CONFIG } from "../dashboard/vocabulary";
+import { TaskStatus as PrismaTaskStatus } from "@prisma/client";
+
+describe("task status vocabulary — alignment with Prisma TaskStatus enum", () => {
+  it("TASK_STATUS_CONFIG has exactly the same keys as the Prisma TaskStatus enum", () => {
+    // The Prisma client exports the enum values as an object. We compare
+    // the sorted arrays — if either side adds or removes a value, this
+    // test fails loudly.
+    const prismaKeys = Object.values(PrismaTaskStatus).sort();
+    const vocabKeys = Object.keys(TASK_STATUS_CONFIG).sort();
+    expect(vocabKeys).toEqual(prismaKeys);
+  });
+
+  it("every TASK_STATUS_CONFIG entry has a non-empty label + tone + definition", () => {
+    for (const [key, cfg] of Object.entries(TASK_STATUS_CONFIG)) {
+      expect(cfg.label, `${key}: label must be non-empty`).toBeTruthy();
+      expect(cfg.tone, `${key}: tone must be non-empty`).toBeTruthy();
+      expect(cfg.definition, `${key}: definition must be non-empty`).toBeTruthy();
+      expect(cfg.definition!.length, `${key}: definition must be substantive`).toBeGreaterThan(20);
+    }
+  });
+
+  it("PENDING → 'To Do' (friendly label, not 'Pending')", () => {
+    // The brief specifies: PENDING → "To Do". This is the friendly label
+    // staff + reps see — NOT the raw enum value in capitals.
+    expect(TASK_STATUS_CONFIG.PENDING.label).toBe("To Do");
+  });
+
+  it("IN_PROGRESS → 'In Progress'", () => {
+    expect(TASK_STATUS_CONFIG.IN_PROGRESS.label).toBe("In Progress");
+  });
+
+  it("COMPLETED → 'Done' (friendly label, not 'Completed')", () => {
+    // The brief specifies: COMPLETED → "Done". This is the friendly label.
+    expect(TASK_STATUS_CONFIG.COMPLETED.label).toBe("Done");
+  });
+
+  it("CANCELLED → 'Cancelled' (the real cancelled state staff need)", () => {
+    // The brief: "I want a real cancelled state as staff need to cancel tasks."
+    // CANCELLED is now a real Prisma enum value + a TASK_STATUS_CONFIG key.
+    expect(TASK_STATUS_CONFIG.CANCELLED.label).toBe("Cancelled");
+    // The definition must make clear that cancelled tasks stay on the list
+    // (not deleted) — this is the audit-history contract.
+    expect(TASK_STATUS_CONFIG.CANCELLED.definition).toMatch(/audit|history|not deleted|stays on/i);
+  });
+
+  it("no invented names (TODO / DONE) remain in TASK_STATUS_CONFIG", () => {
+    // The old map used TODO + DONE (invented names that didn't match the DB).
+    // This test is the graveyard alarm: if anyone re-introduces them, the
+    // test fails.
+    const keys = Object.keys(TASK_STATUS_CONFIG);
+    expect(keys).not.toContain("TODO");
+    expect(keys).not.toContain("DONE");
+  });
+});
