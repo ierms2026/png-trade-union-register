@@ -1,5 +1,5 @@
 {
-  "backedUpAt": "2026-10-04T22:44:43.432Z",
+  "backedUpAt": "2026-10-04T23:12:10.721Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.21.0",
   "fileCount": 299,
@@ -1260,9 +1260,9 @@
     },
     {
       "path": "src/lib/__tests__/dashboard-nav.test.ts",
-      "checksum": "4408f0d4c08f1a6307d580ea7c5e5d6910617a7da62aefd1c67a225283bc86c9",
-      "size": 37007,
-      "mtime": "2026-10-04T22:34:24.723Z"
+      "checksum": "d07372040fdee840dac4978384f2b6e474685a59cc973c5bc29654608a77fd9c",
+      "size": 39136,
+      "mtime": "2026-10-04T23:10:38.529Z"
     },
     {
       "path": "src/lib/__tests__/dashboard-snapshot.test.ts",
@@ -1482,9 +1482,9 @@
     },
     {
       "path": "src/lib/dashboard/nav-structure.ts",
-      "checksum": "d50671b17e1176c1ed9fceab5b76cb2355deab78d097dbc16620cd17aa441f19",
-      "size": 20027,
-      "mtime": "2026-10-04T21:50:56.385Z"
+      "checksum": "e81afc5fff6fc8d835d8adff277de9285eea476dcb1417218d8f1a210835a4a4",
+      "size": 23562,
+      "mtime": "2026-10-04T23:10:16.673Z"
     },
     {
       "path": "src/lib/dashboard/snapshot.ts",

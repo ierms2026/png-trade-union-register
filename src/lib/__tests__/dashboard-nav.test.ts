@@ -592,20 +592,60 @@ describe("nav-structure — one source of truth (palette + quick actions + view 
     // Verify the navigate action labels use shortLabel where set.
     const labels = navigateActions.map((a) => a.label);
     expect(labels).toContain("Register Union");
+    expect(labels).toContain("Upload Document");
     expect(labels).toContain("Create Task");
     expect(labels).toContain("View Audit Log");
   });
 
-  it("getQuickActions for OFFICER omits Registrar-only actions", () => {
+  it("getQuickActions for INSPECTOR omits Register Union + Upload Document (task gating)", () => {
+    // INSPECTORS can visit Unions + Documents (to inspect) but don't get
+    // the "Register Union" or "Upload Document" do-buttons. They see:
+    // Create Task, View Audit Log (navigate) + Compliance Report (external).
+    // This is the task-gating fix: visit ≠ can-do.
+    const actions = getQuickActions("INSPECTOR");
+    const labels = actions.map((a) => a.label);
+    // INSPECTOR sees: Create Task, View Audit Log, Compliance Report = 3 total.
+    expect(labels).toContain("Create Task");
+    expect(labels).toContain("View Audit Log");
+    expect(labels).toContain("Compliance Report");
+    // INSPECTOR does NOT see: Register Union, Upload Document.
+    expect(labels).not.toContain("Register Union");
+    expect(labels).not.toContain("Upload Document");
+    // Verify the count: 2 navigate + 1 external = 3.
+    expect(actions).toHaveLength(3);
+  });
+
+  it("getQuickActions for OFFICER has exactly ONE Upload Document (no duplicate)", () => {
+    // OFFICERS see: Upload Document (from my-union, scoped to their union),
+    // Create Task, Compliance Report. They do NOT see a second "Upload
+    // Document" from the documents destination (that's gated to REGISTRAR).
+    // This is the dedup fix: one task = one button.
     const actions = getQuickActions("OFFICER");
     const labels = actions.map((a) => a.label);
-    // OFFICER sees: Upload Document (via my-union), Create Task, Compliance Report.
-    // OFFICER does NOT see: Register Union (Registrar/Inspector), View Audit Log (Registrar/Inspector).
+    // OFFICER sees exactly ONE "Upload Document".
+    const uploadCount = labels.filter((l) => l === "Upload Document").length;
+    expect(uploadCount).toBe(1);
+    // OFFICER sees: Upload Document, Create Task, Compliance Report = 3 total.
     expect(labels).toContain("Upload Document");
     expect(labels).toContain("Create Task");
     expect(labels).toContain("Compliance Report");
+    // OFFICER does NOT see: Register Union, View Audit Log.
     expect(labels).not.toContain("Register Union");
     expect(labels).not.toContain("View Audit Log");
+    expect(actions).toHaveLength(3);
+  });
+
+  it("getQuickActions never returns duplicate labels for any role (dedup safety net)", () => {
+    // The dedup-by-label safety net: even if the config drifts + two
+    // destinations produce the same label for the same role, only the
+    // first is kept. This test verifies the dedup works by checking all
+    // three roles have no duplicate labels.
+    for (const role of ["REGISTRAR", "INSPECTOR", "OFFICER"] as const) {
+      const actions = getQuickActions(role);
+      const labels = actions.map((a) => a.label);
+      const uniqueLabels = new Set(labels);
+      expect(uniqueLabels.size, `${role}: duplicate labels found`).toBe(labels.length);
+    }
   });
 
   it("VIEW_TITLES mirrors NAV_STRUCTURE labels (no drift)", () => {

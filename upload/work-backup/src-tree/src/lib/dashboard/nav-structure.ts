@@ -78,10 +78,32 @@ export type StaffRole = "REGISTRAR" | "INSPECTOR" | "OFFICER";
  * for the button (e.g. "Register Union" instead of "Unions", "Upload
  * Document" instead of "Documents"). If omitted, the destination's `label`
  * is used.
+ *
+ * TASK GATING (not just destination gating):
+ *   The destination's `roles` array controls who can SEE the destination in
+ *   the nav. But a quick action is a TASK ("do this job"), not a destination
+ *   ("visit this page"). Some roles can visit a page but shouldn't get the
+ *   do-button for it. For example:
+ *     - INSPECTORS can visit Unions (to inspect) but shouldn't get the
+ *       "Register Union" button (they don't register unions).
+ *     - INSPECTORS can visit Documents (to inspect) but shouldn't get the
+ *       "Upload Document" button (they don't upload).
+ *   The optional `roles` field on QuickAction handles this: if set, the
+ *   quick action only appears for roles in THAT array (a subset of the
+ *   destination's `roles`). If omitted, the quick action appears for all
+ *   roles that can see the destination (the old behavior — kept for
+ *   backward compat).
+ *
+ * DEDUP:
+ *   If two destinations produce the same label for the same role (e.g.
+ *   "Upload Document" from both `my-union` and `documents` for an OFFICER),
+ *   getQuickActions keeps only the FIRST one. This is a safety net — the
+ *   task-gating `roles` field should already prevent duplicates, but the
+ *   dedup ensures no duplicate buttons even if the config drifts.
  */
 export type QuickAction =
-  | { kind: "navigate"; shortLabel?: string }
-  | { kind: "external"; href: string; shortLabel?: string };
+  | { kind: "navigate"; shortLabel?: string; roles?: StaffRole[] }
+  | { kind: "external"; href: string; shortLabel?: string; roles?: StaffRole[] };
 
 /**
  * A single nav destination. The `route` is the string passed to
@@ -164,9 +186,17 @@ export const NAV_STRUCTURE: NavGroup[] = [
     label: "Unions",
     icon: Building2,
     destinations: [
-      { label: "Unions", route: "unions", icon: Building2, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Register Union"], quickAction: { kind: "navigate", shortLabel: "Register Union" } },
+      // Register Union: REGISTRAR only (Inspectors can visit Unions to
+      // inspect but don't register new unions).
+      { label: "Unions", route: "unions", icon: Building2, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Register Union"], quickAction: { kind: "navigate", shortLabel: "Register Union", roles: ["REGISTRAR"] } },
+      // Upload Document (Officer's single upload): OFFICER only. This is
+      // the ONLY upload button an Officer sees — scoped to their own union.
       { label: "My Union", route: "my-union", icon: Home, roles: ["OFFICER"], quickAction: { kind: "navigate", shortLabel: "Upload Document" } },
-      { label: "Documents", route: "documents", icon: FileText, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Upload Document"], quickAction: { kind: "navigate", shortLabel: "Upload Document" } },
+      // Upload Document (general): REGISTRAR only. Officers get their
+      // upload via my-union above; Inspectors don't upload. Without this
+      // gate, an Officer would see TWO "Upload Document" buttons (one
+      // from my-union, one from documents) + an Inspector would see one.
+      { label: "Documents", route: "documents", icon: FileText, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Upload Document"], quickAction: { kind: "navigate", shortLabel: "Upload Document", roles: ["REGISTRAR"] } },
       { label: "Compare", route: "compare", icon: GitCompare, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Compare Unions"] },
     ],
   },
@@ -396,17 +426,43 @@ export interface QuickActionEntry {
  * quick-action row visually echoes the menu order. Destinations without
  * `quickAction` set are skipped.
  *
+ * TASK GATING:
+ *   A quick action appears for `role` iff:
+ *     1. The destination is visible to `role` (dest.roles includes role), AND
+ *     2. The quick action's own `roles` field (if set) includes `role`.
+ *   This separates "can I visit this page?" (1) from "should I get the
+ *   do-button?" (2). For example, an INSPECTOR can visit the Unions page
+ *   (1 = true) but doesn't get the "Register Union" button (2 = false,
+ *   because the quickAction.roles is ["REGISTRAR"]).
+ *
+ * DEDUP:
+ *   If two destinations produce the same label for the same role, only the
+ *   FIRST is kept. This is a safety net — the task-gating `roles` field
+ *   should already prevent duplicates (e.g. Officer sees "Upload Document"
+ *   only from `my-union`, not from `documents`), but the dedup ensures no
+ *   duplicate buttons even if the config drifts.
+ *
  * EXTERNAL ACTIONS: the Compliance Report is the one external quick action.
  * It lives at /reports/compliance (a Server Component route, outside the
  * SPA router), so it can't use onNavigate — it opens in a new tab instead.
  */
 export function getQuickActions(role: StaffRole): QuickActionEntry[] {
   const entries: QuickActionEntry[] = [];
+  const seenLabels = new Set<string>(); // for dedup-by-label
   for (const group of NAV_STRUCTURE) {
     for (const dest of group.destinations) {
       if (!dest.quickAction) continue;
+      // Gate 1: the destination must be visible to the role.
       if (!dest.roles.includes(role)) continue;
+      // Gate 2: the quick action's own roles field (if set) must include
+      // the role. This is the task gate — it can be a subset of the
+      // destination's roles.
+      if (dest.quickAction.roles && !dest.quickAction.roles.includes(role)) continue;
       const label = dest.quickAction.shortLabel ?? dest.label;
+      // Dedup: if we've already added an entry with this label for this
+      // role, skip. Keeps the first occurrence (NAV_STRUCTURE order).
+      if (seenLabels.has(label)) continue;
+      seenLabels.add(label);
       if (dest.quickAction.kind === "navigate") {
         entries.push({ route: dest.route, label, icon: dest.icon, kind: "navigate" });
       } else {
@@ -426,6 +482,9 @@ export function getQuickActions(role: StaffRole): QuickActionEntry[] {
   // these extras. The dashboard doesn't keep its own list.
   for (const extra of EXTRA_QUICK_ACTIONS) {
     if (!extra.roles.includes(role)) continue;
+    // Dedup extras too (in case an extra has the same label as a nav action).
+    if (seenLabels.has(extra.label)) continue;
+    seenLabels.add(extra.label);
     entries.push({
       route: extra.route,
       label: extra.label,

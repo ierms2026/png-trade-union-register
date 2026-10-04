@@ -562,3 +562,36 @@ Stage Summary:
 - Public portal tabs are addressable: /?tab=register, /?tab=resources, /?tab=help. Refresh, Back/Forward, and sharing all work. Old tab values (search/legislation) are mapped to the new values for backward compat.
 - Forgot-password step is addressable: /?login=1&step=forgot opens the forgot-password form directly. This enables future use cases like a "Forgot password?" link in an email or external page that goes straight to the form.
 - Login screen survives refresh: /?login=1 stays in the URL (was stripped before), so refresh keeps you on the login screen instead of kicking you back to the public portal.
+
+---
+Task ID: gate-quick-actions-by-task
+Agent: main
+Task: Gate quick actions by task, not by destination — hide Register Union + Upload Document for Inspectors; give Officers a single Upload Document
+
+Work Log:
+- Audited the drift: getQuickActions(role) gated by destination only (dest.roles). If a role could visit a page, they got the do-button for it. This caused: (a) Inspectors saw "Register Union" + "Upload Document" buttons (they can visit Unions/Documents to inspect but shouldn't get do-buttons); (b) Officers saw TWO "Upload Document" buttons (one from my-union, one from documents — both had quickAction set).
+- Added an optional `roles` field to the QuickAction type. This is the TASK gate: if set, the quick action only appears for roles in THAT array (a subset of the destination's `roles`). If omitted, the quick action appears for all roles that can see the destination (backward compat).
+  - The QuickAction type is now: `{ kind: "navigate"; shortLabel?: string; roles?: StaffRole[] } | { kind: "external"; href: string; shortLabel?: string; roles?: StaffRole[] }`.
+  - This separates "can I visit this page?" (dest.roles) from "should I get the do-button?" (quickAction.roles).
+- Updated the quick-action config on the three Unions-group destinations:
+  - `unions` (Register Union): quickAction.roles = ["REGISTRAR"] — Inspectors can visit but don't get the button.
+  - `my-union` (Upload Document): no roles field — OFFICER only (the destination itself is OFFICER-only). This is the Officer's single upload.
+  - `documents` (Upload Document): quickAction.roles = ["REGISTRAR"] — Officers get their upload via my-union; Inspectors don't upload.
+- Updated getQuickActions to respect the new task gate + add dedup-by-label:
+  - Gate 1: destination visible to role (dest.roles includes role) — unchanged.
+  - Gate 2: quickAction.roles (if set) includes role — NEW. This is the task gate.
+  - Dedup: if two destinations produce the same label for the same role, only the first is kept (safety net — the task gate should already prevent it, but dedup ensures no duplicates even if config drifts).
+  - Extras (Compliance Report) are also deduped.
+- Updated the one-source-of-truth tests:
+  - REGISTRAR test: unchanged — still sees 5 (Register Union, Upload Document, Create Task, View Audit Log, Compliance Report).
+  - NEW INSPECTOR test: sees 3 (Create Task, View Audit Log, Compliance Report). Does NOT see Register Union or Upload Document. This is the task-gating fix.
+  - REWRITTEN OFFICER test: sees exactly ONE "Upload Document" (from my-union). Does NOT see a second from documents. Sees 3 total (Upload Document, Create Task, Compliance Report). This is the dedup fix.
+  - NEW dedup safety-net test: for all three roles, no duplicate labels in getQuickActions output.
+- All 606 tests pass (was 604 → 606, +2 new). ESLint clean. TypeScript clean. Backed up (299 files).
+
+Stage Summary:
+- Quick actions are now gated by TASK, not by destination. A role can visit a page (dest.roles) without getting the do-button for it (quickAction.roles).
+- INSPECTORS see: Create Task, View Audit Log, Compliance Report (3 buttons, was 5). No more "Register Union" or "Upload Document" — they inspect, they don't register or upload.
+- OFFICERS see: Upload Document (one, scoped to their union via my-union), Create Task, Compliance Report (3 buttons, was 4 with a duplicate). No more duplicate "Upload Document" buttons.
+- REGISTRARS see: Register Union, Upload Document, Create Task, View Audit Log, Compliance Report (5 buttons, unchanged).
+- A dedup safety net prevents duplicate labels even if the config drifts.
