@@ -113,7 +113,9 @@ export default function Home() {
       }
       const wantLogin = urlParams.get("login") === "1";
       if (wantLogin) {
-        window.history.replaceState({}, "", "/");
+        // Don't strip ?login=1 — keep it so refresh stays on the login
+        // screen. The ?step= param (if present) is read by LoginForm
+        // directly (lazy initializer) to start on the forgot-password step.
         if (!cancelled) setMode("login");
         return;
       }
@@ -180,7 +182,12 @@ export default function Home() {
   }
 
   if (mode === "public") {
-    return <PublicPortal onStaffLogin={() => setMode("login")} />;
+    return <PublicPortal onStaffLogin={() => {
+      // Push /?login=1 so refresh stays on the login screen + the Back
+      // button returns to the public portal.
+      window.history.pushState({}, "", "/?login=1");
+      setMode("login");
+    }} />;
   }
 
   if (resetToken) {
@@ -194,7 +201,12 @@ export default function Home() {
   }
 
   if (mode === "login") {
-    return <LoginForm onBackToPortal={() => setMode("public")} />;
+    return <LoginForm onBackToPortal={() => {
+      // Push / (clean URL) so the Back button works + refresh lands on
+      // the public portal, not the login screen.
+      window.history.pushState({}, "", "/");
+      setMode("public");
+    }} />;
   }
 
   if (!user) return null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import Image from "next/image";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -25,15 +25,60 @@ export function LoginForm({ onBackToPortal }: Props) {
   //   - "password": email + password form (the default)
   //   - "2fa":      6-digit TOTP code form (after password verifies)
   //   - "forgot":   self-service "Forgot password?" form
-  // All three share the same chrome (coat-of-arms header, "Back to Public
-  // Portal" footer). Only the card body changes.
-  const [step, setStep] = useState<"password" | "2fa" | "forgot">("password");
+  //
+  // URL-AWARENESS:
+  //   The "forgot" step is URL-addressable via ?step=forgot. This means:
+  //     - Refresh on /?login=1&step=forgot stays on the forgot step
+  //     - Back/Forward works between the password + forgot steps
+  //     - A "Forgot password?" link from an email or external page can go
+  //       straight to /?login=1&step=forgot
+  //   The "2fa" step is NOT URL-addressable — it's transient (reached via
+  //   password submit, not via URL). If the user refreshes during 2FA,
+  //   they're back on the password step (the challenge token is gone).
+  //
+  // We use a lazy initializer to read ?step= on first render (avoids
+  // setState-in-effect + avoids a flash of the wrong step).
+  const [step, setStep] = useState<"password" | "2fa" | "forgot">(() => {
+    if (typeof window === "undefined") return "password";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("step") === "forgot" ? "forgot" : "password";
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [challengeToken, setChallengeToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+  // --- Listen for Back/Forward + pushState --------------------------------
+  // When the URL changes (browser Back/Forward), re-read the ?step= param
+  // + update state. This makes the forgot ↔ password transition work with
+  // the Back button.
+  useEffect(() => {
+    function handleUrlChange() {
+      const params = new URLSearchParams(window.location.search);
+      // Only honor ?step=forgot when we're also in login mode (?login=1).
+      // If ?login=1 is gone (user went back to the public portal), do
+      // nothing — page.tsx handles the mode switch.
+      if (params.get("login") !== "1") return;
+      const urlStep = params.get("step");
+      if (urlStep === "forgot") {
+        setStep("forgot");
+      } else {
+        // No ?step= or ?step=password → go back to the password step.
+        // But DON'T override if we're on the 2fa step — 2fa is transient
+        // (reached via password submit, not via URL) + shouldn't be
+        // disrupted by a popstate event.
+        setStep((current) => (current === "2fa" ? "2fa" : "password"));
+      }
+    }
+    window.addEventListener("popstate", handleUrlChange);
+    window.addEventListener("urlchange", handleUrlChange);
+    return () => {
+      window.removeEventListener("popstate", handleUrlChange);
+      window.removeEventListener("urlchange", handleUrlChange);
+    };
+  }, []);
 
   async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault();
@@ -64,12 +109,28 @@ export function LoginForm({ onBackToPortal }: Props) {
     } catch { toast.error("Network error. Please try again."); setLoading(false); }
   }
 
-  function backToPassword() { setStep("password"); setOtp(""); setChallengeToken(""); setErrors({}); }
+  // --- Step transitions that sync to the URL -------------------------------
+  // "Forgot password?" → push /?login=1&step=forgot
+  // "Back to sign in"  → push /?login=1 (no step param = password)
+  function goToForgot() {
+    setErrors({});
+    setStep("forgot");
+    window.history.pushState({}, "", "/?login=1&step=forgot");
+  }
+
+  function backToPassword() {
+    setStep("password");
+    setOtp("");
+    setChallengeToken("");
+    setErrors({});
+    // Push /?login=1 (no ?step=) so the URL reflects the password step.
+    window.history.pushState({}, "", "/?login=1");
+  }
 
   // --- "Forgot password?" sub-screen delegates to its own component --------
   // The ForgotPasswordForm owns its own state (email, loading, submitted,
   // rate-limited). We just give it an onBackToLogin callback that returns
-  // the user to the password step here.
+  // the user to the password step here (which pushes to the URL).
   if (step === "forgot") {
     return <ForgotPasswordForm onBackToLogin={backToPassword} />;
   }
@@ -92,7 +153,7 @@ export function LoginForm({ onBackToPortal }: Props) {
                     <Label htmlFor="password">Password</Label>
                     <button
                       type="button"
-                      onClick={() => { setErrors({}); setStep("forgot"); }}
+                      onClick={goToForgot}
                       className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
                     >
                       Forgot password?

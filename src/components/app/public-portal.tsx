@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -22,11 +22,61 @@ interface PublicUnion { id: string; unionName: string; registrationNo: string; s
 interface LegislationEntry { id: string; title: string; shortTitle: string; year: number; jurisdiction: string; category: string; summary: string; url: string; lastUpdated: string; }
 interface Props { onStaffLogin: () => void; }
 
+// =============================================================================
+// Public tab values — the canonical URL values for each public-portal tab.
+// These match the tab labels shown to the user (Register / Resources / Help).
+// The URL param is ?tab=<value>. Refresh, Back/Forward, + sharing all work.
+// =============================================================================
+type PublicTab = "register" | "resources" | "help";
+
+/** Read the ?tab= param from the URL. Falls back to "register" (the default). */
+function readTabFromUrl(): PublicTab {
+  if (typeof window === "undefined") return "register";
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  if (tab === "register" || tab === "resources" || tab === "help") return tab;
+  // Legacy values: "search" → register, "legislation" → resources.
+  // Kept for backward compat so old bookmarks don't break.
+  if (tab === "search") return "register";
+  if (tab === "legislation") return "resources";
+  return "register";
+}
+
 export function PublicPortal({ onStaffLogin }: Props) {
-  const [tab, setTab] = useState<"search" | "legislation" | "help">("search");
+  // --- URL-aware tab state ------------------------------------------------
+  // The tab is driven by ?tab= in the URL. Lazy initializer reads on first
+  // render (avoids setState-in-effect + avoids a flash of the wrong tab).
+  // Tab clicks push to the URL; popstate/urlchange re-reads.
+  const [tab, setTab] = useState<PublicTab>(readTabFromUrl);
   const [searchQuery, setSearchQuery] = useState("");
   const { data: allUnions, loading: unionsLoading, error: unionsError } = useFetch<{ unions: PublicUnion[] }>("/api/public/unions");
   const { data: legislation, loading: legLoading, error: legError } = useFetch<LegislationEntry[]>("/api/legislation");
+
+  // --- Listen for Back/Forward + pushState --------------------------------
+  // When the URL changes (browser Back/Forward, or page.tsx pushing a new
+  // URL), re-read the ?tab= param + update state. This keeps the tab in
+  // sync with the URL — the URL is the source of truth.
+  useEffect(() => {
+    function handleUrlChange() {
+      setTab(readTabFromUrl());
+    }
+    window.addEventListener("popstate", handleUrlChange);
+    window.addEventListener("urlchange", handleUrlChange);
+    return () => {
+      window.removeEventListener("popstate", handleUrlChange);
+      window.removeEventListener("urlchange", handleUrlChange);
+    };
+  }, []);
+
+  // --- Push tab changes to the URL ----------------------------------------
+  // Called when the user clicks a tab button. Pushes ?tab=X so refresh +
+  // Back/Forward + sharing work.
+  function handleTabChange(newTab: PublicTab) {
+    setTab(newTab);
+    const url = new URL(window.location.origin + "/");
+    url.searchParams.set("tab", newTab);
+    window.history.pushState({}, "", url.toString());
+  }
 
   const filteredUnions: PublicUnion[] = (() => {
     const all = allUnions?.unions ?? [];
@@ -195,14 +245,14 @@ export function PublicPortal({ onStaffLogin }: Props) {
       </header>
       <div className="border-b bg-card">
         <div className="mx-auto flex max-w-4xl gap-1 px-4">
-          <button onClick={() => setTab("search")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "search" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Register</button>
-          <button onClick={() => setTab("legislation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "legislation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Resources</button>
-          <button onClick={() => setTab("help")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "help" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Help</button>
+          <button onClick={() => handleTabChange("register")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "register" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Register</button>
+          <button onClick={() => handleTabChange("resources")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "resources" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Resources</button>
+          <button onClick={() => handleTabChange("help")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "help" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Help</button>
         </div>
       </div>
       <main className="mx-auto max-w-4xl space-y-10 p-4 py-10">
         {renderHero()}
-        {tab === "search" ? renderSearch() : tab === "legislation" ? renderLegislation() : renderHelp()}
+        {tab === "register" ? renderSearch() : tab === "resources" ? renderLegislation() : renderHelp()}
       </main>
       <footer className="border-t bg-card">
         <div className="mx-auto max-w-4xl space-y-3 px-4 py-6 text-center text-xs text-muted-foreground">

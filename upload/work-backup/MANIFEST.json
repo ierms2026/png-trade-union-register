@@ -1,5 +1,5 @@
 {
-  "backedUpAt": "2026-10-04T22:37:11.956Z",
+  "backedUpAt": "2026-10-04T22:44:43.432Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.21.0",
   "fileCount": 299,
@@ -582,9 +582,9 @@
     },
     {
       "path": "src/app/page.tsx",
-      "checksum": "9fd6d2c2cea83ec64e84b60f9428eeb93cbd8ba11d3647bf7b69cd62ac3143de",
-      "size": 13025,
-      "mtime": "2026-10-04T21:50:53.017Z"
+      "checksum": "bb7ec01ab026793df26391000b8351ce9ed6274fc8869d2eacde0c2a45213202",
+      "size": 13564,
+      "mtime": "2026-10-04T22:41:17.766Z"
     },
     {
       "path": "src/app/portal/page.tsx",
@@ -666,9 +666,9 @@
     },
     {
       "path": "src/components/app/login-form.tsx",
-      "checksum": "610db7b9f4fc106e86c52951a2089bbf5e48ce9e500570b0b99a6b64301a8ff5",
-      "size": 7620,
-      "mtime": "2026-10-04T21:50:53.471Z"
+      "checksum": "ef132b81bb266c52087d3c82debf7368ce245c00b42850e753002009dfcff0e4",
+      "size": 10247,
+      "mtime": "2026-10-04T22:42:44.489Z"
     },
     {
       "path": "src/components/app/print-button.tsx",
@@ -678,9 +678,9 @@
     },
     {
       "path": "src/components/app/public-portal.tsx",
-      "checksum": "d3fdd00f711112b5bf92842d08984bd243c3e9f11ec8114b2b97a963150d29cd",
-      "size": 13820,
-      "mtime": "2026-10-04T21:50:53.529Z"
+      "checksum": "fcbf89d012a8b80ca31d122a4ad36cff60ab621917f51bafd34b66645068aaa5",
+      "size": 16245,
+      "mtime": "2026-10-04T22:41:59.728Z"
     },
     {
       "path": "src/components/app/registrar-contact-info.tsx",

@@ -531,3 +531,34 @@ Stage Summary:
 - One source of truth: both the staff Tasks view + the portal Tasks view read from the shared TASK_STATUS_CONFIG in vocabulary.ts. The local STATUS_CONFIG copies were deleted.
 - A real CANCELLED state: staff can cancel tasks via a dedicated Cancel button (XCircle icon, with confirm dialog). Cancelled tasks stay on the list for audit history (not deleted) and show a line-through title. Clicking the cycle button on a cancelled task un-cancels it.
 - A contract test prevents drift: if anyone adds/removes a TaskStatus enum value without updating TASK_STATUS_CONFIG (or vice versa), the test fails loudly.
+
+---
+Task ID: addressable-public-tabs-and-forgot-password
+Agent: main
+Task: Make public tabs and the forgot-password step URL-addressable (?tab=help, ?login=1&step=forgot)
+
+Work Log:
+- Made public portal tabs URL-addressable:
+  - Tab state changed from "search"|"legislation"|"help" to "register"|"resources"|"help" (matching the user-facing labels).
+  - Lazy initializer reads ?tab= from the URL on first render. Legacy values (search/legislation) are mapped to the new values for backward compat.
+  - Tab clicks push ?tab=X to the URL via window.history.pushState.
+  - popstate + urlchange listener re-reads ?tab= on Back/Forward.
+  - Result: /?tab=help opens the Help tab, /?tab=resources opens Resources, /?tab=register (or /) opens the Register. Refresh + sharing + Back/Forward all work.
+- Made forgot-password step URL-addressable:
+  - LoginForm's step state now uses a lazy initializer that reads ?step= from the URL. If ?step=forgot, starts on the forgot step.
+  - "Forgot password?" click pushes /?login=1&step=forgot to the URL.
+  - "Back to Sign in" from forgot pushes /?login=1 (no ?step= = password step).
+  - popstate + urlchange listener re-reads ?step= on Back/Forward.
+  - The 2FA step is NOT URL-addressable (transient — reached via password submit, not via URL). The listener deliberately doesn't override the 2fa step on popstate.
+  - Result: /?login=1&step=forgot opens the forgot-password form directly. Refresh stays on the forgot step. Back/Forward works between password and forgot steps.
+- Updated page.tsx:
+  - Stopped stripping ?login=1 from the URL. Previously, entering login mode immediately replaced the URL with "/" — so refresh kicked you back to the public portal. Now ?login=1 stays in the URL, so refresh stays on the login screen.
+  - onStaffLogin callback now pushes /?login=1 to the URL + sets mode to "login".
+  - onBackToPortal callback now pushes / (clean URL) + sets mode to "public".
+  - Result: clicking "Sign In" on the public portal pushes /?login=1 (Back returns to the portal). Clicking "Back to Public Portal" pushes / (Back from the portal returns to the login screen).
+- All 604 tests pass (no new tests needed — the URL-aware patterns are the same as the Audit + Contact Requests views). ESLint clean. TypeScript clean. Backed up (299 files).
+
+Stage Summary:
+- Public portal tabs are addressable: /?tab=register, /?tab=resources, /?tab=help. Refresh, Back/Forward, and sharing all work. Old tab values (search/legislation) are mapped to the new values for backward compat.
+- Forgot-password step is addressable: /?login=1&step=forgot opens the forgot-password form directly. This enables future use cases like a "Forgot password?" link in an email or external page that goes straight to the form.
+- Login screen survives refresh: /?login=1 stays in the URL (was stripped before), so refresh keeps you on the login screen instead of kicking you back to the public portal.
