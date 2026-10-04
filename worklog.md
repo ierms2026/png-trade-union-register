@@ -595,3 +595,33 @@ Stage Summary:
 - OFFICERS see: Upload Document (one, scoped to their union via my-union), Create Task, Compliance Report (3 buttons, was 4 with a duplicate). No more duplicate "Upload Document" buttons.
 - REGISTRARS see: Register Union, Upload Document, Create Task, View Audit Log, Compliance Report (5 buttons, unchanged).
 - A dedup safety net prevents duplicate labels even if the config drifts.
+
+---
+Task ID: search-filters-and-pagination
+Agent: main
+Task: Add filters (union, type, review status) and paging to Search
+
+Work Log:
+- Audited current state: /api/search had a hard cap of 50 results (take: 50) with no pagination, no filters. SearchView read ?q= from the URL but had no filter dropdowns + no pagination controls. Results beyond #50 were completely invisible.
+- Updated /api/search route:
+  - Added 3 filter params: ?union=ID, ?documentType=X, ?reviewStatus=Y (validated against the Prisma ReviewStatus enum).
+  - Added 2 pagination params: ?page=N (1-indexed, default 1) + ?limit=M (default 20, max 50).
+  - Replaced `take: 50` with proper `skip: (page-1)*limit, take: limit` pagination.
+  - Added a separate `count({ where })` query to get the total matching count (needed for totalPages + "Showing 1–20 of 150" display).
+  - Response shape now includes: results, count (on this page), total (across all pages), page, limit, totalPages, query.
+  - Role scoping unchanged: OFFICER/REPRESENTATIVE are scoped to their assigned union (the ?union= filter is ignored for them — they can only search their own union).
+- Rewrote SearchView component:
+  - Added 3 filter dropdowns (Union, Document Type, Review Status) — same pattern as the Documents view. Union list fetched from /api/unions, document types from /api/compliance.
+  - Added pagination controls: Previous / page numbers / Next. Page numbers use a smart truncation (always show page 1, current page ±1, last page, with "..." for gaps) so the bar doesn't overflow with 100+ pages.
+  - Added "Showing 1–20 of 150 results" display.
+  - Changed page size from 50 (hard cap) to 20 (paginated).
+  - All state (query, filters, page) is URL-aware: lazy initializers read from the URL on mount, changes push to the URL, popstate/urlchange listener re-reads on Back/Forward. Result: /?view=search&q=ballot&union=ID&documentType=Constitution&reviewStatus=APPROVED&page=2 is shareable, refresh-safe, Back/Forward works.
+  - Filter changes reset to page 1 (so you don't end up on page 5 of an empty result set after narrowing).
+  - "Clear search" keeps filters (user might want to re-search within the same filter context). "Clear filters" button clears all 3 filters + resets to page 1.
+- All 606 tests pass (no new tests — the search-utils tests already cover snippet extraction; the URL-aware patterns are the same as Audit + Contact Requests). ESLint clean. TypeScript clean. Backed up (299 files).
+
+Stage Summary:
+- Search now has 3 filters: Union, Document Type, Review Status — matching the Documents view's filters for consistency.
+- Search is paginated (20 per page) with Previous/page numbers/Next controls. No more invisible results beyond #50.
+- All search state is URL-addressable: /?view=search&q=ballot&union=ID&documentType=Constitution&reviewStatus=APPROVED&page=2 works for refresh, sharing, Back/Forward.
+- The API returns total + totalPages so the frontend can render "Showing 1–20 of 150 results" + the correct number of page buttons.

@@ -1,5 +1,5 @@
 {
-  "backedUpAt": "2026-10-04T23:12:10.721Z",
+  "backedUpAt": "2026-10-04T23:22:22.658Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.21.0",
   "fileCount": 299,
@@ -414,9 +414,9 @@
     },
     {
       "path": "src/app/api/search/route.ts",
-      "checksum": "da65157dbbd8146321233674a9bfd817abf0f60f31d9e510e8c9f4755c4cdcdf",
-      "size": 6160,
-      "mtime": "2026-09-27T22:08:55.000Z"
+      "checksum": "f3e78f1cbae2f922427cccc8471a43f641a2a9069d86970c3f7b090e44759b2a",
+      "size": 8713,
+      "mtime": "2026-10-04T23:20:20.339Z"
     },
     {
       "path": "src/app/api/security/login-trend/route.ts",
@@ -822,9 +822,9 @@
     },
     {
       "path": "src/components/app/views/search.tsx",
-      "checksum": "503af1e2c2e4de5de2fa6450f24f536a7e404d60f7e55a887441a25bc0d489e6",
-      "size": 9181,
-      "mtime": "2026-10-04T21:50:54.112Z"
+      "checksum": "4ca346ff75dbf8a77712348cb35a5a913daadb95e18265f85ec4ac3f75398a8a",
+      "size": 19750,
+      "mtime": "2026-10-04T23:20:56.253Z"
     },
     {
       "path": "src/components/app/views/security.tsx",

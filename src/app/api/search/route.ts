@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Role } from "@prisma/client";
+import { Role, ReviewStatus } from "@prisma/client";
 import {
   checkRateLimit,
   rateLimitedResponse,
@@ -11,9 +11,20 @@ import {
 import { extractSnippet } from "@/lib/search/search-utils";
 
 // =============================================================================
-// GET /api/search?q=...
+// GET /api/search?q=...&union=ID&documentType=X&reviewStatus=Y&page=N&limit=M
 // -----------------------------------------------------------------------------
-// Chunk 6: Full-text search across all document contents.
+// Full-text search across all document contents, with filters + pagination.
+//
+// FILTERS:
+//   ?union=ID           — restrict to a specific union (by union ID)
+//   ?documentType=X     — restrict to a specific document type (e.g.
+//                         "Constitution", "Annual Return")
+//   ?reviewStatus=Y     — restrict to a review status (PENDING / APPROVED /
+//                         REJECTED). Case-insensitive.
+//
+// PAGINATION:
+//   ?page=N   — 1-indexed page number (default 1)
+//   ?limit=M  — results per page (default 20, max 50)
 //
 // Searches the DocumentVersion.textContent field using SQLite's LIKE operator
 // (ASCII case-insensitive). Returns matching documents with a snippet of the
@@ -22,7 +33,8 @@ import { extractSnippet } from "@/lib/search/search-utils";
 // AUTH: Any authenticated role. Role-based scoping:
 //   - REGISTRAR + INSPECTOR → search across ALL unions' documents
 //   - OFFICER + REPRESENTATIVE → scoped to their assigned union only
-//     (same pattern as /api/tasks — see chunk 5)
+//     (same pattern as /api/tasks — see chunk 5). The ?union= filter is
+//     IGNORED for these roles (they can only search their own union).
 //
 // RATE LIMIT: 30 queries/min per user (search bucket). X-RateLimit-* headers
 // on every response so polite clients can self-throttle.
@@ -33,7 +45,11 @@ import { extractSnippet } from "@/lib/search/search-utils";
 //       documentId, documentType, unionId, unionName,
 //       versionNumber, versionId, fileName, snippet, uploadedAt
 //     }],
-//     count: number,
+//     count: number,         // results on THIS page
+//     total: number,         // total matching results across all pages
+//     page: number,          // current page (1-indexed)
+//     limit: number,         // page size
+//     totalPages: number,    // ceil(total / limit)
 //     query: string
 //   }
 //
@@ -41,6 +57,11 @@ import { extractSnippet } from "@/lib/search/search-utils";
 // frontend uses highlightMatches() to render <mark> tags). Each result also
 // includes the `versionId` so the frontend can construct a download URL.
 // =============================================================================
+
+/** Default results per page. */
+const DEFAULT_LIMIT = 20;
+/** Maximum results per page (prevents a user from requesting limit=10000). */
+const MAX_LIMIT = 50;
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
@@ -62,6 +83,13 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const query = url.searchParams.get("q") || "";
+  const unionFilter = url.searchParams.get("union"); // union ID
+  const documentTypeFilter = url.searchParams.get("documentType");
+  const reviewStatusFilter = url.searchParams.get("reviewStatus");
+
+  // Pagination params
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(url.searchParams.get("limit") || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT));
 
   if (query.trim().length < 2) {
     return NextResponse.json(
@@ -96,23 +124,49 @@ export async function GET(req: NextRequest) {
   // as a wildcard — acceptable for an authed search endpoint (users rarely
   // search for literal %, and the worst case is a slightly broader match).
   const whitespaceFlexibleQuery = trimmedQuery.replace(/\s+/g, "%");
-  const whereClause: Record<string, unknown> = {
-    textContent: { contains: whitespaceFlexibleQuery },
-    // Exclude disposed documents — they're "gone from active views" per the
-    // codebase's own comment in calculator.ts. The Document row stays for
-    // audit history, but search shouldn't surface it.
-    document: { disposedAt: null },
+  const documentWhere: Record<string, unknown> = {
+    disposedAt: null,
   };
 
+  // --- Apply filters ------------------------------------------------------
   // Role-based scoping:
-  //   REGISTRAR + INSPECTOR → all unions
-  //   OFFICER + REPRESENTATIVE → their assigned union only
+  //   REGISTRAR + INSPECTOR → all unions (the ?union= filter is honored)
+  //   OFFICER + REPRESENTATIVE → their assigned union only (the ?union=
+  //   filter is IGNORED — they can only search their own union)
   const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
   if (isUnionScopedRole && user.assignedUnionId) {
-    (whereClause.document as Record<string, unknown>).unionId = user.assignedUnionId;
+    documentWhere.unionId = user.assignedUnionId;
+  } else if (unionFilter) {
+    // Registrar/Inspector: honor the ?union= filter if set.
+    documentWhere.unionId = unionFilter;
   }
 
+  // Document type filter
+  if (documentTypeFilter) {
+    documentWhere.documentType = documentTypeFilter;
+  }
+
+  // Review status filter (validate against the Prisma enum)
+  if (reviewStatusFilter) {
+    const upperStatus = reviewStatusFilter.toUpperCase();
+    if (Object.values(ReviewStatus).includes(upperStatus as ReviewStatus)) {
+      documentWhere.reviewStatus = upperStatus;
+    }
+  }
+
+  const whereClause: Record<string, unknown> = {
+    textContent: { contains: whitespaceFlexibleQuery },
+    document: documentWhere,
+  };
+
+  // --- Get total count (for pagination) ----------------------------------
+  // We need the total matching count to compute totalPages + show
+  // "Showing 1–20 of 150 results". This is a separate count query —
+  // Prisma's findMany with skip/take doesn't return the total.
+  const total = await db.documentVersion.count({ where: whereClause });
+
   // --- Search DocumentVersion rows with matching textContent -------------
+  const skip = (page - 1) * limit;
   const versions = await db.documentVersion.findMany({
     where: whereClause,
     select: {
@@ -133,7 +187,8 @@ export async function GET(req: NextRequest) {
       },
     },
     orderBy: { uploadedAt: "desc" },
-    take: 50, // Cap at 50 results
+    skip,
+    take: limit,
   });
 
   // --- Build result array with snippets ----------------------------------
@@ -159,10 +214,16 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  const totalPages = Math.ceil(total / limit);
+
   return NextResponse.json(
     {
       results,
       count: results.length,
+      total,
+      page,
+      limit,
+      totalPages,
       query: trimmedQuery,
     },
     { headers: rlHeaders },
