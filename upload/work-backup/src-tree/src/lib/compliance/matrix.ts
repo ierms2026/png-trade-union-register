@@ -159,8 +159,15 @@ export function buildComplianceMatrix(
       // (COMPLIANT / EXPIRING / OVERDUE). For AWAITING_REVIEW / MISSING /
       // NOT_APPLICABLE, it's null — see /api/compliance/route.ts for the
       // full rationale.
+      //
+      // T50: AWAITING_REVIEW is excluded because the renewal clock should
+      // not start until the Registrar approves the document. Computing an
+      // expiry date from the upload date would make a document that sat in
+      // review for 6 months show as "expires in 6 months" when finally
+      // approved — misleading, and it caused the compliance sweep to send
+      // renewal notices for un-approved documents.
       const expiresAt =
-        latestVersion && status !== "NOT_APPLICABLE" && status !== "MISSING"
+        latestVersion && status !== "NOT_APPLICABLE" && status !== "MISSING" && status !== "AWAITING_REVIEW"
           ? computeExpiryDate(latestVersion.uploadedAt, rule.renewalYears).toISOString()
           : null;
 
