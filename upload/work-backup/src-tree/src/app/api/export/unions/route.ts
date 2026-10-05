@@ -17,6 +17,15 @@ export async function GET(req: NextRequest) {
     ? { id: user.assignedUnionId }
     : {};
 
+  // T40: "Documents" column = count of ACTIVE (non-disposed) documents,
+  // matching the convention used by /api/dashboard/stats and
+  // /api/public/stats (both filter `disposedAt: null`). The old query used
+  // `documents: { select: { _count: true } }`, which returns an ARRAY of
+  // { _count: N } objects; reading `u.documents._count` on that array was
+  // undefined for every union — the column was blank for every row.
+  //
+  // Prisma 6 supports filtered relation counts via _count + where, so we
+  // count documents where disposedAt is null directly in the query.
   const unions = await db.union.findMany({
     where,
     orderBy: { unionName: "asc" },
@@ -24,7 +33,7 @@ export async function GET(req: NextRequest) {
       id: true, unionName: true, registrationNo: true, fileNumber: true,
       status: true, address: true, contactPerson: true, contactEmail: true,
       contactPhone: true, remarks: true, createdAt: true,
-      documents: { select: { _count: true } },
+      _count: { select: { documents: { where: { disposedAt: null } } } },
     },
   });
 
@@ -33,7 +42,7 @@ export async function GET(req: NextRequest) {
     "Registration No": u.registrationNo,
     "File Number": u.fileNumber || "",
     "Status": u.status,
-    "Documents": u.documents._count,
+    "Documents": u._count.documents,
     "Address": u.address || "",
     "Contact Person": u.contactPerson || "",
     "Contact Email": u.contactEmail || "",

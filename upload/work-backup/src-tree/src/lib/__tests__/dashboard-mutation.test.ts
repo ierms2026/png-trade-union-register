@@ -575,11 +575,12 @@ describe("composition bar — segment widths match counts as percentages", () =>
       COMPLIANT: 10,
       EXPIRING: 0,
       OVERDUE: 0,
+      AWAITING_REVIEW: 0,
       MISSING: 0,
       NOT_APPLICABLE: 0,
     };
     const denominator = 20; // intentionally wrong (should be 10)
-    const sum = counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.MISSING;
+    const sum = counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.AWAITING_REVIEW + counts.MISSING;
     expect(sum).not.toBe(denominator); // guard should detect this
   });
 
@@ -857,7 +858,7 @@ function makeFixtureUnions() {
     id: `union-${i}`,
     name: `Union ${String.fromCharCode(65 + i)}`, // Union A, B, C, D, E, F
     registrationNo: `TU-2024-${String(i + 1).padStart(3, "0")}`,
-    status: i === 5 ? "SUSPENDED" : "ACTIVE",
+    status: (i === 5 ? "SUSPENDED" : "ACTIVE") as "ACTIVE" | "SUSPENDED" | "DEREGISTERED",
   }));
 }
 

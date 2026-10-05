@@ -46,13 +46,6 @@ export async function POST(req: NextRequest) {
   const matrix = buildComplianceMatrix(data);
 
   // --- 3. Build system-wide issue list ---
-  interface DigestItem {
-    unionName: string;
-    documentType: string;
-    daysUntilExpiry: number;
-    expiryDate: string;
-  }
-
   const overdue: DigestItem[] = [];
   const expiring30: DigestItem[] = [];
   const expiring90: DigestItem[] = [];
@@ -203,6 +196,13 @@ export async function POST(req: NextRequest) {
 // =============================================================================
 // Digest email template — renders a bucketed summary with tables.
 // =============================================================================
+
+interface DigestItem {
+  unionName: string;
+  documentType: string;
+  daysUntilExpiry: number;
+  expiryDate: string;
+}
 
 interface DigestEmailParams {
   recipientName: string;

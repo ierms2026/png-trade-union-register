@@ -73,6 +73,7 @@ export interface ComplianceTrendPoint {
   compliant: number;
   expiring: number;
   overdue: number;
+  awaitingReview: number;
   missing: number;
   rateNumerator: number;
   rateDenominator: number;
@@ -99,6 +100,7 @@ export interface EnsureSnapshotResult {
     compliant: number;
     expiring: number;
     overdue: number;
+    awaitingReview: number;
     missing: number;
     rateNumerator: number;
     rateDenominator: number;
@@ -327,6 +329,7 @@ export async function getComplianceTrend(
     compliant: r.compliant,
     expiring: r.expiring,
     overdue: r.overdue,
+    awaitingReview: r.awaitingReview,
     missing: r.missing,
     rateNumerator: r.rateNumerator,
     rateDenominator: r.rateDenominator,

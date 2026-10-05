@@ -44,6 +44,7 @@ interface DashboardData {
     compliant: number;
     expiring: number;
     overdue: number;
+    awaitingReview: number;
     missing: number;
     notApplicable: number;
     overallRate: number;

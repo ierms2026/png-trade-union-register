@@ -156,8 +156,9 @@ export function buildComplianceMatrix(
       const status = calculateStatusFromRows(rule, doc, latestVersion, now);
 
       // expiresAt is only meaningful for ACTIVE filings
-      // (COMPLIANT / EXPIRING / OVERDUE). For MISSING / NOT_APPLICABLE,
-      // it's null — see /api/compliance/route.ts for the full rationale.
+      // (COMPLIANT / EXPIRING / OVERDUE). For AWAITING_REVIEW / MISSING /
+      // NOT_APPLICABLE, it's null — see /api/compliance/route.ts for the
+      // full rationale.
       const expiresAt =
         latestVersion && status !== "NOT_APPLICABLE" && status !== "MISSING"
           ? computeExpiryDate(latestVersion.uploadedAt, rule.renewalYears).toISOString()

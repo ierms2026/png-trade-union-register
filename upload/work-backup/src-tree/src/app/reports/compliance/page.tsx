@@ -6,8 +6,8 @@ import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import { getExpiryForecast, getNeedsAttention, type ComplianceCell, type UnionSummary } from "@/lib/dashboard/metrics";
 import { getComplianceTrend } from "@/lib/dashboard/snapshot";
-import { STATUS_CONFIG, EXPIRING_WINDOW_DAYS } from "@/lib/dashboard/status-config";
-import { ArrowLeft, Printer, FileText, AlertTriangle, CheckCircle2, XCircle, FileQuestion, Ban, FileDown } from "lucide-react";
+import { STATUS_CONFIG, EXPIRING_WINDOW_DAYS, COMPLIANCE_STATUSES } from "@/lib/dashboard/status-config";
+import { ArrowLeft, Printer, FileText, AlertTriangle, CheckCircle2, XCircle, FileQuestion, Ban, FileDown, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,20 +58,21 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
   const now = new Date();
 
   // --- 2. Build summary statistics ---
-  let compliant = 0, expiring = 0, overdue = 0, missing = 0, notApplicable = 0;
+  let compliant = 0, expiring = 0, overdue = 0, awaitingReview = 0, missing = 0, notApplicable = 0;
   for (const row of matrix.unions) {
     for (const cell of row.scores) {
       switch (cell.status) {
         case "COMPLIANT": compliant++; break;
         case "EXPIRING": expiring++; break;
         case "OVERDUE": overdue++; break;
+        case "AWAITING_REVIEW": awaitingReview++; break;
         case "MISSING": missing++; break;
         case "NOT_APPLICABLE": notApplicable++; break;
       }
     }
   }
   const totalCells = matrix.unions.length * matrix.documentTypes.length;
-  const applicableCells = compliant + expiring + overdue + missing;
+  const applicableCells = compliant + expiring + overdue + awaitingReview + missing;
   const complianceRate = applicableCells === 0 ? 0 : Math.round((compliant / applicableCells) * 100);
 
   // --- 3. Build needs attention + expiry forecast ---
@@ -104,6 +105,7 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
       case "COMPLIANT": return <CheckCircle2 className="h-3 w-3" />;
       case "EXPIRING": return <AlertTriangle className="h-3 w-3" />;
       case "OVERDUE": return <XCircle className="h-3 w-3" />;
+      case "AWAITING_REVIEW": return <Clock className="h-3 w-3" />;
       case "MISSING": return <FileQuestion className="h-3 w-3" />;
       case "NOT_APPLICABLE": return <Ban className="h-3 w-3" />;
       default: return null;
@@ -115,6 +117,7 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
       case "COMPLIANT": return "text-green-600";
       case "EXPIRING": return "text-orange-500";
       case "OVERDUE": return "text-red-600";
+      case "AWAITING_REVIEW": return "text-blue-600";
       case "MISSING": return "text-gray-500";
       case "NOT_APPLICABLE": return "text-gray-400";
       default: return "text-gray-500";
@@ -196,12 +199,12 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
 
           {/* Status breakdown */}
           <div className="mt-4 flex flex-wrap gap-3 print-card">
-            {(["COMPLIANT", "EXPIRING", "OVERDUE", "MISSING", "NOT_APPLICABLE"] as const).map((s) => (
+            {COMPLIANCE_STATUSES.map((s) => (
               <div key={s} className="flex items-center gap-2 rounded-md border px-3 py-1.5">
                 <span className={statusColor(s)}>{statusIcon(s)}</span>
                 <span className="text-sm font-medium">{STATUS_CONFIG[s].label}</span>
                 <span className="text-sm text-muted-foreground">
-                  {s === "COMPLIANT" ? compliant : s === "EXPIRING" ? expiring : s === "OVERDUE" ? overdue : s === "MISSING" ? missing : notApplicable}
+                  {s === "COMPLIANT" ? compliant : s === "EXPIRING" ? expiring : s === "OVERDUE" ? overdue : s === "AWAITING_REVIEW" ? awaitingReview : s === "MISSING" ? missing : notApplicable}
                 </span>
               </div>
             ))}
@@ -235,7 +238,7 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
                     {row.scores.map((cell, i) => (
                       <td key={i} className="border border-gray-300 px-2 py-1.5 text-center text-xs">
                         <span className={statusColor(cell.status)}>
-                          {cell.status === "COMPLIANT" ? "C" : cell.status === "EXPIRING" ? "E" : cell.status === "OVERDUE" ? "O" : cell.status === "MISSING" ? "M" : "N/A"}
+                          {cell.status === "COMPLIANT" ? "C" : cell.status === "EXPIRING" ? "E" : cell.status === "OVERDUE" ? "O" : cell.status === "AWAITING_REVIEW" ? "R" : cell.status === "MISSING" ? "M" : "N/A"}
                         </span>
                       </td>
                     ))}
