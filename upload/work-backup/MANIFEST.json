@@ -1,8 +1,8 @@
 {
-  "backedUpAt": "2026-10-05T00:14:16.244Z",
+  "backedUpAt": "2026-10-05T00:49:22.539Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.21.0",
-  "fileCount": 300,
+  "fileCount": 302,
   "files": [
     {
       "path": "src/app/api/api-keys/[id]/route.ts",
@@ -1325,6 +1325,12 @@
       "mtime": "2026-08-25T05:09:06.000Z"
     },
     {
+      "path": "src/lib/__tests__/packaging-check.test.ts",
+      "checksum": "7ee8a2d1573bfce435df83e4ff451648953e06b566175b96aedb799140cce9de",
+      "size": 4700,
+      "mtime": "2026-10-05T00:48:08.960Z"
+    },
+    {
       "path": "src/lib/__tests__/password-reset.test.ts",
       "checksum": "b79725bde8d316b2b0b930bc7abd6630da5e052361969e38b16cbc4363d68192",
       "size": 6383,
@@ -1482,9 +1488,9 @@
     },
     {
       "path": "src/lib/dashboard/nav-structure.ts",
-      "checksum": "3d7f0214795886a2c2c20646d4ebbbcf58cf7f8903c9a65af76c8106adf90410",
-      "size": 23982,
-      "mtime": "2026-10-05T00:12:28.857Z"
+      "checksum": "4a0e36ca2bd126b2cfb5e87accc65fc52bb6efb8d681d3ee21709f22cbc715ce",
+      "size": 23416,
+      "mtime": "2026-10-05T00:27:17.577Z"
     },
     {
       "path": "src/lib/dashboard/snapshot.ts",
@@ -1713,6 +1719,12 @@
       "checksum": "34d767cfaac4fd919b7fa3575c00e7a93d3f0831818806be44f9404d8ae205c3",
       "size": 2702,
       "mtime": "2026-10-04T21:50:57.050Z"
+    },
+    {
+      "path": "scripts/packaging-check.ts",
+      "checksum": "c8061df0a4fd35d676b8aaa959c39b112412fc34a420f06a6eb748eddd25f13f",
+      "size": 7567,
+      "mtime": "2026-10-05T00:47:51.911Z"
     },
     {
       "path": "scripts/render-pdf.py",

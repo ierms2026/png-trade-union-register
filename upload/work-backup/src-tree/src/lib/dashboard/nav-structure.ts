@@ -2,18 +2,8 @@
 // Nav Structure — the SINGLE SOURCE OF TRUTH for the staff dashboard's
 // navigation, search palette, quick actions, + breadcrumbs.
 //
-// STRUCTURE: 8 top-level groups, 19 destinations:
-//
-//   Dashboard     (direct link, all roles)
-//   Unions        (dropdown: Unions, My Union, Documents, Compare)
-//   Compliance    (dropdown: Compliance, Rules)
-//   Tasks         (direct link, all roles)
-//   Calendar      (direct link, all roles)
-//   Work Queues   (dropdown: Review Queue, Contact Updates, Retention Queue)
-//   Search        (direct link, all roles)
-//   Admin         (dropdown: Audit, Users, Security, API Keys, Webhooks, Resources)
-//
-// All 19 destinations are reachable in ≤2 clicks.
+// Defines the staff navigation groups and destinations.
+// Roles determine which items each user can see.
 //
 // =============================================================================
 //
@@ -166,8 +156,7 @@ export interface NavGroup {
 }
 
 /**
- * The complete nav structure. 8 top-level groups, 19 destinations.
- * Ordered left-to-right in the top nav.
+ * The complete nav structure. Ordered left-to-right in the top nav.
  *
  * LABEL DISCIPLINE: each destination's `label` is the canonical name. The
  * palette, breadcrumbs, and page headings all use it. Aliases (where
@@ -304,8 +293,7 @@ export function getNavForRole(role: StaffRole, retentionEnabled = false): NavGro
  * route. Used by the route smoke test + reachability test in
  * `dashboard-nav.test.ts`.
  *
- * Returns 19 routes (the complete inventory, regardless of role). The
- * tests use this to assert every route resolves in `page.tsx`'s switch
+ * The tests use this to assert every route resolves in `page.tsx`'s switch
  * + is reachable in ≤2 clicks.
  */
 export function getAllRoutes(): string[] {
