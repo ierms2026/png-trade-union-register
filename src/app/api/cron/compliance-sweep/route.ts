@@ -4,6 +4,7 @@ import { db } from "@/lib/prisma";
 import { Role, NotificationType, WebhookEventType } from "@prisma/client";
 import { createNotificationForUsers } from "@/lib/notifications";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
+import { collectSweepIssues, type SweepIssue } from "@/lib/compliance/sweep-issues";
 import { dispatchEvent } from "@/lib/webhooks/dispatcher";
 import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 
@@ -85,38 +86,11 @@ export async function POST(req: NextRequest) {
   const matrix = buildComplianceMatrix(data);
 
   // --- 3. Build the list of compliance issues with tiered urgency -------
-  type Tier = "T_180_DAYS" | "T_90_DAYS" | "T_30_DAYS" | "T_0_OVERDUE" | "T_30_OVERDUE";
-  interface Issue {
-    unionId: string;
-    unionName: string;
-    documentType: string;
-    tier: Tier;
-    expiresAt: string | null;
-    renewalYears: number;
-    daysUntilExpiry: number | null;
-  }
-  const issues: Issue[] = [];
+  // The issue-collection logic lives in collectSweepIssues() so it can be
+  // unit-tested directly. The route passes the built matrix + rules map +
+  // current time; the function returns the tiered issues.
   const renewalByType = new Map(data.rules.map((r) => [r.documentType, r.renewalYears]));
-  const nowMs = now.getTime();
-  const msPerDay = 24 * 60 * 60 * 1000;
-  for (const row of matrix.unions) {
-    for (const cell of row.scores) {
-      if (!cell.expiresAt) continue;
-      const renewalYears = renewalByType.get(cell.documentType) ?? 1;
-      if (renewalYears >= 99) continue;
-      const expiryMs = new Date(cell.expiresAt).getTime();
-      const daysUntil = Math.floor((expiryMs - nowMs) / msPerDay);
-      let tier: Tier | null = null;
-      if (daysUntil < -30) tier = "T_30_OVERDUE";  // 30+ days overdue → escalation
-      else if (daysUntil < 0) tier = "T_0_OVERDUE";
-      else if (daysUntil <= 30) tier = "T_30_DAYS";
-      else if (daysUntil <= 90) tier = "T_90_DAYS";
-      else if (daysUntil <= 180 && renewalYears >= 3) tier = "T_180_DAYS";
-      if (tier) {
-        issues.push({ unionId: row.unionId, unionName: row.unionName, documentType: cell.documentType, tier, expiresAt: cell.expiresAt, renewalYears, daysUntilExpiry: daysUntil });
-      }
-    }
-  }
+  const issues: SweepIssue[] = collectSweepIssues(matrix, renewalByType, now);
 
   if (issues.length === 0) {
     return NextResponse.json({
