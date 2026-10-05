@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
-import { StatusBadge } from "@/components/app/status-badge";
+import { ComplianceStatusBadge } from "@/components/app/compliance-status-badge";
 
 // =============================================================================
 // PortalComplianceView — chunk 5
@@ -126,7 +126,7 @@ export function PortalComplianceView() {
                     </p>
                   )}
                 </div>
-                <StatusBadge status={cell.status} />
+                <ComplianceStatusBadge status={cell.status} />
               </li>
             ))}
           </ul>
