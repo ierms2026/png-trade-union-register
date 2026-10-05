@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Role, Severity, NotificationType } from "@prisma/client";
+import { Role, Severity, NotificationType, Prisma } from "@prisma/client";
 import { createNotification, getUserNotificationPrefs } from "@/lib/notifications";
 
 // =============================================================================
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const data: Record<string, unknown> = {
+  const data: Prisma.TaskUncheckedCreateInput = {
     title: body.title.trim(),
     description:
       typeof body.description === "string" ? body.description.trim() : null,

@@ -209,7 +209,7 @@ describe("compliance heatmap — rendering", () => {
     // call calculateStatus, tallyComplianceCounts, or any date math.
     // Verify by checking that the statuses in the matrix match the input cells.
     const cellStatuses = new Set(cells.map((c) => c.status));
-    const matrixStatuses = new Set<string>();
+    const matrixStatuses = new Set<ComplianceStatus>();
     for (const row of matrix.rows) {
       for (const cell of row.cells) {
         if (cell.status !== "MISSING") {
