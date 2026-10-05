@@ -797,3 +797,18 @@ Stage Summary:
 - Combined report packaged as /home/z/my-project/download/t40-t41-t11-report.md (markdown, ~16.9KB, 318 lines).
 - Covers all three tasks: T40 (export Documents column bug fix), T41 (clear 8 remaining src tsc errors with no behavior change), T11 (retention 404 body no longer leaks env var name per D5).
 - Includes the branch structure table, per-task file lists, the bug analysis (T40 array-shape _count, T41 Item 2 guard analysis confirming no runtime bug, T11 env var name leak), test descriptions, and verification results.
+
+---
+Task ID: package-t20-report
+Agent: main
+Task: Package T20 report as a downloadable Markdown file
+
+Work Log:
+- Confirmed branch state: fix/t20-one-source-compliance-labels @ 0705f61, branched from main @ f1db550. Verified 7-file diff stat (175 insertions, 46 deletions).
+- Wrote /home/z/my-project/download/t20-report.md (20.8KB, 287 lines). Combined report covering all 5 steps of T20 in the same format as the existing t06{a,b,c,d}-report.md and t40-t41-t11-report.md files.
+- Includes: branch structure table, verification summary, files-changed table, the full Step 0 map (definition | fields | importing files), Step 1 design constraints, Step 2 replacements with code samples, Step 3 compliance page copy, Step 4 contact-request labels table, Step 5 contract tests with the guard-proof transcript, verification table, defaults relied on (D4), the definitions-stay-in-status-config deviation with rationale, 5 out-of-scope findings, the full on-screen-text-changes table (old → new), and the impact summary.
+
+Stage Summary:
+- T20 report packaged as /home/z/my-project/download/t20-report.md (markdown, ~20.8KB, 287 lines).
+- Covers: single source for compliance status labels (vocabulary.ts), D4 enforcement (NOT_APPLICABLE label "Not Applicable" + shortLabel "N/A"), 5 contract tests with proven guard, B3 + subtitle copy fix, contact-request labels (Pending → Pending Review), and the full on-screen text changes table.
+- Documents the one deviation (definitions stay in status-config.ts because of template-interpolation tests) and 5 out-of-scope findings (portal StatusBadge type mismatch, compare.tsx STATUS_LETTER duplication, reports/compliance/page.tsx visual-token duplication, cell-letter ternary duplication, orphaned STATUS_BADGE_CLASSES export).
