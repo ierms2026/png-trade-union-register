@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 
 // =============================================================================
-// Compliance statuses (COMPLIANT / EXPIRING / OVERDUE / MISSING / NOT_APPLICABLE)
+// Compliance statuses (COMPLIANT / EXPIRING / OVERDUE / AWAITING_REVIEW / MISSING / NOT_APPLICABLE)
 // =============================================================================
 
 export type ComplianceStatus =

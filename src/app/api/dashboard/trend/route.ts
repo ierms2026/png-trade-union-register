@@ -26,6 +26,7 @@ import { getComplianceTrend, type ComplianceTrendPoint } from "@/lib/dashboard/s
 //     compliant: number,
 //     expiring: number,
 //     overdue: number,
+//     awaitingReview: number,
 //     missing: number,
 //     rateNumerator: number,
 //     rateDenominator: number,

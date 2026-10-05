@@ -74,7 +74,7 @@ export interface ComplianceCell {
 export interface ComplianceRate {
   /** Number of COMPLIANT cells */
   numerator: number;
-  /** Number of applicable cells (COMPLIANT + EXPIRING + OVERDUE + MISSING) */
+  /** Number of applicable cells (COMPLIANT + EXPIRING + OVERDUE + AWAITING_REVIEW + MISSING) */
   denominator: number;
   /** numerator / denominator × 100, rounded to nearest integer. 0 if denominator is 0. */
   percentage: number;

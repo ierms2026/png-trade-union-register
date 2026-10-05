@@ -57,7 +57,7 @@ function makeCleanTrend(days = 7, denom = 10): ComplianceTrendPoint[] {
       compliant,
       expiring: 0,
       overdue: 0,
-      missing: denom - compliant,
+      awaitingReview: 0, missing: denom - compliant,
       rateNumerator: compliant,
       rateDenominator: denom,
       percentage: computePercentage(compliant, denom),
@@ -123,11 +123,11 @@ describe("sliceTrendToWindow — window derived from point dates, not hardcoded"
     // Two points 10 days apart, slice to last 5 days → only the second point.
     const trend: ComplianceTrendPoint[] = [
       {
-        date: "2026-06-05", compliant: 1, expiring: 0, overdue: 0, missing: 9,
+        date: "2026-06-05", compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 9,
         rateNumerator: 1, rateDenominator: 10, percentage: 10,
       },
       {
-        date: "2026-06-15", compliant: 9, expiring: 0, overdue: 0, missing: 1,
+        date: "2026-06-15", compliant: 9, expiring: 0, overdue: 0, awaitingReview: 0, missing: 1,
         rateNumerator: 9, rateDenominator: 10, percentage: 90,
       },
     ];
@@ -160,11 +160,11 @@ describe("buildChartSeriesWithGaps — line breaks at gaps", () => {
     // The data array should have 3 rows: 13, 14 (gap), 15.
     const trend: ComplianceTrendPoint[] = [
       {
-        date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, missing: 7,
+        date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 7,
         rateNumerator: 1, rateDenominator: 10, percentage: 10,
       },
       {
-        date: "2026-06-15", compliant: 3, expiring: 1, overdue: 1, missing: 5,
+        date: "2026-06-15", compliant: 3, expiring: 1, overdue: 1, awaitingReview: 0, missing: 5,
         rateNumerator: 3, rateDenominator: 10, percentage: 30,
       },
     ];
@@ -194,11 +194,11 @@ describe("buildChartSeriesWithGaps — line breaks at gaps", () => {
     // This is the explicit "no synthesis" assertion.
     const trend: ComplianceTrendPoint[] = [
       {
-        date: "2026-06-13", compliant: 1, expiring: 0, overdue: 0, missing: 9,
+        date: "2026-06-13", compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 9,
         rateNumerator: 1, rateDenominator: 10, percentage: 10,
       },
       {
-        date: "2026-06-15", compliant: 9, expiring: 0, overdue: 0, missing: 1,
+        date: "2026-06-15", compliant: 9, expiring: 0, overdue: 0, awaitingReview: 0, missing: 1,
         rateNumerator: 9, rateDenominator: 10, percentage: 90,
       },
     ];
@@ -218,11 +218,11 @@ describe("buildChartSeriesWithGaps — line breaks at gaps", () => {
     // 5-day gap: 2026-06-10 → 2026-06-15. Should insert 4 gap rows.
     const trend: ComplianceTrendPoint[] = [
       {
-        date: "2026-06-10", compliant: 1, expiring: 0, overdue: 0, missing: 9,
+        date: "2026-06-10", compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 9,
         rateNumerator: 1, rateDenominator: 10, percentage: 10,
       },
       {
-        date: "2026-06-15", compliant: 6, expiring: 0, overdue: 0, missing: 4,
+        date: "2026-06-15", compliant: 6, expiring: 0, overdue: 0, awaitingReview: 0, missing: 4,
         rateNumerator: 6, rateDenominator: 10, percentage: 60,
       },
     ];
@@ -255,9 +255,9 @@ describe("buildChartSeriesWithGaps — line breaks at gaps", () => {
     // gap, but the tooltip will say "No applicable requirements" instead of
     // "No data (no snapshot for this date)".
     const trend: ComplianceTrendPoint[] = [
-      { date: "2026-06-13", compliant: 5, expiring: 0, overdue: 0, missing: 5, rateNumerator: 5, rateDenominator: 10, percentage: 50 },
-      { date: "2026-06-14", compliant: 0, expiring: 0, overdue: 0, missing: 0, rateNumerator: 0, rateDenominator: 0, percentage: null },
-      { date: "2026-06-15", compliant: 8, expiring: 0, overdue: 0, missing: 2, rateNumerator: 8, rateDenominator: 10, percentage: 80 },
+      { date: "2026-06-13", compliant: 5, expiring: 0, overdue: 0, awaitingReview: 0, missing: 5, rateNumerator: 5, rateDenominator: 10, percentage: 50 },
+      { date: "2026-06-14", compliant: 0, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 0, rateDenominator: 0, percentage: null },
+      { date: "2026-06-15", compliant: 8, expiring: 0, overdue: 0, awaitingReview: 0, missing: 2, rateNumerator: 8, rateDenominator: 10, percentage: 80 },
     ];
     const data = buildChartSeriesWithGaps(trend);
     expect(data).toHaveLength(3);
@@ -349,9 +349,9 @@ describe("buildSparklinePoints — sparkline geometry", () => {
 
 describe("extractSparklineSeries", () => {
   const trend: ComplianceTrendPoint[] = [
-    { date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, missing: 7, rateNumerator: 1, rateDenominator: 10, percentage: 10 },
-    { date: "2026-06-14", compliant: 2, expiring: 1, overdue: 1, missing: 6, rateNumerator: 2, rateDenominator: 10, percentage: 20 },
-    { date: "2026-06-15", compliant: 3, expiring: 1, overdue: 1, missing: 5, rateNumerator: 3, rateDenominator: 10, percentage: 30 },
+    { date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 7, rateNumerator: 1, rateDenominator: 10, percentage: 10 },
+    { date: "2026-06-14", compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 6, rateNumerator: 2, rateDenominator: 10, percentage: 20 },
+    { date: "2026-06-15", compliant: 3, expiring: 1, overdue: 1, awaitingReview: 0, missing: 5, rateNumerator: 3, rateDenominator: 10, percentage: 30 },
   ];
 
   it("extracts the compliant series (counts for the Compliant KPI sparkline)", () => {
@@ -368,9 +368,9 @@ describe("extractSparklineSeries", () => {
 
   it("preserves null percentages in the rate series (no synthesis to 0)", () => {
     const withZeroDenom: ComplianceTrendPoint[] = [
-      { date: "2026-06-13", compliant: 5, expiring: 0, overdue: 0, missing: 5, rateNumerator: 5, rateDenominator: 10, percentage: 50 },
-      { date: "2026-06-14", compliant: 0, expiring: 0, overdue: 0, missing: 0, rateNumerator: 0, rateDenominator: 0, percentage: null },
-      { date: "2026-06-15", compliant: 8, expiring: 0, overdue: 0, missing: 2, rateNumerator: 8, rateDenominator: 10, percentage: 80 },
+      { date: "2026-06-13", compliant: 5, expiring: 0, overdue: 0, awaitingReview: 0, missing: 5, rateNumerator: 5, rateDenominator: 10, percentage: 50 },
+      { date: "2026-06-14", compliant: 0, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 0, rateDenominator: 0, percentage: null },
+      { date: "2026-06-15", compliant: 8, expiring: 0, overdue: 0, awaitingReview: 0, missing: 2, rateNumerator: 8, rateDenominator: 10, percentage: 80 },
     ];
     expect(extractSparklineSeries(withZeroDenom, "rate")).toEqual([50, null, 80]);
   });

@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     Compliant: p.compliant,
     Expiring: p.expiring,
     Overdue: p.overdue,
+    AwaitingReview: p.awaitingReview,
     Missing: p.missing,
     RateNumerator: p.rateNumerator,
     RateDenominator: p.rateDenominator,

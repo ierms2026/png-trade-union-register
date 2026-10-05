@@ -16,7 +16,7 @@ import { tallyStatuses, computeRateFromCounts } from "@/lib/dashboard/metrics";
 //     union: { id, unionName, registrationNo, status },
 //     activeCount: number,           // non-disposed documents for this union
 //     compliance: {
-//       compliant, expiring, overdue, missing, notApplicable,
+//       compliant, expiring, overdue, awaitingReview, missing, notApplicable,
 //       overallRate,                  // 0-100
 //       rate: { numerator, denominator, percentage }
 //     },
