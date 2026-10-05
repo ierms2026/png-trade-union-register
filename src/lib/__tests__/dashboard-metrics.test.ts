@@ -4,8 +4,11 @@ import {
   type DashboardMetrics,
   type UnionSummary,
   type DocumentTypeCount,
+  type ComplianceCounts,
   tallyComplianceCounts,
   computeComplianceRate,
+  tallyStatuses,
+  computeRateFromCounts,
   getComplianceCounts,
   getComplianceRate,
   getActiveDocumentCount,
@@ -17,6 +20,7 @@ import {
   getUnionsWithNonCompliance,
   buildDashboardMetrics,
 } from "../dashboard/metrics";
+import { COMPLIANCE_STATUSES, type ComplianceStatus } from "../dashboard/status-config";
 
 // =============================================================================
 // Mock data — deterministic, does NOT hit the DB. The numbers below mirror
@@ -262,5 +266,157 @@ describe("metrics", () => {
       expect(rate.denominator).toBe(78);
       expect(rate.percentage).toBe(Math.round((17 / 78) * 100));
     });
+  });
+});
+
+// =============================================================================
+// T06a: tallyStatuses + computeRateFromCounts — AWAITING_REVIEW support.
+//
+// These tests verify the new helpers that accept any { status }[] shape
+// (not just ComplianceCell[]) and correctly count AWAITING_REVIEW in both
+// the tally and the rate denominator.
+//
+// The fixture iterates the canonical COMPLIANCE_STATUSES list so that
+// adding a new status in the future breaks these tests (forces a conscious
+// update rather than silent omission).
+// =============================================================================
+
+describe("tallyStatuses + computeRateFromCounts (T06a)", () => {
+  // Build a fixture that contains every ComplianceStatus value at least once.
+  // We iterate the canonical COMPLIANCE_STATUSES list so this test
+  // automatically breaks if a new status is added without updating
+  // the helpers.
+  function makeFixtureWithAllStatuses(): Array<{ status: ComplianceStatus }> {
+    // One cell per status, plus an extra COMPLIANT + AWAITING_REVIEW
+    // to make the counts non-trivial.
+    const cells: Array<{ status: ComplianceStatus }> = [];
+    for (const status of COMPLIANCE_STATUSES) {
+      cells.push({ status });
+    }
+    // Add extras to make the test more interesting:
+    cells.push({ status: "COMPLIANT" });       // total COMPLIANT = 2
+    cells.push({ status: "AWAITING_REVIEW" }); // total AWAITING_REVIEW = 2
+    cells.push({ status: "MISSING" });         // total MISSING = 2
+    return cells;
+  }
+
+  it("tallyStatuses counts every ComplianceStatus in the canonical list", () => {
+    const cells = makeFixtureWithAllStatuses();
+    const counts = tallyStatuses(cells);
+
+    // Every status in COMPLIANCE_STATUSES should have count >= 1.
+    for (const status of COMPLIANCE_STATUSES) {
+      expect(counts[status], `counts[${status}] should be >= 1`).toBeGreaterThanOrEqual(1);
+    }
+
+    // Specific counts from the fixture:
+    // 1 each from the loop + extras: COMPLIANT=2, AWAITING_REVIEW=2, MISSING=2,
+    // everything else = 1.
+    expect(counts.COMPLIANT).toBe(2);
+    expect(counts.EXPIRING).toBe(1);
+    expect(counts.OVERDUE).toBe(1);
+    expect(counts.AWAITING_REVIEW).toBe(2);
+    expect(counts.MISSING).toBe(2);
+    expect(counts.NOT_APPLICABLE).toBe(1);
+  });
+
+  it("the six counts sum to the number of input cells", () => {
+    const cells = makeFixtureWithAllStatuses();
+    const counts = tallyStatuses(cells);
+    const sum =
+      counts.COMPLIANT +
+      counts.EXPIRING +
+      counts.OVERDUE +
+      counts.AWAITING_REVIEW +
+      counts.MISSING +
+      counts.NOT_APPLICABLE;
+    expect(sum).toBe(cells.length);
+  });
+
+  it("AWAITING_REVIEW is counted (not silently dropped)", () => {
+    const cells: Array<{ status: ComplianceStatus }> = [
+      { status: "AWAITING_REVIEW" },
+      { status: "AWAITING_REVIEW" },
+      { status: "AWAITING_REVIEW" },
+    ];
+    const counts = tallyStatuses(cells);
+    expect(counts.AWAITING_REVIEW).toBe(3);
+    // All other counts should be 0.
+    for (const status of COMPLIANCE_STATUSES) {
+      if (status !== "AWAITING_REVIEW") {
+        expect(counts[status], `counts[${status}] should be 0`).toBe(0);
+      }
+    }
+  });
+
+  it("computeRateFromCounts includes AWAITING_REVIEW in the denominator (not in numerator)", () => {
+    // Fixture: 2 COMPLIANT, 1 EXPIRING, 1 OVERDUE, 2 AWAITING_REVIEW, 2 MISSING, 1 N/A
+    // Rule: numerator = COMPLIANT = 2
+    //       denominator = COMPLIANT + EXPIRING + OVERDUE + AWAITING_REVIEW + MISSING
+    //                   = 2 + 1 + 1 + 2 + 2 = 8 (NOT_APPLICABLE excluded)
+    //       percentage = round(2/8 * 100) = 25
+    const counts: ComplianceCounts = {
+      COMPLIANT: 2,
+      EXPIRING: 1,
+      OVERDUE: 1,
+      AWAITING_REVIEW: 2,
+      MISSING: 2,
+      NOT_APPLICABLE: 1,
+    };
+    const rate = computeRateFromCounts(counts);
+    expect(rate.numerator).toBe(2);
+    expect(rate.denominator).toBe(8);
+    expect(rate.percentage).toBe(25);
+  });
+
+  it("computeRateFromCounts excludes NOT_APPLICABLE from both numerator and denominator", () => {
+    const counts: ComplianceCounts = {
+      COMPLIANT: 3,
+      EXPIRING: 0,
+      OVERDUE: 0,
+      AWAITING_REVIEW: 0,
+      MISSING: 0,
+      NOT_APPLICABLE: 99,
+    };
+    const rate = computeRateFromCounts(counts);
+    // numerator = 3, denominator = 3 (N/A excluded), percentage = 100
+    expect(rate.numerator).toBe(3);
+    expect(rate.denominator).toBe(3);
+    expect(rate.percentage).toBe(100);
+  });
+
+  it("computeRateFromCounts returns 0 percentage when denominator is 0", () => {
+    const counts: ComplianceCounts = {
+      COMPLIANT: 0,
+      EXPIRING: 0,
+      OVERDUE: 0,
+      AWAITING_REVIEW: 0,
+      MISSING: 0,
+      NOT_APPLICABLE: 5,
+    };
+    const rate = computeRateFromCounts(counts);
+    expect(rate.numerator).toBe(0);
+    expect(rate.denominator).toBe(0);
+    expect(rate.percentage).toBe(0);
+  });
+
+  it("tallyStatuses works with any { status } shape (not just ComplianceCell)", () => {
+    // Simulate ComplianceScoreCell from the matrix builder — has `status`
+    // but different field names than ComplianceCell.
+    const cells = [
+      { status: "COMPLIANT" as ComplianceStatus, documentType: "Constitution", documentId: "abc" },
+      { status: "AWAITING_REVIEW" as ComplianceStatus, documentType: "Annual Return", documentId: "def" },
+      { status: "MISSING" as ComplianceStatus, documentType: "Financial Return", documentId: null },
+    ];
+    const counts = tallyStatuses(cells);
+    expect(counts.COMPLIANT).toBe(1);
+    expect(counts.AWAITING_REVIEW).toBe(1);
+    expect(counts.MISSING).toBe(1);
+  });
+
+  it("iterating COMPLIANCE_STATUSES covers exactly 6 statuses (breaks if a status is added)", () => {
+    // This test is a tripwire: if someone adds a 7th status to
+    // COMPLIANCE_STATUSES without updating the helpers/tests, this fails.
+    expect(COMPLIANCE_STATUSES).toHaveLength(6);
   });
 });

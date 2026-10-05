@@ -62,6 +62,7 @@ interface StatsResponse {
     compliant: number;
     expiring: number;
     overdue: number;
+    awaitingReview: number;
     missing: number;
     notApplicable: number;
     overallRate: number;
@@ -702,8 +703,10 @@ function ComplianceCompositionBar({ counts, denominator, totalUnions, onFilter }
     );
   }
 
-  // Denominator mismatch guard: sum of applicable counts must equal denominator
-  const sum = counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.MISSING;
+  // Denominator mismatch guard: sum of applicable counts must equal denominator.
+  // AWAITING_REVIEW is included in the applicable set per the rule in
+  // metrics.ts computeRateFromCounts (it's in the denominator).
+  const sum = counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.AWAITING_REVIEW + counts.MISSING;
   if (sum !== denominator) {
     console.error(
       `[ComplianceCompositionBar] Denominator mismatch: sum of counts (${sum}) != denominator (${denominator}). Not rendering.`,
@@ -1458,6 +1461,7 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
         COMPLIANT: stats.compliance.compliant,
         EXPIRING: stats.compliance.expiring,
         OVERDUE: stats.compliance.overdue,
+        AWAITING_REVIEW: stats.compliance.awaitingReview,
         MISSING: stats.compliance.missing,
         NOT_APPLICABLE: stats.compliance.notApplicable,
       }

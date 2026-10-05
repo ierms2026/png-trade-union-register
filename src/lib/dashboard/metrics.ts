@@ -147,6 +147,48 @@ export function tallyComplianceCounts(cells: ComplianceCell[]): ComplianceCounts
  */
 export function computeComplianceRate(cells: ComplianceCell[]): ComplianceRate {
   const counts = tallyComplianceCounts(cells);
+  return computeRateFromCounts(counts);
+}
+
+/**
+ * Tally any array of `{ status: ComplianceStatus }` objects into a
+ * ComplianceCounts object. More general than `tallyComplianceCounts` —
+ * accepts ComplianceScoreCell, ComplianceCell, or any shape that has a
+ * `status` field. Used by the dashboard stats API route which works with
+ * ComplianceScoreCell (from the matrix builder), not ComplianceCell.
+ *
+ * Pure: no I/O, no side effects.
+ */
+export function tallyStatuses(
+  cells: Array<{ status: ComplianceStatus }>,
+): ComplianceCounts {
+  const counts: ComplianceCounts = {
+    COMPLIANT: 0,
+    EXPIRING: 0,
+    OVERDUE: 0,
+    AWAITING_REVIEW: 0,
+    MISSING: 0,
+    NOT_APPLICABLE: 0,
+  };
+  for (const cell of cells) {
+    counts[cell.status]++;
+  }
+  return counts;
+}
+
+/**
+ * Compute the compliance rate from a ComplianceCounts object.
+ * numerator = COMPLIANT count.
+ * denominator = COMPLIANT + EXPIRING + OVERDUE + AWAITING_REVIEW + MISSING
+ * (excludes NOT_APPLICABLE).
+ *
+ * This is the same rule as `computeComplianceRate` but operates on counts
+ * directly (useful when the caller already has a ComplianceCounts object
+ * from `tallyStatuses` and doesn't want to re-tally).
+ *
+ * Pure: no I/O, no side effects.
+ */
+export function computeRateFromCounts(counts: ComplianceCounts): ComplianceRate {
   const numerator = counts.COMPLIANT;
   const denominator =
     counts.COMPLIANT + counts.EXPIRING + counts.OVERDUE + counts.AWAITING_REVIEW + counts.MISSING;
