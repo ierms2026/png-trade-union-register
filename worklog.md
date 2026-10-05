@@ -711,3 +711,74 @@ Stage Summary:
 - Zero code changes, zero test changes, zero build impact. The 9 baseline tsc errors are unchanged from T06c.
 - The report scopes the next code-bearing task: Items 1-3 are safe to ship together in a single PR (two one-line code/comment fixes + one new regression test). Item 4 is held by D2 for the Registrar's decision at the 2026-10-19 checkpoint; default if no answer is "align with D1" per the guardrails clause.
 - The Item 1 → Item 2 dependency is documented: fixing matrix.ts's expiresAt exclusion makes the cron sweep's `!cell.expiresAt` guard automatically skip AWAITING_REVIEW cells, so no separate code change is needed in the sweep — only a regression test to lock the behavior in.
+
+---
+Task ID: T40
+Agent: main
+Task: Fix the Documents column in the unions export (real bug — was undefined for every row)
+
+Work Log:
+- Read src/app/api/export/unions/route.ts. Confirmed the bug at L27+L36: query selects `documents: { select: { _count: true } }` (returns an ARRAY of {_count:N}), then row builder reads `u.documents._count` on the array → undefined for every union.
+- Convention check: src/app/api/dashboard/stats/route.ts L44-52 + src/app/api/public/stats/route.ts L27 both filter `disposedAt: null`. T40 matches: "Documents" = active (non-disposed) docs only.
+- TESTS FIRST: wrote src/lib/__tests__/export-unions-documents-count.test.ts (2 tests) following the report-html-awaiting-review.test.ts pattern. Test 1 seeds 3 docs (2 active + 1 disposed) and asserts the count is 2. Test 2 documents the old buggy shape yields undefined. Both passed against the new query shape (test 2 confirmed the old shape's bug).
+- Fix: replaced `documents: { select: { _count: true } }` with `_count: { select: { documents: { where: { disposedAt: null } } } }` (Prisma 6 filtered relation count) and `u.documents._count` → `u._count.documents`. Added a comment explaining the bug + convention.
+- Searched src/app/api for `.documents._count` / `.versions._count` / `documents: { select: { _count: true } }` / `versions: { select: { _count: true } }`. Only the fixed route matched (in comments). No other identical bugs.
+- Verification: tsc src errors 9→8 (export/unions:36 error gone); lint baseline (3e/2w); tests 621→623 (+2 new); build pass.
+- Committed 8d8d83b on fix/t40-unions-export-docs-column.
+
+Stage Summary:
+- Documents column in /api/export/unions CSV now shows the count of active (non-disposed) documents per union, matching the dashboard + public stats convention. Was undefined for every row before.
+- One-line query fix + 2 new tests. tsc src errors reduced from 9 to 8.
+
+---
+Task ID: T41
+Agent: main
+Task: Clear the remaining src type errors with NO behavior change (branched from T40)
+
+Work Log:
+- Item 1 (cron/compliance-digest/route.ts): moved `interface DigestItem` from inside POST (~L49) to module scope above `DigestEmailParams`. Pure move, no behavior change. Eliminated 4 tsc errors.
+- Item 2 (api/dashboard/document-types/route.ts): investigated the guard. `officerScoped = user.role === "OFFICER" && user.assignedUnionId` — TS can't narrow `assignedUnionId` from `string|null` to `string` through the boolean variable. Runtime is correct (officerScoped is truthy only when both hold). Fix: split into an early-return `if (user.role === "OFFICER" && user.assignedUnionId)` branch with a local `scopedUnionId` const (TS narrows inside the block), then a non-officer fallthrough. No `!`, no `as any`, no behavior change. Eliminated 1 tsc error.
+- Item 3 (api/tasks/route.ts ~L195): typed `data` as `Prisma.TaskUncheckedCreateInput` (imported `Prisma` namespace from @prisma/client — the type isn't a top-level export). Field-allowlist logic unchanged. Eliminated 1 tsc error.
+- Item 3 (api/unions/route.ts ~L201): typed `data` as `Prisma.UnionUncheckedCreateInput`. Replaced the `for (const field of optionalFields)` loop (which needed `data[field] = ...` indexed assignment incompatible with the Prisma type) with an inline object literal using an `opt()` helper for the 6 nullable string fields. Field-allowlist logic equivalent — same fields, same null-on-empty behavior. Eliminated 1 tsc error.
+- Item 4 (dashboard-heatmap.test.ts ~L222): changed `new Set<string>()` to `new Set<ComplianceStatus>()` (ComplianceStatus already imported). No cast hacks. Eliminated 1 tsc error.
+- Verification: tsc src errors 8→0 (all 8 cleared); 13 non-src errors unchanged (scripts/ + vitest.config.ts — baseline, ignored per task); lint baseline; tests 623 (no change — no behavior change); build pass. Did NOT touch next.config.ts.
+- Committed 02a255d on fix/t41-clear-src-type-errors (branched from T40).
+
+Stage Summary:
+- All 9 baseline src tsc errors now cleared (T40 fixed 1, T41 fixed the remaining 8). Zero behavior change in T41.
+- Key decisions: used `Prisma.XxxUncheckedCreateInput` namespace import (not a top-level export); split the document-types route into an early-return Officer branch for proper TS narrowing without `!`; replaced the unions-route optional-fields loop with an inline literal + `opt()` helper to satisfy the Prisma type without indexed assignment.
+- Did NOT touch next.config.ts. Did NOT fix the 13 non-src baseline errors (scripts/ + vitest.config.ts).
+
+---
+Task ID: T11
+Agent: main
+Task: Retention flag off returns a bare 404 (decision D5) — no env var name in body
+
+Work Log:
+- Audited src/lib/retention-flag.ts: `RETENTION_DISABLED_MESSAGE` (L46-47) exposed `NEXT_PUBLIC_RETENTION_ENABLED` in the body text. Grepped all uses: 8 retention/disposition/legal-hold API routes import + return it in their 404 body. app-shell.tsx + page.tsx use `isRetentionEnabled()` (client-side, no body leak).
+- TESTS FIRST: wrote src/lib/__tests__/retention-flag.test.ts (3 tests). Test 1 asserts the message does NOT contain "NEXT_PUBLIC_RETENTION_ENABLED" or "RETENTION_ENABLED". Test 2 asserts the message matches a generic not-found pattern + is short. Test 3 asserts isRetentionEnabled() returns a boolean without throwing. Ran before the fix — test 1 failed for the right reason (message contained the env var name).
+- Fix: changed `RETENTION_DISABLED_MESSAGE` from "The retention workflow is not enabled. Set NEXT_PUBLIC_RETENTION_ENABLED=true to enable it." to "Not found." Updated the file's header comment to explain WHY the env var name is not in the body (decision D5) + point to .env.example for the enable instruction. The 8 route files were NOT touched — they import the constant, so the fix propagates automatically.
+- Created .env.example (was absent) with variable names only, no values. Includes a comment block for NEXT_PUBLIC_RETENTION_ENABLED explaining the flag + pointing to docs/decisions-and-defaults.md D5. Updated .gitignore to un-ignore .env.example (`!.env.example` exception after `.env*`).
+- No root README.md exists (only download/README*.md which are deploy-package artifacts), so no README section was added per the task's "if a README.md exists" condition.
+- Did NOT touch the Compliance view subtitle (handled in another session per task).
+- Verification: tsc src errors 0 (unchanged from T41); lint baseline; tests 623→626 (+3 new); build pass. Confirmed the 404 body is "Not found." with no env var name.
+- Committed 8b4a4e3 on fix/t11-retention-404-no-env-name (branched from T41).
+
+Stage Summary:
+- Retention routes now return `{"error":"Not found."}` with HTTP 404 when the flag is off — generic body, no env var name leaked. The enable instruction lives in .env.example (variable name + comment) instead of the response body.
+- 3 new tests lock the contract: no env var name in the message, generic not-found wording, isRetentionEnabled() doesn't throw.
+- .env.example created with all 20 env var names the app reads (no values). .gitignore updated to track .env.example while still ignoring .env*.
+
+---
+Task ID: T40-T41-T11-branch-fix
+Agent: main
+Task: Fix branch structure — commits had landed on main instead of task branches
+
+Work Log:
+- Discovered via reflog that the tool environment checked out main before each commit, so all 3 task commits (8d8d83b, 02a255d, 8b4a4e3) landed on main instead of their respective task branches. The task branches (fix/t40-*, fix/t41-*, fix/t11-*) were stale, pointing at the pre-task base.
+- Fix: `git branch -f fix/t40-unions-export-docs-column 8d8d83b`, `git branch -f fix/t41-clear-src-type-errors 02a255d`, `git branch -f fix/t11-retention-404-no-env-name 8b4a4e3`. Then `git checkout main && git reset --hard 9f54d4f` (the pre-T40 base).
+- Verified the chain: main → 9f54d4f (base, unchanged); fix/t40 → 8d8d83b (T40); fix/t41 → 02a255d (T41, parent 8d8d83b); fix/t11 → 8b4a4e3 (T11, parent 02a255d). Each task branch is branched from the previous task's branch as the task instructions require (T41 from T40, T11 from T41).
+- Re-verified on fix/t11 branch (which contains all 3 tasks): tsc src errors = 0, tests = 626 passed, lint baseline, build pass.
+
+Stage Summary:
+- Branch structure corrected: main is back at the pre-task base; each task branch points at its own commit; T41 branches from T40; T11 branches from T41. No commits lost, no rebase, no force-push (branches were local-only).
