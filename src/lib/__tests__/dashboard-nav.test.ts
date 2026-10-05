@@ -213,21 +213,25 @@ describe("nav-structure — route smoke test (DONE WHEN criterion)", () => {
   });
 
   it("every NAV_STRUCTURE route resolves to a <...View /> component", () => {
-    // page.tsx's switch returns a View component for each case. Two
+    // page.tsx's switch returns a View component for each case. Three
     // patterns to handle:
     //   1. `case "route": return <SomeView ... />` (direct return)
     //   2. `case "route":\n case "other": return <SomeView ... />` (fall-
     //      through; the `unions` + `my-union` cases share a return)
+    //   3. `case "route":\n if (condition) return <SomeView ... />` (guarded
+    //      return; the `retention` case has an isRetentionEnabled() guard)
     //
     // The regex allows optional whitespace (including newlines) between
-    // `return` and `<`, and handles the fall-through by allowing other
-    // `case` clauses between the route's case and its return.
+    // `return` and `<`, handles the fall-through by allowing other
+    // `case` clauses, and handles the guard by allowing `if (...)` blocks.
     const allRoutes = getAllRoutes();
     for (const route of allRoutes) {
-      // Match: `case "route":` followed by optional fall-through case
-      // clauses, then `return` then optional `(` then `<SomeView`.
+      // Match: `case "route":` followed by (eventually, after comments,
+      // fall-through cases, or if-guards) `return <SomeView`.
+      // The `s` flag makes `.` match newlines; we use a non-greedy `.*?`
+      // so we stop at the FIRST `return <...View` after the case label.
       const casePattern = new RegExp(
-        `case "${route}"\\s*:(?:\\s*case "[^"]+"\\s*:)*\\s*return\\s*\\(?\\s*<\\w+View`,
+        `case "${route}"\\s*:[\\s\\S]*?return\\s*\\(?\\s*<\\w+View`,
       );
       expect(
         pageSource,
@@ -239,11 +243,23 @@ describe("nav-structure — route smoke test (DONE WHEN criterion)", () => {
 
 describe("nav-structure — getNavForRole (role filtering)", () => {
   it("REGISTRAR sees all 9 groups (20 destinations accessible — my-union is OFFICER-only)", () => {
-    const nav = getNavForRole("REGISTRAR");
+    // Pass retentionEnabled=true so the Retention Queue destination is
+    // included. When the retention flag is off (the default), REGISTRAR
+    // sees 18 destinations (retention is hidden).
+    const nav = getNavForRole("REGISTRAR", true);
     expect(nav).toHaveLength(9);
     const allRoutes = nav.flatMap((g) => g.destinations.map((d) => d.route));
     expect(allRoutes).toHaveLength(19); // all 20 minus my-union
     expect(allRoutes).not.toContain("my-union");
+  });
+
+  it("REGISTRAR with retention disabled sees 18 destinations (retention hidden)", () => {
+    // When the retention flag is off (default), the Retention Queue
+    // destination is filtered out. REGISTRAR sees 18 destinations.
+    const nav = getNavForRole("REGISTRAR", false);
+    const allRoutes = nav.flatMap((g) => g.destinations.map((d) => d.route));
+    expect(allRoutes).toHaveLength(18);
+    expect(allRoutes).not.toContain("retention");
   });
 
   it("INSPECTOR sees Dashboard, Unions, Compliance, Tasks, Calendar, Search, Admin (Audit), Help", () => {
@@ -312,7 +328,7 @@ describe("app-shell.tsx — nav component uses NAV_STRUCTURE (no hardcoded desti
   });
 
   it("AppShell uses getNavForRole (not the old buildNav)", () => {
-    expect(appShellSource).toContain("getNavForRole(user.role as StaffRole)");
+    expect(appShellSource).toContain("getNavForRole(user.role as StaffRole, isRetentionEnabled())");
     expect(appShellSource).not.toContain("buildNav(");
   });
 
@@ -519,9 +535,10 @@ import {
 import { VIEW_TITLES } from "../dashboard/vocabulary";
 
 describe("nav-structure — one source of truth (palette + quick actions + view titles)", () => {
-  it("getPaletteEntries returns every destination visible to the role (REGISTRAR sees 19)", () => {
+  it("getPaletteEntries returns every destination visible to the role (REGISTRAR sees 19 with retention enabled)", () => {
     // REGISTRAR sees all 20 minus my-union (OFFICER-only) = 19.
-    const entries = getPaletteEntries("REGISTRAR");
+    // Pass retentionEnabled=true so the Retention Queue is included.
+    const entries = getPaletteEntries("REGISTRAR", true);
     expect(entries).toHaveLength(19);
     // Every entry has the canonical label, route, icon, + groupLabel.
     for (const e of entries) {

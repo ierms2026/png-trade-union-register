@@ -663,3 +663,28 @@ Stage Summary:
 - The compliance rate denominator includes AWAITING_REVIEW (the document type IS required, the union just hasn't gotten approval yet) — so pending reviews lower the rate, but the matrix shows them distinctly so the Registrar can see their review backlog.
 - The snapshot DB schema now stores awaitingReview (with @default(0) for backward compat with old rows).
 - All surfaces updated: dashboard KPI tiles, compliance matrix legend + filter, compare grid, PDF report, rule-preview rank, help glossary, public glossary.
+
+---
+Task ID: hide-retention-workflow
+Agent: main
+Task: Hide the retention workflow — legal-hold and disposition screens before anyone can dispose of real records
+
+Work Log:
+- Audited all retention/disposition/legal-hold surfaces: 1 nav entry (Retention Queue in Work Queues group), 1 view (retention.tsx), 8 API routes (3 retention, 2 legal-holds, 3 dispositions), 2 cron sweep routes (audit-retention-sweep, snapshot-retention-sweep — harmless but related).
+- Created src/lib/retention-flag.ts with isRetentionEnabled() + RETENTION_DISABLED_MESSAGE. Uses NEXT_PUBLIC_RETENTION_ENABLED so both server (API routes) and client (nav, page.tsx) can read it. The flag is not sensitive — it's just "is this feature turned on" — so NEXT_PUBLIC_ is appropriate.
+- Nav gating: getNavForRole() now takes an optional retentionEnabled param (default false). When false, the "Retention Queue" destination is filtered out. app-shell.tsx passes isRetentionEnabled() to both getNavForRole calls (nav + breadcrumbs). getPaletteEntries() also takes the param (so the Cmd+K palette hides Retention Queue too).
+- View gating: page.tsx's renderView() switch for "retention" now checks isRetentionEnabled(). If off, falls through to the Dashboard (so a stale bookmark or direct URL to /?view=retention doesn't render the view).
+- API gating: all 8 retention/disposition/legal-hold routes now have a guard at the top of each handler: if (!isRetentionEnabled()) return 404. This is defense in depth — even if someone hits the URL directly, they can't dispose of real records. The guard was added via a Python script that inserted the import + the guard block into each file.
+- .env: added NEXT_PUBLIC_RETENTION_ENABLED (commented out = off by default). Comment explains what it does + how to enable.
+- Updated tests:
+  - getNavForRole tests: REGISTRAR test now passes retentionEnabled=true to get the full 19-destination count. Added a new test "REGISTRAR with retention disabled sees 18 destinations (retention hidden)" that passes false + asserts retention is not in the list.
+  - getPaletteEntries test: passes retentionEnabled=true to get 19 entries.
+  - Route smoke test: regex updated to handle the if-guard + comments in the retention case block (now uses [\s\S]*? non-greedy match between case: and return <...View).
+  - AppShell test: assertion updated to expect getNavForRole(user.role as StaffRole, isRetentionEnabled()).
+- All 609 tests pass (was 608 → 609, +1 new "retention disabled" test). ESLint clean. TypeScript clean. Backed up (300 files).
+
+Stage Summary:
+- The retention/disposition/legal-hold workflow is completely hidden by default. Nobody can see the Retention Queue, navigate to it, or call the API routes — the nav entry is gone, the view falls through to the Dashboard, and the API routes return 404.
+- To enable: set NEXT_PUBLIC_RETENTION_ENABLED=true in .env. Everything reappears — the nav entry, the view, the API routes, the palette entry.
+- The flag is NEXT_PUBLIC_ so it works in both server + client code. It's not sensitive (just "is this feature on"), so exposing it to the client is fine.
+- The 8 API routes are guarded individually (defense in depth) — even if someone discovers the URL pattern, they get 404, not a destructive action.

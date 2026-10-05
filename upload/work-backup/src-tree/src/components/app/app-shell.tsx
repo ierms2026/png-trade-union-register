@@ -33,6 +33,7 @@ import {
   type NavGroup,
   type StaffRole,
 } from "@/lib/dashboard/nav-structure";
+import { isRetentionEnabled } from "@/lib/retention-flag";
 
 interface AuthUser {
   id: string; email: string;
@@ -63,7 +64,7 @@ function buildBreadcrumbs(activeView: string, role: AuthUser["role"]): Crumb[] {
   // a crumb (they'd just see "Home > Audit"). The full NAV_STRUCTURE's
   // findGroupForRoute would happily return the Admin group regardless of
   // role; the role-filtered version respects the user's permissions.
-  const navForRole = getNavForRole(role as StaffRole);
+  const navForRole = getNavForRole(role as StaffRole, isRetentionEnabled());
   const group = navForRole.find((g) => g.destinations.some((d) => d.route === activeView)) ?? null;
   if (!group) {
     // The active route isn't in the user's role-filtered nav. Fall back to
@@ -260,7 +261,7 @@ interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view:
 export function AppShell({ user, activeView, onNavigate, children }: AppShellProps) {
   // REPRESENTATIVE users are redirected to /portal before reaching here,
   // so we can safely narrow to StaffRole for the nav structure.
-  const nav = getNavForRole(user.role as StaffRole);
+  const nav = getNavForRole(user.role as StaffRole, isRetentionEnabled());
   const crumbs = buildBreadcrumbs(activeView, user.role as StaffRole);
   const { data: notifData, loading: notifLoading, refetch: refetchNotifs } = useFetch<{ notifications: Notification[]; unreadCount: number; }>("/api/notifications");
   const notifications = notifData?.notifications ?? [];

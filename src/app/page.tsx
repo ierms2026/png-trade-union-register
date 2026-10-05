@@ -27,6 +27,7 @@ import { ApiKeysView } from "@/components/app/views/api-keys";
 import { LegislationView } from "@/components/app/views/legislation";
 import { AccountSecurityView } from "@/components/app/views/account-security";
 import { HelpGuideView } from "@/components/app/views/help-guide";
+import { isRetentionEnabled } from "@/lib/retention-flag";
 import { navigateToComplianceFilter } from "@/lib/dashboard/status-filter";
 import { parseStatusParam, parseViewParam, PARAM_VIEW, PARAM_STATUS } from "@/lib/dashboard/dashboard-links";
 
@@ -284,7 +285,13 @@ export default function Home() {
       case "compare": return <CompareView />;
       case "tasks": return <TasksView />;
       case "reviews": return <ReviewsView />;
-      case "retention": return <RetentionView user={currentUser} />;
+      case "retention":
+        // The retention view is hidden when the retention flag is off.
+        // If someone lands on ?view=retention via a stale bookmark or
+        // direct URL, fall through to the dashboard instead of rendering
+        // the view.
+        if (isRetentionEnabled()) return <RetentionView user={currentUser} />;
+        return <DashboardView user={currentUser} onNavigate={handleNavigate} onFilterCompliance={handleFilterCompliance} />;
       case "contact-requests": return <ContactRequestsView />;
       case "search": return <SearchView />;
       case "webhooks": return <WebhooksView />;

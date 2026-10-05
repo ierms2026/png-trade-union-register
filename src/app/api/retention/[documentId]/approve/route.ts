@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role, Severity } from "@prisma/client";
+import { isRetentionEnabled, RETENTION_DISABLED_MESSAGE } from "@/lib/retention-flag";
 
 // =============================================================================
 // POST /api/retention/[documentId]/approve
@@ -35,6 +36,17 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ documentId: string }> },
 ) {
+  // --- Retention feature guard -------------------------------------------
+  // When the retention flag is off, the entire retention/disposition/
+  // legal-hold workflow is hidden. These API routes return 404 so nobody
+  // can dispose of real records by hitting the URL directly.
+  if (!isRetentionEnabled()) {
+    return NextResponse.json(
+      { error: RETENTION_DISABLED_MESSAGE },
+      { status: 404 },
+    );
+  }
+
   const { documentId } = await params;
 
   const user = await getAuthUser(req);

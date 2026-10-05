@@ -278,16 +278,23 @@ export const NAV_STRUCTURE: NavGroup[] = [
  * - A group that has only 1 available destination renders as a direct
  *   link (the caller checks `destinations.length` — if 1, render direct;
  *   if 2+, render dropdown).
+ * - The "Retention Queue" destination is filtered out when
+ *   `retentionEnabled` is false (default). This hides the retention
+ *   workflow until the office is ready to use it.
  *
  * Pure: no I/O, no side effects. Pass a role, get the filtered structure.
  *
  * Used by: app-shell.tsx (top nav + breadcrumbs), global-search.tsx
  * (palette navigation group), dashboard.tsx (quick actions).
  */
-export function getNavForRole(role: StaffRole): NavGroup[] {
+export function getNavForRole(role: StaffRole, retentionEnabled = false): NavGroup[] {
   return NAV_STRUCTURE.map((group) => ({
     ...group,
-    destinations: group.destinations.filter((d) => d.roles.includes(role)),
+    destinations: group.destinations.filter((d) => {
+      // Hide the Retention Queue destination when the retention flag is off.
+      if (d.route === "retention" && !retentionEnabled) return false;
+      return d.roles.includes(role);
+    }),
   }))
     .filter((group) => group.destinations.length > 0);
 }
@@ -385,8 +392,8 @@ export interface PaletteEntry {
  * `my-union` and `unions` are mutually exclusive by role — the palette
  * doesn't need to special-case them; the role filter handles it.
  */
-export function getPaletteEntries(role: StaffRole): PaletteEntry[] {
-  return getNavForRole(role).flatMap((group) =>
+export function getPaletteEntries(role: StaffRole, retentionEnabled = false): PaletteEntry[] {
+  return getNavForRole(role, retentionEnabled).flatMap((group) =>
     group.destinations.map((dest) => ({
       route: dest.route,
       label: dest.label,
