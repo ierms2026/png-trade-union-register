@@ -812,3 +812,18 @@ Stage Summary:
 - T20 report packaged as /home/z/my-project/download/t20-report.md (markdown, ~20.8KB, 287 lines).
 - Covers: single source for compliance status labels (vocabulary.ts), D4 enforcement (NOT_APPLICABLE label "Not Applicable" + shortLabel "N/A"), 5 contract tests with proven guard, B3 + subtitle copy fix, contact-request labels (Pending → Pending Review), and the full on-screen text changes table.
 - Documents the one deviation (definitions stay in status-config.ts because of template-interpolation tests) and 5 out-of-scope findings (portal StatusBadge type mismatch, compare.tsx STATUS_LETTER duplication, reports/compliance/page.tsx visual-token duplication, cell-letter ternary duplication, orphaned STATUS_BADGE_CLASSES export).
+
+---
+Task ID: package-t50-t51-t52-report
+Agent: main
+Task: Package T50, T51, T52 report as a downloadable Markdown file
+
+Work Log:
+- Confirmed branch chain: fix/t50-awaiting-review-no-expiry @ 387c0b2, fix/t51-unions-export-real-route-test @ 72d06ef (parent T50), fix/t52-portal-compliance-status-badge @ 71ba82f (parent T51). main @ 753ed0e (pre-T50 base).
+- Wrote /home/z/my-project/download/t50-t51-t52-report.md (19.9KB, 397 lines). Combined report covering all three tasks in the same format as the existing t06{a,b,c,d}-report.md, t40-t41-t11-report.md, and t20-report.md files.
+- Includes: branch structure table, verification summary, per-task sections with files changed, the bug analysis (T50 matrix.ts comment/code mismatch + sweep false-notification, T51 copied-query test problem, T52 StatusBadge fallback to deregistered styling + raw enum text), test descriptions, verification results, the full expiresAt consumer table (T50), the guard proof (T51), the before/after on-screen-changes table (T52), and the combined-impact summary.
+
+Stage Summary:
+- Combined report packaged as /home/z/my-project/download/t50-t51-t52-report.md (markdown, ~19.9KB, 397 lines).
+- Covers: T50 (AWAITING_REVIEW no longer gets expiry dates or renewal notices), T51 (unions-export test exercises the real route code), T52 (portal compliance badge uses single-source labels + visual tokens).
+- Documents the T50 expiresAt-consumer grep (all 10 consumers handle null gracefully), the T51 guard proof (temporarily reverted to old array-style select, both tests failed), and the T52 before/after table for all 6 compliance statuses.
