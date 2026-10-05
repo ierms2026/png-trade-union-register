@@ -827,3 +827,17 @@ Stage Summary:
 - Combined report packaged as /home/z/my-project/download/t50-t51-t52-report.md (markdown, ~19.9KB, 397 lines).
 - Covers: T50 (AWAITING_REVIEW no longer gets expiry dates or renewal notices), T51 (unions-export test exercises the real route code), T52 (portal compliance badge uses single-source labels + visual tokens).
 - Documents the T50 expiresAt-consumer grep (all 10 consumers handle null gracefully), the T51 guard proof (temporarily reverted to old array-style select, both tests failed), and the T52 before/after table for all 6 compliance statuses.
+
+---
+Task ID: package-t06e-report
+Agent: main
+Task: Package T06e report as a downloadable Markdown file
+
+Work Log:
+- Confirmed T06e was a read-only task with no branch/commit. Wrote /home/z/my-project/download/t06e-report.md (16.4KB, 264 lines).
+- Report covers all 6 numbered items with file:line evidence quotes, one table per item, and a prioritized needs-fix list.
+
+Stage Summary:
+- T06e report packaged as /home/z/my-project/download/t06e-report.md (markdown, ~16.4KB, 264 lines).
+- Covers: Item 1 (digest/snapshot/notifications — all fine or harmlessly omit AWAITING_REVIEW), Item 2 (webhook payloads — no status counts, payload shape undocumented), Item 3 (v1 API — has awaitingReview in summary, no rate computed, undocumented), Item 4 (filters — no omissions), Item 5 (PROVISIONAL hits — 5 total, only 1 has a D-reference (D4), computeRateFromCounts is MISSING PROVISIONAL(D1)), Item 6 (Awaiting Review tile data flow traced end-to-end — shows a number, not blank).
+- 4 needs-fix items identified: missing PROVISIONAL(D1) comment, undocumented webhook payloads, undocumented v1 API, stale dashboard comment (already fixed on T50 branch).
