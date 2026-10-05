@@ -1,6 +1,6 @@
 "use client";
 
-import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
+import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG, VIEW_TITLES } from "@/lib/dashboard/vocabulary";
 import { type ComplianceStatus } from "@/lib/dashboard/status-config";
 import { useState } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, FileText, Loader2, Clock } from "lucide-react";
@@ -60,13 +60,14 @@ interface ComplianceMatrixResponse {
 
 type StatusFilter = "ALL" | "COMPLIANT" | "EXPIRING" | "OVERDUE" | "AWAITING_REVIEW" | "MISSING" | "NOT_APPLICABLE";
 
-const STATUS_CONFIG: Record<string, { label: string; cell: string; dot: string; icon: typeof CheckCircle2 }> = {
-  COMPLIANT: { label: "Compliant", cell: "bg-chart-3/15 text-chart-3 border-chart-3/30", dot: "bg-chart-3", icon: CheckCircle2 },
-  EXPIRING: { label: "Expiring", cell: "bg-accent/15 text-accent-foreground border-accent/30", dot: "bg-accent", icon: AlertTriangle },
-  OVERDUE: { label: "Overdue", cell: "bg-destructive/10 text-destructive border-destructive/30", dot: "bg-destructive", icon: XCircle },
-  AWAITING_REVIEW: { label: "Awaiting Review", cell: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900", dot: "bg-blue-500", icon: Clock },
-  MISSING: { label: "Missing", cell: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground/40", icon: FileQuestion },
-  NOT_APPLICABLE: { label: "N/A", cell: "bg-muted/50 text-muted-foreground border-border", dot: "bg-muted-foreground/20", icon: Ban },
+// Visual tokens only — labels come from COMPLIANCE_STATUS_CONFIG (single source).
+const STATUS_VISUAL: Record<string, { cell: string; dot: string; icon: typeof CheckCircle2 }> = {
+  COMPLIANT: { cell: "bg-chart-3/15 text-chart-3 border-chart-3/30", dot: "bg-chart-3", icon: CheckCircle2 },
+  EXPIRING: { cell: "bg-accent/15 text-accent-foreground border-accent/30", dot: "bg-accent", icon: AlertTriangle },
+  OVERDUE: { cell: "bg-destructive/10 text-destructive border-destructive/30", dot: "bg-destructive", icon: XCircle },
+  AWAITING_REVIEW: { cell: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900", dot: "bg-blue-500", icon: Clock },
+  MISSING: { cell: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground/40", icon: FileQuestion },
+  NOT_APPLICABLE: { cell: "bg-muted/50 text-muted-foreground border-border", dot: "bg-muted-foreground/20", icon: Ban },
 };
 
 export function ComplianceView({ initialFilter }: { initialFilter?: string | null }) {
@@ -138,11 +139,11 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
           }
         }
         return [
-          { name: "Compliant", count: totals.COMPLIANT, fill: "var(--status-compliant)" },
-          { name: "Expiring", count: totals.EXPIRING, fill: "var(--status-expiring)" },
-          { name: "Overdue", count: totals.OVERDUE, fill: "var(--status-overdue)" },
-          { name: "Awaiting Review", count: totals.AWAITING_REVIEW, fill: "var(--status-review)" },
-          { name: "Missing", count: totals.MISSING, fill: "var(--status-missing)" },
+          { name: COMPLIANCE_STATUS_CONFIG.COMPLIANT.label, count: totals.COMPLIANT, fill: "var(--status-compliant)" },
+          { name: COMPLIANCE_STATUS_CONFIG.EXPIRING.label, count: totals.EXPIRING, fill: "var(--status-expiring)" },
+          { name: COMPLIANCE_STATUS_CONFIG.OVERDUE.label, count: totals.OVERDUE, fill: "var(--status-overdue)" },
+          { name: COMPLIANCE_STATUS_CONFIG.AWAITING_REVIEW.label, count: totals.AWAITING_REVIEW, fill: "var(--status-review)" },
+          { name: COMPLIANCE_STATUS_CONFIG.MISSING.label, count: totals.MISSING, fill: "var(--status-missing)" },
         ];
       })()
     : [];
@@ -167,9 +168,9 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Compliance Matrix</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{VIEW_TITLES.compliance}</h1>
           <p className="text-sm text-muted-foreground">
-            Live compliance status for every union × document type. Computed on every read — no caching.
+            Live compliance status for every union and document type.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -193,12 +194,12 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All statuses</SelectItem>
-            <SelectItem value="COMPLIANT">Compliant only</SelectItem>
-            <SelectItem value="EXPIRING">Expiring only</SelectItem>
-            <SelectItem value="OVERDUE">Overdue only</SelectItem>
-            <SelectItem value="AWAITING_REVIEW">Awaiting Review only</SelectItem>
-            <SelectItem value="MISSING">Missing only</SelectItem>
-            <SelectItem value="NOT_APPLICABLE">N/A only</SelectItem>
+            <SelectItem value="COMPLIANT">{COMPLIANCE_STATUS_CONFIG.COMPLIANT.label} only</SelectItem>
+            <SelectItem value="EXPIRING">{COMPLIANCE_STATUS_CONFIG.EXPIRING.label} only</SelectItem>
+            <SelectItem value="OVERDUE">{COMPLIANCE_STATUS_CONFIG.OVERDUE.label} only</SelectItem>
+            <SelectItem value="AWAITING_REVIEW">{COMPLIANCE_STATUS_CONFIG.AWAITING_REVIEW.label} only</SelectItem>
+            <SelectItem value="MISSING">{COMPLIANCE_STATUS_CONFIG.MISSING.label} only</SelectItem>
+            <SelectItem value="NOT_APPLICABLE">{COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.shortLabel} only</SelectItem>
           </SelectContent>
         </Select>
         </div>
@@ -208,15 +209,17 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
           the canonical definition from COMPLIANCE_STATUS_CONFIG (single source
           of truth — same definitions as the Dashboard + the Help glossary). */}
       <div className="flex flex-wrap gap-4">
-        {Object.entries(STATUS_CONFIG).map(([status, cfg]) => {
-          const definition = COMPLIANCE_STATUS_CONFIG[status as keyof typeof COMPLIANCE_STATUS_CONFIG]?.definition;
+        {Object.entries(STATUS_VISUAL).map(([status, cfg]) => {
+          const statusKey = status as keyof typeof COMPLIANCE_STATUS_CONFIG;
+          const definition = COMPLIANCE_STATUS_CONFIG[statusKey]?.definition;
+          const label = COMPLIANCE_STATUS_CONFIG[statusKey]?.label ?? status;
           return (
             <TooltipProvider key={status} delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex cursor-help items-center gap-2 text-xs">
                     <span className={`h-3 w-3 rounded-full ${cfg.dot}`} />
-                    <span className="text-muted-foreground">{cfg.label}</span>
+                    <span className="text-muted-foreground">{label}</span>
                   </div>
                 </TooltipTrigger>
                 {definition && (
@@ -340,7 +343,7 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
                     <p className="text-xs text-muted-foreground">{getComplianceStatusLabel(row.status as ComplianceStatus)}</p>
                   </td>
                   {row.scores.map((cell) => {
-                    const cfg = STATUS_CONFIG[cell.status];
+                    const cfg = STATUS_VISUAL[cell.status];
                     const dimmed = filter !== "ALL" && cell.status !== filter;
                     return (
                       <td key={cell.documentType} className="px-3 py-3 text-center">
@@ -356,7 +359,7 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
                             <div className="space-y-0.5 text-left">
                               <p className="font-semibold">{row.unionName}</p>
                               <p className="text-primary-foreground/80">{cell.documentType}</p>
-                              <p className="text-primary-foreground/80">Status: {cfg.label}</p>
+                              <p className="text-primary-foreground/80">Status: {getComplianceStatusLabel(cell.status)}</p>
                               {cell.expiresAt && (
                                 <p className="text-primary-foreground/80">
                                   Expires: {new Date(cell.expiresAt).toLocaleDateString()}

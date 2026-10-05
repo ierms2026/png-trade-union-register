@@ -45,6 +45,8 @@ export type ComplianceStatus =
 
 export interface StatusConfig {
   label: string;
+  /** Abbreviated label for space-constrained UI (matrix cells, KPI tiles). Equals label unless an abbreviation is already used on screen. */
+  shortLabel: string;
   icon: LucideIcon;
   /** Tailwind classes for badge rendering. */
   cell: string;
@@ -52,9 +54,13 @@ export interface StatusConfig {
   definition: string;
 }
 
+// PROVISIONAL(D4): see docs/decisions-and-defaults.md
+// NOT_APPLICABLE uses label "Not Applicable" (canonical) + shortLabel "N/A"
+// for space-constrained UI. Other statuses use shortLabel = label.
 export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
   COMPLIANT: {
     label: "Compliant",
+    shortLabel: "Compliant",
     icon: CheckCircle2,
     cell: "bg-chart-3/15 text-chart-3 border-chart-3/30",
     dot: "bg-chart-3",
@@ -62,6 +68,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
   },
   EXPIRING: {
     label: "Expiring",
+    shortLabel: "Expiring",
     icon: AlertTriangle,
     cell: "bg-chart-4/15 text-chart-4 border-chart-4/30",
     dot: "bg-chart-4",
@@ -69,6 +76,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
   },
   OVERDUE: {
     label: "Overdue",
+    shortLabel: "Overdue",
     icon: XCircle,
     cell: "bg-destructive/15 text-destructive border-destructive/30",
     dot: "bg-destructive",
@@ -76,6 +84,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
   },
   AWAITING_REVIEW: {
     label: "Awaiting Review",
+    shortLabel: "Awaiting Review",
     icon: Clock,
     cell: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900",
     dot: "bg-blue-500",
@@ -83,6 +92,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
   },
   MISSING: {
     label: "Missing",
+    shortLabel: "Missing",
     icon: FileQuestion,
     cell: "bg-muted text-muted-foreground border-border",
     dot: "bg-muted-foreground/40",
@@ -90,6 +100,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
   },
   NOT_APPLICABLE: {
     label: "Not Applicable",
+    shortLabel: "N/A",
     icon: Ban,
     cell: "bg-muted/50 text-muted-foreground border-border",
     dot: "bg-muted-foreground/20",
@@ -353,6 +364,10 @@ export const RESOURCES_EMPTY_ACTION = "Add Resource";
 
 export function getComplianceStatusLabel(status: ComplianceStatus): string {
   return COMPLIANCE_STATUS_CONFIG[status]?.label ?? status;
+}
+
+export function getComplianceStatusShortLabel(status: ComplianceStatus): string {
+  return COMPLIANCE_STATUS_CONFIG[status]?.shortLabel ?? status;
 }
 
 export function getReviewStatusLabel(status: ReviewStatus): string {
