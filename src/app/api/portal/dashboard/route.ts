@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
+import { tallyStatuses, computeRateFromCounts } from "@/lib/dashboard/metrics";
 
 // =============================================================================
 // GET /api/portal/dashboard
@@ -79,24 +80,9 @@ export async function GET() {
   data.unions = data.unions.filter((u) => u.id === unionId);
   const matrix = buildComplianceMatrix(data);
 
-  let compliant = 0,
-    expiring = 0,
-    overdue = 0,
-    missing = 0,
-    notApplicable = 0;
-  for (const row of matrix.unions) {
-    for (const cell of row.scores) {
-      switch (cell.status) {
-        case "COMPLIANT": compliant++; break;
-        case "EXPIRING": expiring++; break;
-        case "OVERDUE": overdue++; break;
-        case "MISSING": missing++; break;
-        case "NOT_APPLICABLE": notApplicable++; break;
-      }
-    }
-  }
-  const applicable = compliant + expiring + overdue + missing;
-  const overallRate = applicable === 0 ? 0 : Math.round((compliant / applicable) * 100);
+  const allCells = matrix.unions.flatMap((row) => row.scores);
+  const counts = tallyStatuses(allCells);
+  const rate = computeRateFromCounts(counts);
 
   // --- 3. Needs-attention entries (overdue + expiring) for this union ---
   const needsAttention = matrix.unions.flatMap((row) =>
@@ -123,16 +109,17 @@ export async function GET() {
     union,
     activeCount,
     compliance: {
-      compliant,
-      expiring,
-      overdue,
-      missing,
-      notApplicable,
-      overallRate,
+      compliant: counts.COMPLIANT,
+      expiring: counts.EXPIRING,
+      overdue: counts.OVERDUE,
+      awaitingReview: counts.AWAITING_REVIEW,
+      missing: counts.MISSING,
+      notApplicable: counts.NOT_APPLICABLE,
+      overallRate: rate.percentage,
       rate: {
-        numerator: compliant,
-        denominator: applicable,
-        percentage: overallRate,
+        numerator: rate.numerator,
+        denominator: rate.denominator,
+        percentage: rate.percentage,
       },
     },
     needsAttention,

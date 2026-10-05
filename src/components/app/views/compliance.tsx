@@ -1,6 +1,7 @@
 "use client";
 
 import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
+import { type ComplianceStatus } from "@/lib/dashboard/status-config";
 import { useState } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, FileText, Loader2, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Legend } from "rechar
 
 interface ComplianceCell {
   documentType: string;
-  status: "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
+  status: ComplianceStatus;
   documentId: string | null;
   expiresAt: string | null;
 }
@@ -130,7 +131,7 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
   // horizontal bars showing the registry-wide status distribution.
   const summaryBarData = data
     ? (() => {
-        const totals = { COMPLIANT: 0, EXPIRING: 0, OVERDUE: 0, MISSING: 0 };
+        const totals = { COMPLIANT: 0, EXPIRING: 0, OVERDUE: 0, AWAITING_REVIEW: 0, MISSING: 0 };
         for (const u of data.unions) {
           for (const s of u.scores) {
             if (s.status in totals) totals[s.status as keyof typeof totals]++;
@@ -140,6 +141,7 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
           { name: "Compliant", count: totals.COMPLIANT, fill: "var(--status-compliant)" },
           { name: "Expiring", count: totals.EXPIRING, fill: "var(--status-expiring)" },
           { name: "Overdue", count: totals.OVERDUE, fill: "var(--status-overdue)" },
+          { name: "Awaiting Review", count: totals.AWAITING_REVIEW, fill: "var(--status-review)" },
           { name: "Missing", count: totals.MISSING, fill: "var(--status-missing)" },
         ];
       })()
@@ -335,7 +337,7 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
                 <tr key={row.unionId} className="border-b hover:bg-muted/30 hover:shadow-[inset_2px_0_0_0_oklch(0.74_0.15_85)]">
                   <td className="sticky left-0 z-10 bg-card px-4 py-3">
                     <p className="font-medium">{row.unionName}</p>
-                    <p className="text-xs text-muted-foreground">{getComplianceStatusLabel(row.status as "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE")}</p>
+                    <p className="text-xs text-muted-foreground">{getComplianceStatusLabel(row.status as ComplianceStatus)}</p>
                   </td>
                   {row.scores.map((cell) => {
                     const cfg = STATUS_CONFIG[cell.status];

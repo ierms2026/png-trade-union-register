@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { GitCompare, Plus, X, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { type ComplianceStatus } from "@/lib/dashboard/status-config";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +34,7 @@ import { EmptyState } from "@/components/app/empty-state";
 
 interface ComplianceCell {
   documentType: string;
-  status: "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
+  status: ComplianceStatus;
   documentId: string | null;
   expiresAt: string | null;
 }
