@@ -2,13 +2,13 @@
 // Retention feature flag — controls whether the retention/disposition/
 // legal-hold workflow is visible + callable.
 //
-// When NEXT_PUBLIC_RETENTION_ENABLED is not set (or set to "false"), ALL
-// retention surfaces are hidden:
+// When the flag is not set (or set to "false"), ALL retention surfaces are
+// hidden:
 //   - The "Retention Queue" nav entry + view are removed
 //   - The /api/retention, /api/legal-holds, /api/dispositions routes return 404
 //   - The cron sweep routes are no-ops
 //
-// When NEXT_PUBLIC_RETENTION_ENABLED=true, everything works as before.
+// When the flag is "true", everything works as before.
 //
 // WHY THIS EXISTS:
 //   The retention workflow allows a Registrar to dispose of real records.
@@ -17,21 +17,19 @@
 //   Registrar has signed off on the policy), the feature is hidden so
 //   nobody can accidentally dispose of real records.
 //
-// WHY NEXT_PUBLIC_:
-//   The flag needs to be readable by BOTH server code (API routes, cron)
-//   AND client code (nav structure, page.tsx's view switch). NEXT_PUBLIC_
-//   vars are inlined at build time and available in both environments.
-//   The flag is not sensitive — it's just "is this feature turned on" —
-//   so exposing it to the client is fine.
+// WHY THE ENV VAR NAME IS NOT IN THE 404 BODY (decision D5):
+//   The 404 body returned by retention routes must be a generic "not found"
+//   message. Naming the env var in the body would leak implementation detail
+//   to anyone hitting the URL — including parties who shouldn't know the
+//   feature exists. The enable instruction lives in .env.example + the
+//   README, not in the response body.
 //
-// To enable: set NEXT_PUBLIC_RETENTION_ENABLED=true in .env
+// To enable: see .env.example for the variable name + how to set it.
 // =============================================================================
 
 /**
  * Returns true if the retention/disposition/legal-hold workflow is enabled.
- *
- * Reads NEXT_PUBLIC_RETENTION_ENABLED. Works in both server and client
- * code (the var is inlined at build time).
+ * Works in both server and client code (the var is inlined at build time).
  */
 export function isRetentionEnabled(): boolean {
   return process.env.NEXT_PUBLIC_RETENTION_ENABLED === "true";
@@ -39,9 +37,10 @@ export function isRetentionEnabled(): boolean {
 
 /**
  * Guard message for API routes when retention is disabled.
- * Used by the retention/disposition/legal-hold routes to return a 404
- * when the flag is off — defense in depth so nobody can dispose of real
- * records by hitting the URL directly.
+ *
+ * Generic "not found" wording — does NOT name the env var (decision D5).
+ * Used by the retention/disposition/legal-hold routes to return a 404 when
+ * the flag is off, as defense in depth so nobody can dispose of real records
+ * by hitting the URL directly.
  */
-export const RETENTION_DISABLED_MESSAGE =
-  "The retention workflow is not enabled. Set NEXT_PUBLIC_RETENTION_ENABLED=true to enable it.";
+export const RETENTION_DISABLED_MESSAGE = "Not found.";
