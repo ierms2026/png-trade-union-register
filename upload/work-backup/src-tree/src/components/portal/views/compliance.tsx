@@ -1,6 +1,8 @@
 "use client";
 
 import { CheckCircle2, AlertTriangle, Clock, FileText } from "lucide-react";
+import { type ComplianceStatus } from "@/lib/dashboard/status-config";
+import { COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton } from "@/components/app/skeletons";
@@ -20,7 +22,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 
 interface ComplianceCell {
   documentType: string;
-  status: "COMPLIANT" | "EXPIRING" | "OVERDUE" | "MISSING" | "NOT_APPLICABLE";
+  status: ComplianceStatus;
   expiresAt: string | null;
   documentId: string | null;
 }
@@ -37,9 +39,10 @@ interface ComplianceMatrixResponse {
 const STATUS_ORDER: Record<ComplianceCell["status"], number> = {
   OVERDUE: 0,
   EXPIRING: 1,
-  MISSING: 2,
-  NOT_APPLICABLE: 3,
-  COMPLIANT: 4,
+  AWAITING_REVIEW: 2,
+  MISSING: 3,
+  NOT_APPLICABLE: 4,
+  COMPLIANT: 5,
 };
 
 export function PortalComplianceView() {
@@ -85,11 +88,11 @@ export function PortalComplianceView() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <SummaryTile label="Compliant" count={tally.COMPLIANT ?? 0} tone="green" icon={CheckCircle2} />
-            <SummaryTile label="Expiring" count={tally.EXPIRING ?? 0} tone="amber" icon={Clock} />
-            <SummaryTile label="Overdue" count={tally.OVERDUE ?? 0} tone="red" icon={AlertTriangle} />
-            <SummaryTile label="Missing" count={tally.MISSING ?? 0} tone="slate" icon={FileText} />
-            <SummaryTile label="N/A" count={tally.NOT_APPLICABLE ?? 0} tone="muted" icon={FileText} />
+            <SummaryTile label={COMPLIANCE_STATUS_CONFIG.COMPLIANT.label} count={tally.COMPLIANT ?? 0} tone="green" icon={CheckCircle2} />
+            <SummaryTile label={COMPLIANCE_STATUS_CONFIG.EXPIRING.label} count={tally.EXPIRING ?? 0} tone="amber" icon={Clock} />
+            <SummaryTile label={COMPLIANCE_STATUS_CONFIG.OVERDUE.label} count={tally.OVERDUE ?? 0} tone="red" icon={AlertTriangle} />
+            <SummaryTile label={COMPLIANCE_STATUS_CONFIG.MISSING.label} count={tally.MISSING ?? 0} tone="slate" icon={FileText} />
+            <SummaryTile label={COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.shortLabel} count={tally.NOT_APPLICABLE ?? 0} tone="muted" icon={FileText} />
           </div>
         </CardContent>
       </Card>

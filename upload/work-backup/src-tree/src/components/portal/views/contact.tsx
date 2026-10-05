@@ -17,6 +17,7 @@ import {
 import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
+import { CONTACT_UPDATE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // PortalContactView — chunk 5
@@ -175,17 +176,17 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
 function RequestRow({ request }: { request: ContactUpdateRequest }) {
   const cfg = {
     PENDING: {
-      label: "Pending",
+      label: CONTACT_UPDATE_STATUS_CONFIG.PENDING.label,
       icon: Clock,
       tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
     },
     APPROVED: {
-      label: "Approved",
+      label: CONTACT_UPDATE_STATUS_CONFIG.APPROVED.label,
       icon: CheckCircle2,
       tone: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
     },
     REJECTED: {
-      label: "Rejected",
+      label: CONTACT_UPDATE_STATUS_CONFIG.REJECTED.label,
       icon: XCircle,
       tone: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
     },

@@ -84,7 +84,7 @@ export interface PreviewResponse {
  * Higher number = "worse" status. Used by the summary to count how many
  * unions escalated vs. improved.
  *
- * Order: COMPLIANT (best) < EXPIRING < OVERDUE < MISSING < NOT_APPLICABLE
+ * Order: COMPLIANT (best) < EXPIRING < OVERDUE < AWAITING_REVIEW < MISSING < NOT_APPLICABLE
  *
  * NOT_APPLICABLE is ranked "worst" here for sorting purposes only — it's
  * not actually worse than MISSING, but it's the most unusual change

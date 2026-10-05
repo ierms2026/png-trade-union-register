@@ -21,6 +21,7 @@ import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
+import { CONTACT_UPDATE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // ContactRequestsView — chunk 5 staff-side view (REGISTRAR-only)
@@ -57,9 +58,9 @@ interface ContactRequest {
 }
 
 const STATUS_FILTERS = [
-  { value: "PENDING", label: "Pending" },
-  { value: "APPROVED", label: "Approved" },
-  { value: "REJECTED", label: "Rejected" },
+  { value: "PENDING", label: CONTACT_UPDATE_STATUS_CONFIG.PENDING.label },
+  { value: "APPROVED", label: CONTACT_UPDATE_STATUS_CONFIG.APPROVED.label },
+  { value: "REJECTED", label: CONTACT_UPDATE_STATUS_CONFIG.REJECTED.label },
   { value: "ALL", label: "All" },
 ] as const;
 
@@ -223,9 +224,9 @@ function RequestCard({
   onReject: () => void;
 }) {
   const statusCfg = {
-    PENDING: { label: "Pending", icon: Clock, tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900" },
-    APPROVED: { label: "Approved", icon: CheckCircle2, tone: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900" },
-    REJECTED: { label: "Rejected", icon: XCircle, tone: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900" },
+    PENDING: { label: CONTACT_UPDATE_STATUS_CONFIG.PENDING.label, icon: Clock, tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900" },
+    APPROVED: { label: CONTACT_UPDATE_STATUS_CONFIG.APPROVED.label, icon: CheckCircle2, tone: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900" },
+    REJECTED: { label: CONTACT_UPDATE_STATUS_CONFIG.REJECTED.label, icon: XCircle, tone: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900" },
   }[request.status];
   const StatusIcon = statusCfg.icon;
 

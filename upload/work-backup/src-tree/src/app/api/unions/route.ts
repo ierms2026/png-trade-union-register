@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { UnionStatus, Severity } from "@prisma/client";
+import { UnionStatus, Severity, Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope, getAuthUser } from "@/lib/auth/auth-guard";
 
@@ -178,24 +178,21 @@ export async function POST(req: NextRequest) {
   }
 
   // --- Build the create data ---
-  const data: Record<string, unknown> = {
+  // Helper: optional string fields become null if empty/missing, else trimmed.
+  const opt = (v: unknown): string | null =>
+    typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+
+  const data: Prisma.UnionUncheckedCreateInput = {
     unionName: body.unionName.trim(),
     registrationNo: body.registrationNo.trim(),
     status,
+    fileNumber: opt(body.fileNumber),
+    address: opt(body.address),
+    contactPerson: opt(body.contactPerson),
+    contactEmail: opt(body.contactEmail),
+    contactPhone: opt(body.contactPhone),
+    remarks: opt(body.remarks),
   };
-
-  // Optional string fields (null if empty/missing)
-  const optionalFields: Array<keyof CreateUnionBody> = [
-    "fileNumber", "address", "contactPerson", "contactEmail", "contactPhone", "remarks",
-  ];
-  for (const field of optionalFields) {
-    const value = body[field];
-    if (typeof value === "string" && value.trim().length > 0) {
-      data[field] = value.trim();
-    } else {
-      data[field] = null;
-    }
-  }
 
   // --- Create the union ---
   const union = await db.union.create({ data });

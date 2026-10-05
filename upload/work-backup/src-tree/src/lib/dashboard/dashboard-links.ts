@@ -40,7 +40,7 @@ export type ViewParam =
  * Build a deep-link URL for the compliance view filtered by a specific status.
  * Returns a relative URL suitable for `<a href={...}>`.
  *
- * @param status One of the applicable compliance statuses (COMPLIANT, EXPIRING, OVERDUE, MISSING)
+ * @param status One of the applicable compliance statuses (COMPLIANT, EXPIRING, OVERDUE, AWAITING_REVIEW, MISSING)
  * @returns e.g. "/?view=compliance&status=OVERDUE"
  */
 export function complianceFilterUrl(status: ComplianceStatus): string {

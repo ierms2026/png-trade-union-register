@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
+import { tallyStatuses, computeRateFromCounts } from "@/lib/dashboard/metrics";
 import { toCSV, csvResponse } from "@/lib/csv";
 
 // GET /api/export/stats — summary stats + needs attention as CSV
@@ -15,33 +16,23 @@ export async function GET(req: NextRequest) {
   }
   const matrix = buildComplianceMatrix(data);
 
-  let compliant = 0, expiring = 0, overdue = 0, missing = 0, notApplicable = 0;
-  for (const row of matrix.unions) {
-    for (const cell of row.scores) {
-      switch (cell.status) {
-        case "COMPLIANT": compliant++; break;
-        case "EXPIRING": expiring++; break;
-        case "OVERDUE": overdue++; break;
-        case "MISSING": missing++; break;
-        case "NOT_APPLICABLE": notApplicable++; break;
-      }
-    }
-  }
-  const applicable = compliant + expiring + overdue + missing;
-  const rate = applicable === 0 ? 0 : Math.round((compliant / applicable) * 100);
+  const allCells = matrix.unions.flatMap((row) => row.scores);
+  const counts = tallyStatuses(allCells);
+  const rate = computeRateFromCounts(counts);
 
   // Summary section
   const summaryRows = [
     { Metric: "Total Unions", Value: matrix.unions.length },
     { Metric: "Document Types", Value: matrix.documentTypes.length },
     { Metric: "Total Cells", Value: matrix.unions.length * matrix.documentTypes.length },
-    { Metric: "Compliant", Value: compliant },
-    { Metric: "Expiring", Value: expiring },
-    { Metric: "Overdue", Value: overdue },
-    { Metric: "Missing", Value: missing },
-    { Metric: "Not Applicable", Value: notApplicable },
-    { Metric: "Applicable Cells", Value: applicable },
-    { Metric: "Compliance Rate (%)", Value: rate },
+    { Metric: "Compliant", Value: counts.COMPLIANT },
+    { Metric: "Expiring", Value: counts.EXPIRING },
+    { Metric: "Overdue", Value: counts.OVERDUE },
+    { Metric: "Awaiting Review", Value: counts.AWAITING_REVIEW },
+    { Metric: "Missing", Value: counts.MISSING },
+    { Metric: "Not Applicable", Value: counts.NOT_APPLICABLE },
+    { Metric: "Applicable Cells", Value: rate.denominator },
+    { Metric: "Compliance Rate (%)", Value: rate.percentage },
   ];
 
   // Needs attention section

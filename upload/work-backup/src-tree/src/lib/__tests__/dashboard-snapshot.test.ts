@@ -311,7 +311,7 @@ describe("compliance snapshot — chunk 4.2a", () => {
         testDb.complianceSnapshot.create({
           data: {
             date: FROZEN_TODAY,
-            compliant: 99, expiring: 99, overdue: 99, missing: 99,
+            compliant: 99, expiring: 99, overdue: 99, awaitingReview: 0, missing: 99,
             rateNumerator: 99, rateDenominator: 99,
             capturedWith: "{}",
           },
@@ -559,19 +559,19 @@ describe("compliance snapshot — chunk 4.2a", () => {
       // to verify the selector sorts ascending (not relying on insert order).
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2,
+          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 2,
           rateNumerator: 2, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, missing: 3,
+          date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 3,
           rateNumerator: 1, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-14", compliant: 1, expiring: 2, overdue: 1, missing: 2,
+          date: "2026-06-14", compliant: 1, expiring: 2, overdue: 1, awaitingReview: 0, missing: 2,
           rateNumerator: 1, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
@@ -590,13 +590,13 @@ describe("compliance snapshot — chunk 4.2a", () => {
       // 2026-06-14 entry with zero counts or interpolated values.
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, missing: 3,
+          date: "2026-06-13", compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 3,
           rateNumerator: 1, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2,
+          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 2,
           rateNumerator: 2, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
@@ -610,23 +610,21 @@ describe("compliance snapshot — chunk 4.2a", () => {
       expect(hasGapEntry).toBe(false);
     });
 
-    it("point shape: { date, compliant, expiring, overdue, missing, rateNumerator, rateDenominator, percentage }", async () => {
+    it("point shape: { date, compliant, expiring, overdue, awaitingReview, missing, rateNumerator, rateDenominator, percentage }", async () => {
       // 4.2b ADDITIVE: percentage field added (computed in metrics module).
+      // T06c: awaitingReview field added to ComplianceTrendPoint.
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2,
+          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 2,
           rateNumerator: 2, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
       const trend = await getComplianceTrend(FROZEN_NOW);
       const point = trend[0];
       expect(point).toBeDefined();
-      // Shape check: exactly these 8 keys, no more, no less.
-      // (rateNumerator and rateDenominator — NOT rate.numerator — to match
-      // the ComplianceTrendPoint type exported from snapshot.ts. percentage
-      // is the 4.2b additive extension — see handoff.)
+      // Shape check: exactly these 9 keys, no more, no less.
       const expectedKeys = [
-        "date", "compliant", "expiring", "overdue", "missing",
+        "date", "compliant", "expiring", "overdue", "awaitingReview", "missing",
         "rateNumerator", "rateDenominator", "percentage",
       ].sort();
       const actualKeys = Object.keys(point as ComplianceTrendPoint).sort();
@@ -655,19 +653,19 @@ describe("compliance snapshot — chunk 4.2a", () => {
       // Seed three points with different numerators/denominators.
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-13", compliant: 5, expiring: 0, overdue: 0, missing: 5,
+          date: "2026-06-13", compliant: 5, expiring: 0, overdue: 0, awaitingReview: 0, missing: 5,
           rateNumerator: 5, rateDenominator: 10, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-14", compliant: 7, expiring: 1, overdue: 1, missing: 1,
+          date: "2026-06-14", compliant: 7, expiring: 1, overdue: 1, awaitingReview: 0, missing: 1,
           rateNumerator: 7, rateDenominator: 10, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-15", compliant: 9, expiring: 1, overdue: 0, missing: 0,
+          date: "2026-06-15", compliant: 9, expiring: 1, overdue: 0, awaitingReview: 0, missing: 0,
           rateNumerator: 9, rateDenominator: 10, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
@@ -691,7 +689,7 @@ describe("compliance snapshot — chunk 4.2a", () => {
       // docstring for the rationale.
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-13", compliant: 0, expiring: 0, overdue: 0, missing: 0,
+          date: "2026-06-13", compliant: 0, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0,
           rateNumerator: 0, rateDenominator: 0, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
@@ -711,7 +709,7 @@ describe("compliance snapshot — chunk 4.2a", () => {
       // that to look like "0% compliant".
       await testDb.complianceSnapshot.create({
         data: {
-          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2,
+          date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 2,
           rateNumerator: 2, rateDenominator: 6, capturedWith: '{"expiringWindowDays":90,"requiredTypesCount":2}',
         },
       });
@@ -731,7 +729,7 @@ describe("compliance snapshot — chunk 4.2a", () => {
 
     it("returns false for a single point (default minPoints=2)", () => {
       const onePoint: ComplianceTrendPoint[] = [{
-        date: "2026-06-15", compliant: 1, expiring: 1, overdue: 1, missing: 3,
+        date: "2026-06-15", compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 3,
         rateNumerator: 1, rateDenominator: 6, percentage: 17,
       }];
       expect(hasSufficientHistory(onePoint)).toBe(false);
@@ -739,16 +737,16 @@ describe("compliance snapshot — chunk 4.2a", () => {
 
     it("returns true for 2+ points (default minPoints=2)", () => {
       const twoPoints: ComplianceTrendPoint[] = [
-        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, missing: 3, rateNumerator: 1, rateDenominator: 6, percentage: 17 },
-        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2, rateNumerator: 2, rateDenominator: 6, percentage: 33 },
+        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 3, rateNumerator: 1, rateDenominator: 6, percentage: 17 },
+        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 2, rateNumerator: 2, rateDenominator: 6, percentage: 33 },
       ];
       expect(hasSufficientHistory(twoPoints)).toBe(true);
     });
 
     it("respects a custom minPoints", () => {
       const twoPoints: ComplianceTrendPoint[] = [
-        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, missing: 3, rateNumerator: 1, rateDenominator: 6, percentage: 17 },
-        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, missing: 2, rateNumerator: 2, rateDenominator: 6, percentage: 33 },
+        { date: "2026-06-14", compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 3, rateNumerator: 1, rateDenominator: 6, percentage: 17 },
+        { date: "2026-06-15", compliant: 2, expiring: 1, overdue: 1, awaitingReview: 0, missing: 2, rateNumerator: 2, rateDenominator: 6, percentage: 33 },
       ];
       expect(hasSufficientHistory(twoPoints, 3)).toBe(false);
       expect(hasSufficientHistory(twoPoints, 2)).toBe(true);
@@ -841,13 +839,13 @@ describe("Snapshot retention sweep (chunk 4.3)", () => {
     const recentDate = formatUtcDate(new Date(now.getTime() - 1 * MS_PER_DAY));
 
     await testDb.complianceSnapshot.create({
-      data: { date: oldDate, compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+      data: { date: oldDate, compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
     });
     await testDb.complianceSnapshot.create({
-      data: { date: midDate, compliant: 2, expiring: 0, overdue: 0, missing: 0, rateNumerator: 2, rateDenominator: 2, capturedWith: "{}" },
+      data: { date: midDate, compliant: 2, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 2, rateDenominator: 2, capturedWith: "{}" },
     });
     await testDb.complianceSnapshot.create({
-      data: { date: recentDate, compliant: 3, expiring: 0, overdue: 0, missing: 0, rateNumerator: 3, rateDenominator: 3, capturedWith: "{}" },
+      data: { date: recentDate, compliant: 3, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 3, rateDenominator: 3, capturedWith: "{}" },
     });
 
     const deleted = await deleteSnapshotsOlderThan(365, now);
@@ -864,7 +862,7 @@ describe("Snapshot retention sweep (chunk 4.3)", () => {
     const oldDate = formatUtcDate(new Date(now.getTime() - 400 * MS_PER_DAY));
 
     await testDb.complianceSnapshot.create({
-      data: { date: oldDate, compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+      data: { date: oldDate, compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
     });
 
     const first = await deleteSnapshotsOlderThan(365, now);
@@ -889,7 +887,7 @@ describe("Snapshot retention sweep (chunk 4.3)", () => {
     const boundaryDate = formatUtcDate(new Date(now.getTime() - 365 * MS_PER_DAY));
 
     await testDb.complianceSnapshot.create({
-      data: { date: boundaryDate, compliant: 5, expiring: 0, overdue: 0, missing: 0, rateNumerator: 5, rateDenominator: 5, capturedWith: "{}" },
+      data: { date: boundaryDate, compliant: 5, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 5, rateDenominator: 5, capturedWith: "{}" },
     });
 
     const deleted = await deleteSnapshotsOlderThan(365, now);
@@ -906,13 +904,13 @@ describe("Snapshot retention sweep (chunk 4.3)", () => {
 
     // Insert 2 old rows + 1 recent row.
     await testDb.complianceSnapshot.create({
-      data: { date: formatUtcDate(new Date(now.getTime() - 400 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+      data: { date: formatUtcDate(new Date(now.getTime() - 400 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
     });
     await testDb.complianceSnapshot.create({
-      data: { date: formatUtcDate(new Date(now.getTime() - 380 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+      data: { date: formatUtcDate(new Date(now.getTime() - 380 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
     });
     await testDb.complianceSnapshot.create({
-      data: { date: formatUtcDate(new Date(now.getTime() - 10 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
+      data: { date: formatUtcDate(new Date(now.getTime() - 10 * MS_PER_DAY)), compliant: 1, expiring: 0, overdue: 0, awaitingReview: 0, missing: 0, rateNumerator: 1, rateDenominator: 1, capturedWith: "{}" },
     });
 
     const result = await runSnapshotRetentionSweep(now);

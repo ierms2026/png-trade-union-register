@@ -47,6 +47,7 @@ export interface ReportResult {
     compliant: number;
     expiring: number;
     overdue: number;
+    awaitingReview: number;
     missing: number;
     notApplicable: number;
     overallRate: number;
@@ -69,19 +70,23 @@ export async function buildComplianceReportHtml(options: ReportOptions = {}): Pr
   const matrix = buildComplianceMatrix(data, now);
 
   // --- Tally the status counts --------------------------------------------
-  let compliant = 0, expiring = 0, overdue = 0, missing = 0, notApplicable = 0;
+  let compliant = 0, expiring = 0, overdue = 0, awaitingReview = 0, missing = 0, notApplicable = 0;
   for (const row of matrix.unions) {
     for (const cell of row.scores) {
       switch (cell.status) {
         case "COMPLIANT": compliant++; break;
         case "EXPIRING": expiring++; break;
         case "OVERDUE": overdue++; break;
+        case "AWAITING_REVIEW": awaitingReview++; break;
         case "MISSING": missing++; break;
         case "NOT_APPLICABLE": notApplicable++; break;
       }
     }
   }
-  const totalCells = compliant + expiring + overdue + missing;
+  // Rate per the canonical rule (same as metrics.ts computeRateFromCounts):
+  // numerator = COMPLIANT; denominator = COMPLIANT + EXPIRING + OVERDUE +
+  // AWAITING_REVIEW + MISSING (NOT_APPLICABLE excluded).
+  const totalCells = compliant + expiring + overdue + awaitingReview + missing;
   const overallRate = totalCells === 0 ? 0 : Math.round((compliant / totalCells) * 100);
 
   // --- Build the needs-attention list (overdue + expiring) ----------------
@@ -425,6 +430,7 @@ ${Object.entries(STATUS_CONFIG).map(([status, config]) => {
       compliant,
       expiring,
       overdue,
+      awaitingReview,
       missing,
       notApplicable,
       overallRate,

@@ -32,7 +32,7 @@ import {
 //     union: { id, unionName, registrationNo, status },
 //     generatedAt: ISO timestamp,
 //     overallScore: number | null,
-//     summary: { compliant, expiring, overdue, missing, notApplicable },
+//     summary: { compliant, expiring, overdue, awaitingReview, missing, notApplicable },
 //     requirements: [{
 //       documentType, status, documentId, expiresAt, daysUntilExpiry
 //     }]
@@ -133,6 +133,7 @@ export async function GET(req: NextRequest) {
     compliant: requirements.filter((r) => r.status === "COMPLIANT").length,
     expiring: requirements.filter((r) => r.status === "EXPIRING").length,
     overdue: requirements.filter((r) => r.status === "OVERDUE").length,
+    awaitingReview: requirements.filter((r) => r.status === "AWAITING_REVIEW").length,
     missing: requirements.filter((r) => r.status === "MISSING").length,
     notApplicable: requirements.filter((r) => r.status === "NOT_APPLICABLE").length,
   };
