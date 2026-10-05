@@ -7,6 +7,7 @@ import {
   Clock,
   type LucideIcon,
 } from "lucide-react";
+import { COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // Status Config — the single source of truth for compliance status labels,
@@ -158,7 +159,7 @@ export interface StatusConfig {
  */
 export const STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
   COMPLIANT: {
-    label: "Compliant",
+    label: COMPLIANCE_STATUS_CONFIG.COMPLIANT.label,
     colorToken: "var(--status-compliant)",
     icon: CheckCircle2,
     // Template: interpolates EXPIRING_WINDOW_DAYS so a constant change
@@ -167,33 +168,33 @@ export const STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
     definition: `Document filed, approved by Registrar, with renewal date more than ${EXPIRING_WINDOW_DAYS} days away.`,
   },
   EXPIRING: {
-    label: "Expiring",
+    label: COMPLIANCE_STATUS_CONFIG.EXPIRING.label,
     colorToken: "var(--status-expiring)",
     icon: AlertTriangle,
     definition: `Document filed and approved, but renewal date is within ${EXPIRING_WINDOW_DAYS} days.`,
   },
   OVERDUE: {
-    label: "Overdue",
+    label: COMPLIANCE_STATUS_CONFIG.OVERDUE.label,
     colorToken: "var(--status-overdue)",
     icon: XCircle,
     definition: "Document filed and approved, but renewal date has passed.",
   },
   AWAITING_REVIEW: {
-    label: "Awaiting Review",
+    label: COMPLIANCE_STATUS_CONFIG.AWAITING_REVIEW.label,
     colorToken: "var(--status-review)",
     icon: Clock,
     definition:
       "Document has been uploaded by the union but the Registrar has not yet approved it (or has rejected it). The union has done their part — this is not a gap in compliance, it's an item on the Registrar's desk.",
   },
   MISSING: {
-    label: "Missing",
+    label: COMPLIANCE_STATUS_CONFIG.MISSING.label,
     colorToken: "var(--status-missing)",
     icon: FileQuestion,
     definition:
       "No document has been filed for this type, or a previously-filed document was disposed under retention rules. The union needs to file a new document.",
   },
   NOT_APPLICABLE: {
-    label: "N/A",
+    label: COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.label,
     colorToken: "var(--status-muted)",
     icon: Ban,
     definition: "Document type is not required for this union (rule.required = false).",
