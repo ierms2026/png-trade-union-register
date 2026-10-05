@@ -688,3 +688,26 @@ Stage Summary:
 - To enable: set NEXT_PUBLIC_RETENTION_ENABLED=true in .env. Everything reappears — the nav entry, the view, the API routes, the palette entry.
 - The flag is NEXT_PUBLIC_ so it works in both server + client code. It's not sensitive (just "is this feature on"), so exposing it to the client is fine.
 - The 8 API routes are guarded individually (defense in depth) — even if someone discovers the URL pattern, they get 404, not a destructive action.
+
+---
+Task ID: T06d
+Agent: main
+Task: Package T06d report as a downloadable Markdown file (scoping report for residual AWAITING_REVIEW items from T06c)
+
+Work Log:
+- Read prior context: /home/z/my-project/docs/decisions-and-defaults.md, worklog.md (no T06d entry existed; working tree clean; no T06d code changes present in any prior commit).
+- Read existing T06a/T06b/T06c reports in /home/z/my-project/download/ to match the established report format (title, files-changed table, verification table, defaults relied on, deviations, out-of-scope findings, sweep table, impact summary).
+- Audited the four residual items flagged by T06c:
+  * Item 1: src/lib/compliance/matrix.ts L162-164 — `expiresAt` excludes MISSING + NOT_APPLICABLE but NOT AWAITING_REVIEW. The comment at L158-161 (updated in T06c) says it does, but the code doesn't. Confirmed via `grep -n AWAITING_REVIEW src/lib/compliance/matrix.ts` (1 hit, comment only).
+  * Item 2: src/app/api/cron/compliance-sweep/route.ts L102-119 — sweep iterates cells with `expiresAt`; because Item 1 returns a non-null expiresAt for AWAITING_REVIEW cells, the sweep can fire EXPIRING/OVERDUE notifications for documents that haven't been approved yet. Confirmed via `grep -n AWAITING_REVIEW src/app/api/cron/compliance-sweep/route.ts` (0 hits — zero AWAITING_REVIEW awareness in the sweep).
+  * Item 3: src/components/app/views/dashboard.tsx L41 — stale comment "6 stat cards (unions, documents, compliant, expiring, overdue, missing)" — doesn't include "awaiting review". Confirmed by reading L35-49.
+  * Item 4: src/app/api/public/stats/route.ts L37-43 — switch has no `case "AWAITING_REVIEW"`; cells silently dropped from `applicable`. Confirmed via `grep -n AWAITING_REVIEW src/app/api/public/stats/route.ts` (0 hits). Held by D2 per decisions-and-defaults.md L51-57.
+- Captured current verification state: `npx tsc --noEmit 2>&1 | grep '^src/' | wc -l` → 9 errors (baseline match, same 9 as T06c — all pre-existing, unrelated to AWAITING_REVIEW).
+- Wrote the T06d report to /home/z/my-project/download/t06d-report.md. Format matches T06a/T06b/T06c. Status: needs-human (scoping report — no code changes). Classifies each of the 4 items as fix-now vs needs-human, proposes concrete one-line fixes for Items 1-3, and frames Item 4 as the three options the Registrar chooses from at the 2026-10-19 checkpoint (align / remove / hold).
+- Surfaced two new out-of-scope findings during scoping: (a) compliance-sweep L300-302 webhook path's EXPIRING/OVERDUE filter becomes redundant after Item 2 is fixed; (b) metrics.ts L495 getExpiryForecast's explicit AWAITING_REVIEW exclusion becomes redundant after Item 1 — both left as defensive, not in scope.
+
+Stage Summary:
+- T06d report packaged as /home/z/my-project/download/t06d-report.md (markdown, ~7.4KB).
+- Zero code changes, zero test changes, zero build impact. The 9 baseline tsc errors are unchanged from T06c.
+- The report scopes the next code-bearing task: Items 1-3 are safe to ship together in a single PR (two one-line code/comment fixes + one new regression test). Item 4 is held by D2 for the Registrar's decision at the 2026-10-19 checkpoint; default if no answer is "align with D1" per the guardrails clause.
+- The Item 1 → Item 2 dependency is documented: fixing matrix.ts's expiresAt exclusion makes the cron sweep's `!cell.expiresAt` guard automatically skip AWAITING_REVIEW cells, so no separate code change is needed in the sweep — only a regression test to lock the behavior in.
