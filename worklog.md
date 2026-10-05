@@ -782,3 +782,18 @@ Work Log:
 
 Stage Summary:
 - Branch structure corrected: main is back at the pre-task base; each task branch points at its own commit; T41 branches from T40; T11 branches from T41. No commits lost, no rebase, no force-push (branches were local-only).
+
+---
+Task ID: package-t40-t41-t11-report
+Agent: main
+Task: Package T40, T41, T11 report as a downloadable Markdown file
+
+Work Log:
+- Confirmed branch state: fix/t40-unions-export-docs-column @ 8d8d83b, fix/t41-clear-src-type-errors @ 02a255d, fix/t11-retention-404-no-env-name @ 8b4a4e3. main @ 9f54d4f (pre-T40 base). Verified file diffs per branch.
+- Wrote /home/z/my-project/download/t40-t41-t11-report.md (16.9KB, 318 lines). Combined report covering all three tasks in the T06d-report format: branch structure table, verification summary, per-task sections (files changed, the bug/fix, tests, verification table, defaults relied on, deviations, out-of-scope findings), and a combined-impact summary table.
+- Followed the same format as the existing download/t06{a,b,c}-report.md and download/t06d-report.md files for consistency.
+
+Stage Summary:
+- Combined report packaged as /home/z/my-project/download/t40-t41-t11-report.md (markdown, ~16.9KB, 318 lines).
+- Covers all three tasks: T40 (export Documents column bug fix), T41 (clear 8 remaining src tsc errors with no behavior change), T11 (retention 404 body no longer leaks env var name per D5).
+- Includes the branch structure table, per-task file lists, the bug analysis (T40 array-shape _count, T41 Item 2 guard analysis confirming no runtime bug, T11 env var name leak), test descriptions, and verification results.
