@@ -32,6 +32,9 @@ async function main() {
     console.error("✗ rep's assigned union not found.");
     process.exit(1);
   }
+  // Capture the narrowed union id for use in nested function (restore) where
+  // TypeScript can't narrow across function boundaries.
+  const unionId = union.id;
   const registrar = await db.user.findFirst({ where: { role: Role.REGISTRAR } });
   if (!registrar) {
     console.error("✗ No REGISTRAR user found.");
@@ -190,10 +193,10 @@ async function main() {
   async function restore() {
     console.log("\n(restoring union contact info + deleting test requests)");
     await db.union.update({
-      where: { id: union.id },
+      where: { id: unionId },
       data: original,
     });
-    await db.contactUpdateRequest.deleteMany({ where: { unionId: union.id } });
+    await db.contactUpdateRequest.deleteMany({ where: { unionId } });
   }
 }
 

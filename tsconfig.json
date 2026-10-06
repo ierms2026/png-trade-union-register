@@ -41,6 +41,7 @@
     "upload",
     "download",
     "skills",
-    "examples"
+    "examples",
+    "scripts/test-pdf-parse.ts"
   ]
 }

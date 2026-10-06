@@ -12,9 +12,10 @@ async function main() {
   console.log(`Total notifications with linkUrl: ${all.length}\n`);
 
   // Categorize by format
-  const canonical = []; // /?view=X or /portal?view=X
-  const plainPath = []; // /reviews, /unions, etc. (no ?view=)
-  const other = []; // anything else
+  type NotifRow = { id: string; linkUrl: string | null; title: string; createdAt: Date };
+  const canonical: NotifRow[] = []; // /?view=X or /portal?view=X
+  const plainPath: NotifRow[] = []; // /reviews, /unions, etc. (no ?view=)
+  const other: NotifRow[] = []; // anything else
 
   for (const n of all) {
     const url = n.linkUrl!;
