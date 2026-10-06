@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/prisma";
-import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
+import { computePublicStats } from "@/lib/compliance/public-stats";
 
 // =============================================================================
 // GET /api/public/stats
@@ -18,37 +17,13 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 //
 // RATE LIMITING:
 //   Same per-IP limit as the other public routes (60 req/min).
+//
+// T72: the compliance rate now follows the D1 rule (AWAITING_REVIEW in the
+// denominator) via tallyStatuses() + computeRateFromCounts(). The response
+// shape is unchanged — same 4 fields, same names and types.
 // =============================================================================
 
 export async function GET() {
-  const [totalUnions, activeUnions, totalDocuments] = await Promise.all([
-    db.union.count(),
-    db.union.count({ where: { status: "ACTIVE" } }),
-    db.document.count({ where: { disposedAt: null } }),
-  ]);
-
-  const data = await fetchMatrixData();
-  const matrix = buildComplianceMatrix(data);
-
-  let compliant = 0;
-  let applicable = 0;
-  for (const row of matrix.unions) {
-    for (const cell of row.scores) {
-      switch (cell.status) {
-        case "COMPLIANT": compliant++; applicable++; break;
-        case "EXPIRING":
-        case "OVERDUE":
-        case "MISSING": applicable++; break;
-      }
-    }
-  }
-
-  const overallComplianceRate = applicable === 0 ? 0 : Math.round((compliant / applicable) * 100);
-
-  return NextResponse.json({
-    totalUnions,
-    activeUnions,
-    totalDocuments,
-    overallComplianceRate,
-  });
+  const stats = await computePublicStats();
+  return NextResponse.json(stats);
 }
