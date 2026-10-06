@@ -38,7 +38,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tool
 // Dashboard view — the landing page for authenticated users.
 //
 // Shows:
-//   - 7 stat cards (unions, documents, compliant, expiring, overdue, awaiting review, missing)
+//   - 6 stat cards (unions, documents, compliant, expiring, overdue, missing)
 //   - Compliance summary (overall rate + breakdown)
 //   - Recent activity feed (latest 20 audit log entries)
 //

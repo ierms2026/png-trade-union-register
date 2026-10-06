@@ -1,8 +1,8 @@
 {
-  "backedUpAt": "2026-10-05T11:58:15.740Z",
+  "backedUpAt": "2026-10-05T10:26:00.935Z",
   "prismaVersion": "6.19.2",
   "nodeVersion": "v24.21.0",
-  "fileCount": 312,
+  "fileCount": 306,
   "files": [
     {
       "path": "src/app/api/api-keys/[id]/route.ts",
@@ -162,9 +162,9 @@
     },
     {
       "path": "src/app/api/cron/compliance-sweep/route.ts",
-      "checksum": "8ad22ac4706c1682ee5fe72bed412bd89cebd24ab0641ff944adeb0480a01639",
-      "size": 14862,
-      "mtime": "2026-10-05T11:46:16.779Z"
+      "checksum": "b1f8fb751da3ca03ba781662741f3ef1516222b385d9f87063995009a28ed89e",
+      "size": 15798,
+      "mtime": "2026-10-04T21:50:50.893Z"
     },
     {
       "path": "src/app/api/cron/snapshot-retention-sweep/route.ts",
@@ -276,9 +276,9 @@
     },
     {
       "path": "src/app/api/export/unions/route.ts",
-      "checksum": "f9a7d87b0ac8d3150f904720cfd0f00379add3131ab2134f9634ee8d2137bca2",
-      "size": 1548,
-      "mtime": "2026-10-05T11:49:33.062Z"
+      "checksum": "4028830d259dfec3f6db572b7b31dc738d9a1fab1e65099868bd86184799a187",
+      "size": 2662,
+      "mtime": "2026-10-05T09:55:02.205Z"
     },
     {
       "path": "src/app/api/legal-holds/[documentId]/lift/route.ts",
@@ -611,12 +611,6 @@
       "mtime": "2026-10-05T00:08:01.944Z"
     },
     {
-      "path": "src/components/app/compliance-status-badge.tsx",
-      "checksum": "05b804bffb5c406ffd763e59b2d95a68b8e3dd836443dc13fcefe7a071a707b3",
-      "size": 2268,
-      "mtime": "2026-10-05T11:52:25.608Z"
-    },
-    {
       "path": "src/components/app/document-list.tsx",
       "checksum": "679680cc0330fc7bb8a072ecebc65be160124165d275ed0dbc6e0f4cf5c6f3cc",
       "size": 4295,
@@ -786,9 +780,9 @@
     },
     {
       "path": "src/components/app/views/dashboard.tsx",
-      "checksum": "5cc732bb4fae2a8fc082af0a4d80c5462f04d98b8bce38364ee6b68372b34fce",
-      "size": 87471,
-      "mtime": "2026-10-05T11:46:16.779Z"
+      "checksum": "072eeaaaf5bc8582ad56b40cd96f43241b862c795510e9fd54fbbfd92b4dd7cb",
+      "size": 87454,
+      "mtime": "2026-10-05T08:09:06.980Z"
     },
     {
       "path": "src/components/app/views/document-detail.tsx",
@@ -870,9 +864,9 @@
     },
     {
       "path": "src/components/portal/views/compliance.tsx",
-      "checksum": "31f630102cf67b5a1b9e3665f51fd8ba630bd71db4a7c60e2d3f39c4e06c64bd",
-      "size": 6420,
-      "mtime": "2026-10-05T11:52:25.609Z"
+      "checksum": "7df5f2d298f408dded462a8e2b6ca9ea55b2210c8600afcbdefe7538c1f7be04",
+      "size": 6389,
+      "mtime": "2026-10-05T10:08:37.197Z"
     },
     {
       "path": "src/components/portal/views/contact.tsx",
@@ -1314,9 +1308,9 @@
     },
     {
       "path": "src/lib/__tests__/export-unions-documents-count.test.ts",
-      "checksum": "40abfe54b6e6331fb497351913880fdb2a7b08724ee742416183010e51cb9eb3",
-      "size": 2719,
-      "mtime": "2026-10-05T11:49:33.062Z"
+      "checksum": "a2c656e7ae79f852cc1700a67cb9c9a73198779e3e67d4f65db2de0cac0f64ac",
+      "size": 4590,
+      "mtime": "2026-10-05T09:55:02.206Z"
     },
     {
       "path": "src/lib/__tests__/forgot-password.test.ts",
@@ -1403,24 +1397,6 @@
       "mtime": "2026-10-05T10:08:37.199Z"
     },
     {
-      "path": "src/lib/__tests__/t50-awaiting-review-expiresAt.test.ts",
-      "checksum": "2c817af47d6dc79878d427172222a0a0285eb0e2597132835c08d079a5171e93",
-      "size": 4061,
-      "mtime": "2026-10-05T11:46:16.779Z"
-    },
-    {
-      "path": "src/lib/__tests__/t50-sweep-awaiting-review.test.ts",
-      "checksum": "9f0fa7b3be3bbd79e7232e9fda468673211ce4f4f6dafe4eb1ef47f10523176a",
-      "size": 3977,
-      "mtime": "2026-10-05T11:46:16.779Z"
-    },
-    {
-      "path": "src/lib/__tests__/t52-compliance-status-badge.test.ts",
-      "checksum": "bb995a8c889a5b5aa4226a7bcb0e36c12175dad2d4a0dbef2320bafb239eafc5",
-      "size": 2342,
-      "mtime": "2026-10-05T11:52:25.609Z"
-    },
-    {
       "path": "src/lib/__tests__/text-extraction.test.ts",
       "checksum": "f597d099a57511fb05200a66b523860a50dab5b7d8c42641b1d68251c5ddb33c",
       "size": 7781,
@@ -1488,27 +1464,15 @@
     },
     {
       "path": "src/lib/compliance/matrix.ts",
-      "checksum": "c48ea8a10c4eff188d49d050410a460471c6e6c86497afcce374b31a7cfd345d",
-      "size": 7045,
-      "mtime": "2026-10-05T11:46:16.780Z"
+      "checksum": "74c4d3fd87b1f05492ee5301c3184f257152b4f060176895fb0fdf2b7dd903cb",
+      "size": 6577,
+      "mtime": "2026-10-05T08:09:06.982Z"
     },
     {
       "path": "src/lib/compliance/report-html.ts",
       "checksum": "76af5b5c94417cbbbcc0579f578ee85aa6a73d8b6da00e62f88cb432adc215f2",
       "size": 16640,
       "mtime": "2026-10-05T08:09:06.983Z"
-    },
-    {
-      "path": "src/lib/compliance/sweep-issues.ts",
-      "checksum": "5743fc9c3d86f55aeb9a9d0b6de292b8a3856da7db3d78f44a7c4c1033b292fc",
-      "size": 3310,
-      "mtime": "2026-10-05T11:46:16.780Z"
-    },
-    {
-      "path": "src/lib/compliance/unions-export.ts",
-      "checksum": "c2dc50de55fa5ed9aad6dca7a0e73c0735c845398b87702d01dc384f0d015c76",
-      "size": 2606,
-      "mtime": "2026-10-05T11:49:33.063Z"
     },
     {
       "path": "src/lib/csv.ts",
