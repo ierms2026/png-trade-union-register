@@ -44,7 +44,7 @@ export async function GET(
   }
 
   // --- 2. Officer/Representative scoping — can only access their own union's docs ---
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only download documents from your own union." },

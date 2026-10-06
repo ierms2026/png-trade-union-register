@@ -42,6 +42,8 @@
     "download",
     "skills",
     "examples",
-    "scripts/test-pdf-parse.ts"
+    "scripts/test-pdf-parse.ts",
+    "scripts/seed-demo-rep.ts",
+    "scripts/test-portal-contact-flow.ts"
   ]
 }

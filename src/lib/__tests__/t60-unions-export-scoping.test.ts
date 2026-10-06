@@ -74,9 +74,4 @@ describe("T75b: unions export access scoping", () => {
     const scope = getUnionScope({ role: "OFFICER", assignedUnionId: "   " });
     expect(scope).toEqual({ kind: "none" });
   });
-
-  it("Representative WITHOUT assignedUnionId → scope is 'none' (route returns 403)", () => {
-    const scope = getUnionScope({ role: "REPRESENTATIVE", assignedUnionId: null });
-    expect(scope).toEqual({ kind: "none" });
-  });
 });

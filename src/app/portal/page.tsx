@@ -36,7 +36,7 @@ import { PublicPortal } from "@/components/app/public-portal";
 interface PortalUser {
   id: string;
   email: string;
-  role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE";
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
   assignedUnionId: string | null;
   twoFactorEnabled: boolean;
 }
@@ -91,29 +91,11 @@ export default function PortalPage() {
           setMode("public");
           return;
         }
-        // Bounce non-REPRESENTATIVE users to the staff app.
-        if (data.user.role !== "REPRESENTATIVE") {
-          window.location.href = "/";
-          return;
-        }
-        // Bounce REPRESENTATIVE users without an assigned union — they
-        // can't use the portal without one. (Shouldn't happen if the
-        // Registrar set them up correctly, but defensive.)
-        if (!data.user.assignedUnionId) {
-          window.location.href = "/?error=no_assigned_union";
-          return;
-        }
-        setUser(data.user);
-        // Load the union info.
-        try {
-          const unionRes = await fetch("/api/portal/me", { credentials: "include" });
-          const unionData: { union: UnionInfo | null } = await unionRes.json();
-          if (!cancelled) setUnion(unionData.union);
-        } catch {
-          // Non-fatal — the shell shows without the union badge.
-        }
-        setMode("auth");
-        window.history.replaceState({}, "", "/portal");
+        // The Representative role has been removed (D7). All authenticated
+        // users are bounced to the staff app — the portal is no longer
+        // accessible to any role.
+        window.location.href = "/";
+        return;
       } catch {
         if (!cancelled) setMode("public");
       }

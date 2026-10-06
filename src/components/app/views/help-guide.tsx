@@ -157,14 +157,6 @@ const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
       "Tasks", "Calendar", "Search",
     ],
   },
-  // Representative doesn't use this view (they're on the portal), but the
-  // type requires the key to exist. This is never rendered.
-  REPRESENTATIVE: {
-    roleName: "Union Representative",
-    summary: "You use the union self-service portal at /portal.",
-    tasks: [],
-    accessibleAreas: [],
-  },
 };
 
 interface HelpGuideViewProps {

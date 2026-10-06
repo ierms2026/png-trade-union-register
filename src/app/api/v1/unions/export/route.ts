@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   const hasPiiScope = hasScope(user, "unions:read:pii");
 
   // Build the where clause with Officer/Representative scoping
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   const where = isUnionScopedRole && user.assignedUnionId
     ? { id: user.assignedUnionId }
     : {};

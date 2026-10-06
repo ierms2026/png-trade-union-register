@@ -1366,7 +1366,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export function DashboardView({ user, onNavigate, onFilterCompliance }: {
-  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE" };
+  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" };
   onNavigate?: (view: string) => void;
   onFilterCompliance?: (status: string) => void;
 }) {

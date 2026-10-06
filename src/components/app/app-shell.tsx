@@ -37,7 +37,7 @@ import { isRetentionEnabled } from "@/lib/retention-flag";
 
 interface AuthUser {
   id: string; email: string;
-  role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE";
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
   assignedUnionId: string | null; twoFactorEnabled: boolean;
 }
 interface Notification { id: string; type: string; title: string; body: string; linkUrl: string | null; createdAt: string; }

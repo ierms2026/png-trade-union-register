@@ -44,7 +44,7 @@ export async function POST(
     );
   }
   // Chunk 5: REPRESENTATIVE scoping (same as OFFICER)
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only extract text from your own union's documents." },

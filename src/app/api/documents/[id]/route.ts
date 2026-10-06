@@ -94,7 +94,7 @@ export async function GET(
   }
 
   // Role scoping: Officers/Reps can only see their own union's documents
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== doc.union.id) {
     return NextResponse.json(
       { error: "You can only view documents for your own union." },

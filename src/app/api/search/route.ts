@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
   //   REGISTRAR + INSPECTOR → all unions (the ?union= filter is honored)
   //   OFFICER + REPRESENTATIVE → their assigned union only (the ?union=
   //   filter is IGNORED — they can only search their own union)
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId) {
     documentWhere.unionId = user.assignedUnionId;
   } else if (unionFilter) {

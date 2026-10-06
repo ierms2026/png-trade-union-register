@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Officer/Representative scoping — can only query their own union
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only query compliance status for your own union." },

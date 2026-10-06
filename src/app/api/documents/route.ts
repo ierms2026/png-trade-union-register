@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Build the where clause with role scoping
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   const where: Record<string, unknown> = {};
 
   // Role scoping: Officers/Reps can only see their own union's documents

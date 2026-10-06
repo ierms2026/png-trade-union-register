@@ -60,9 +60,4 @@ describe("T75b: document-types where-builder + scope", () => {
     const scope = getDocumentTypesScope({ role: "OFFICER", assignedUnionId: "   " });
     expect(scope).toEqual({ kind: "none" });
   });
-
-  it("Representative WITHOUT assignedUnionId → scope is 'none' (route returns 403)", () => {
-    const scope = getDocumentTypesScope({ role: "REPRESENTATIVE", assignedUnionId: null });
-    expect(scope).toEqual({ kind: "none" });
-  });
 });

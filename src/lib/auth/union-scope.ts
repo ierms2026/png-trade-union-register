@@ -40,9 +40,9 @@ export function getUnionScope(user: {
     return { kind: "all" };
   }
 
-  // Officer and Representative are scoped to their assigned union. A null,
-  // empty, or whitespace-only id is an invalid state — fail closed (none).
-  if (user.role === "OFFICER" || user.role === "REPRESENTATIVE") {
+  // Officer is scoped to their assigned union. A null, empty, or
+  // whitespace-only id is an invalid state — fail closed (none).
+  if (user.role === "OFFICER") {
     const unionId = user.assignedUnionId?.trim();
     if (unionId && unionId.length > 0) {
       return { kind: "union", unionId };

@@ -105,7 +105,7 @@ export async function POST(
   }
   // Both OFFICER and REPRESENTATIVE are scoped to their assigned union.
   // REGISTRAR can upload to any union.
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only upload documents to your own union." },

@@ -277,13 +277,12 @@ export const UNION_STATUS_CONFIG: Record<
 // Role labels — translates stored Role enum values to human-readable labels
 // =============================================================================
 
-export type UserRole = "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE";
+export type UserRole = "REGISTRAR" | "INSPECTOR" | "OFFICER";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   REGISTRAR: "Registrar",
   INSPECTOR: "Inspector",
   OFFICER: "Officer",
-  REPRESENTATIVE: "Union Representative",
 };
 
 export function getRoleLabel(role: string): string {

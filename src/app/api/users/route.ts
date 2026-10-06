@@ -134,18 +134,18 @@ export async function POST(req: NextRequest) {
   // role — required, must be one of the enum values
   if (
     typeof body.role !== "string" ||
-    !["REGISTRAR", "INSPECTOR", "OFFICER", "REPRESENTATIVE"].includes(body.role)
+    !["REGISTRAR", "INSPECTOR", "OFFICER"].includes(body.role)
   ) {
     return NextResponse.json(
-      { error: "Field 'role' is required and must be one of: REGISTRAR, INSPECTOR, OFFICER, REPRESENTATIVE." },
+      { error: "Field 'role' is required and must be one of: REGISTRAR, INSPECTOR, OFFICER." },
       { status: 400 },
     );
   }
 
-  // assignedUnionId — required for OFFICER + REPRESENTATIVE, must be null
-  // for others. Per spec, Officers and Representatives are scoped to
-  // exactly one union; Registrars and Inspectors have no scoping.
-  if (body.role === "OFFICER" || body.role === "REPRESENTATIVE") {
+  // assignedUnionId — required for OFFICER, must be null for others.
+  // Per spec, Officers are scoped to exactly one union; Registrars and
+  // Inspectors have no scoping.
+  if (body.role === "OFFICER") {
     if (
       typeof body.assignedUnionId !== "string" ||
       body.assignedUnionId.trim().length === 0
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
   const email = body.email.trim().toLowerCase();
   const role = body.role as Role;
   const assignedUnionId =
-    role === Role.OFFICER || role === Role.REPRESENTATIVE
+    role === Role.OFFICER
       ? (body.assignedUnionId as string)
       : null;
 

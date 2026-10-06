@@ -76,7 +76,7 @@ export async function POST(
     );
   }
   // Officer/Representative scoping
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only submit documents for your own union." },

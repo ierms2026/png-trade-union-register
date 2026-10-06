@@ -34,7 +34,7 @@ import { parseStatusParam, parseViewParam, PARAM_VIEW, PARAM_STATUS } from "@/li
 interface AuthUser {
   id: string;
   email: string;
-  role: "REGISTRAR" | "INSPECTOR" | "OFFICER" | "REPRESENTATIVE";
+  role: "REGISTRAR" | "INSPECTOR" | "OFFICER";
   assignedUnionId: string | null;
   twoFactorEnabled: boolean;
 }
@@ -125,10 +125,6 @@ export default function Home() {
         const data: { user: AuthUser | null } = await res.json();
         if (cancelled) return;
         if (data.user) {
-          if (data.user.role === "REPRESENTATIVE") {
-            window.location.href = "/portal";
-            return;
-          }
           setUser(data.user);
           setMode("auth");
           // Read ALL deep-link params from the URL on mount — same function

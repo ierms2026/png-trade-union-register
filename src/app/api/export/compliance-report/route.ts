@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
   let unionId = url.searchParams.get("unionId");
 
   // Officer/Representative scoping — force their union
-  const isUnionScopedRole = user.role === Role.OFFICER || user.role === Role.REPRESENTATIVE;
+  const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId) {
     unionId = user.assignedUnionId;
   }

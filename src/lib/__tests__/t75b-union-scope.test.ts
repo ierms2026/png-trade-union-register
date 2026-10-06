@@ -26,13 +26,6 @@ describe("T75b: getUnionScope", () => {
     });
   });
 
-  it("Representative with a non-empty assignedUnionId → that union", () => {
-    expect(getUnionScope({ role: "REPRESENTATIVE", assignedUnionId: "union-456" })).toEqual({
-      kind: "union",
-      unionId: "union-456",
-    });
-  });
-
   it("Officer with null assignedUnionId → none (fail closed)", () => {
     expect(getUnionScope({ role: "OFFICER", assignedUnionId: null })).toEqual({ kind: "none" });
   });
@@ -43,18 +36,6 @@ describe("T75b: getUnionScope", () => {
 
   it("Officer with whitespace assignedUnionId → none (fail closed)", () => {
     expect(getUnionScope({ role: "OFFICER", assignedUnionId: "   " })).toEqual({ kind: "none" });
-  });
-
-  it("Representative with null assignedUnionId → none (fail closed)", () => {
-    expect(getUnionScope({ role: "REPRESENTATIVE", assignedUnionId: null })).toEqual({ kind: "none" });
-  });
-
-  it("Representative with empty assignedUnionId → none (fail closed)", () => {
-    expect(getUnionScope({ role: "REPRESENTATIVE", assignedUnionId: "" })).toEqual({ kind: "none" });
-  });
-
-  it("Representative with whitespace assignedUnionId → none (fail closed)", () => {
-    expect(getUnionScope({ role: "REPRESENTATIVE", assignedUnionId: "  " })).toEqual({ kind: "none" });
   });
 
   it("Unknown role → none (fail closed)", () => {
