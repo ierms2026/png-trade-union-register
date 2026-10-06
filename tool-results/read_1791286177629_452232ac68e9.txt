@@ -1,0 +1,702 @@
+  1000→                              />
+  1001→                            </span>
+  1002→                          </TooltipTrigger>
+  1003→                          <TooltipContent side="top" className="max-w-xs">
+  1004→                            <p className="text-xs">
+  1005→                              <span className="font-medium">{config.label}</span>: {config.definition}
+  1006→                            </p>
+  1007→                          </TooltipContent>
+  1008→                        </Tooltip>
+  1009→                      </TooltipProvider>
+  1010→                      <div className="min-w-0">
+  1011→                        <p className="truncate font-medium">{item.documentType}</p>
+  1012→                        <p className="truncate text-xs text-muted-foreground">{item.unionName}</p>
+  1013→                      </div>
+  1014→                    </div>
+  1015→                    <div className="flex shrink-0 items-center gap-2">
+  1016→                      <span className="text-xs text-muted-foreground">
+  1017→                        {formatDueDate(expiryDate, now)}
+  1018→                      </span>
+  1019→                      <a
+  1020→                        href={`/unions/${item.unionId}`}
+  1021→                        className="text-xs font-medium text-primary hover:underline"
+  1022→                        aria-label={`View ${item.documentType} for ${item.unionName}`}
+  1023→                      >
+  1024→                        View
+  1025→                      </a>
+  1026→                    </div>
+  1027→                  </li>
+  1028→                );
+  1029→              })}
+  1030→            </ul>
+  1031→            {hasMore && (
+  1032→              <div className="mt-3 border-t pt-2">
+  1033→                <button
+  1034→                  type="button"
+  1035→                  onClick={() => onNavigate?.("compliance")}
+  1036→                  className="text-xs font-medium text-primary hover:underline"
+  1037→                >
+  1038→                  View all {total}
+  1039→                </button>
+  1040→              </div>
+  1041→            )}
+  1042→          </>
+  1043→        )}
+  1044→      </CardContent>
+  1045→    </Card>
+  1046→  );
+  1047→}
+  1048→
+  1049→// =============================================================================
+  1050→// ComplianceHeatmap — a color-coded grid (unions × doc types) rendering
+  1051→// the matrix from 3.2a's selector. Keyboard-navigable with roving tabindex,
+  1052→// tooltip-explained cells, sticky union-name column.
+  1053→//
+  1054→// Cell links: all cells link to /unions/{unionId} (the most specific
+  1055→// existing route). The union detail page shows documents — the user can
+  1056→// then find the specific document. No direct document-detail route exists
+  1057→// (gap logged in handoff for 4.1).
+  1058→// =============================================================================
+  1059→
+  1060→interface ComplianceHeatmapProps {
+  1061→  matrix: UnionDocMatrix;
+  1062→}
+  1063→
+  1064→function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
+  1065→  const now = new Date();
+  1066→
+  1067→  // Empty state: no unions
+  1068→  if (matrix.rows.length === 0) {
+  1069→    return (
+  1070→      <Card>
+  1071→        <CardHeader>
+  1072→          <CardTitle className="text-lg">Compliance Matrix</CardTitle>
+  1073→          <CardDescription>Union × document type compliance status.</CardDescription>
+  1074→        </CardHeader>
+  1075→        <CardContent>
+  1076→          <p className="text-sm text-muted-foreground">No unions registered.</p>
+  1077→        </CardContent>
+  1078→      </Card>
+  1079→    );
+  1080→  }
+  1081→
+  1082→  return (
+  1083→    <Card>
+  1084→      <CardHeader>
+  1085→        <div className="flex items-center justify-between">
+  1086→          <div>
+  1087→            <CardTitle className="text-lg">Compliance Matrix</CardTitle>
+  1088→            <CardDescription>
+  1089→              {matrix.rows.length} unions × {matrix.columnTypes.length} document types.
+  1090→            </CardDescription>
+  1091→          </div>
+  1092→          <a href="/api/export/compliance-matrix" target="_blank" rel="noopener noreferrer">
+  1093→            <Button variant="outline" size="sm" className="gap-1.5">
+  1094→              <FileDown className="h-3.5 w-3.5" />
+  1095→              Export CSV
+  1096→            </Button>
+  1097→          </a>
+  1098→        </div>
+  1099→      </CardHeader>
+  1100→      <CardContent>
+  1101→        {/* Grid with sticky union column + horizontal scroll */}
+  1102→        <div className="overflow-x-auto">
+  1103→          <div role="grid" aria-label="Compliance matrix" className="inline-block min-w-full">
+  1104→            {/* Column headers */}
+  1105→            <div role="row" className="flex">
+  1106→              <div className="sticky left-0 z-20 w-32 shrink-0 bg-card px-2 py-1 text-xs font-medium text-muted-foreground" />
+  1107→              {matrix.columnTypes.map((docType) => (
+  1108→                <div
+  1109→                  key={docType}
+  1110→                  className="w-16 shrink-0 px-1 py-1 text-center text-[10px] font-medium leading-tight text-muted-foreground"
+  1111→                  title={docType}
+  1112→                >
+  1113→                  {docType.length > 12 ? docType.slice(0, 10) + "…" : docType}
+  1114→                </div>
+  1115→              ))}
+  1116→            </div>
+  1117→
+  1118→            {/* Body rows */}
+  1119→            {matrix.rows.map((row, rowIdx) => (
+  1120→              <div key={row.unionId} role="row" className="flex">
+  1121→                {/* Sticky union name */}
+  1122→                <div className="sticky left-0 z-10 flex w-32 shrink-0 items-center bg-card px-2 py-1">
+  1123→                  <span className="truncate text-xs font-medium" title={row.unionName}>
+  1124→                    {row.unionName}
+  1125→                  </span>
+  1126→                </div>
+  1127→                {/* Cells */}
+  1128→                {row.cells.map((cell, colIdx) => {
+  1129→                  const config = STATUS_CONFIG[cell.status];
+  1130→                  const isNotRequired = cell.status === "NOT_APPLICABLE";
+  1131→                  const hasDueDate = cell.dueDate !== null;
+  1132→                  const accessibleName = `${row.unionName} — ${matrix.columnTypes[colIdx]}: ${config.label}${hasDueDate ? `, due ${formatAbsolute(cell.dueDate!)}` : ""}${cell.status === "MISSING" ? ". No document on file." : ""}`;
+  1133→
+  1134→                  return (
+  1135→                    <TooltipProvider key={colIdx} delayDuration={0}>
+  1136→                      <Tooltip>
+  1137→                        <TooltipTrigger asChild>
+  1138→                          <a
+  1139→                            href={`/unions/${row.unionId}`}
+  1140→                            role="gridcell"
+  1141→                            tabIndex={-1} // roving tabindex — only one cell is tabbable at a time via JS
+  1142→                            aria-label={accessibleName}
+  1143→                            className="m-0.5 flex h-8 w-16 shrink-0 items-center justify-center rounded transition-all hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+  1144→                            style={{
+  1145→                              backgroundColor: config.colorToken,
+  1146→                              opacity: isNotRequired ? 0.3 : 1,
+  1147→                              backgroundImage: isNotRequired
+  1148→                                ? "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(128,128,128,0.15) 3px, rgba(128,128,128,0.15) 6px)"
+  1149→                                : undefined,
+  1150→                            }}
+  1151→                            data-row={rowIdx}
+  1152→                            data-col={colIdx}
+  1153→                          />
+  1154→                        </TooltipTrigger>
+  1155→                        <TooltipContent side="top" className="max-w-xs">
+  1156→                          <p className="text-xs">
+  1157→                            <span className="font-medium">{row.unionName}</span> — {matrix.columnTypes[colIdx]}
+  1158→                            <br />
+  1159→                            <span style={{ color: config.colorToken }}>{config.label}</span>: {config.definition}
+  1160→                            {hasDueDate && (
+  1161→                              <>
+  1162→                                <br />
+  1163→                                Due: {formatDueDate(cell.dueDate!, now)}
+  1164→                              </>
+  1165→                            )}
+  1166→                            {cell.status === "MISSING" && (
+  1167→                              <>
+  1168→                                <br />
+  1169→                                No document on file.
+  1170→                              </>
+  1171→                            )}
+  1172→                          </p>
+  1173→                        </TooltipContent>
+  1174→                      </Tooltip>
+  1175→                    </TooltipProvider>
+  1176→                  );
+  1177→                })}
+  1178→              </div>
+  1179→            ))}
+  1180→          </div>
+  1181→        </div>
+  1182→
+  1183→        {/* Legend — all statuses including zero-count, labels only.
+  1184→            6.2: each legend entry is a focus-accessible tooltip trigger
+  1185→            showing the status definition (matches the composition bar
+  1186→            legend pattern). The span uses tabIndex={0} + role="img" so
+  1187→            keyboard users can focus each legend entry to read the
+  1188→            definition; aria-label gives screen-reader users the status
+  1189→            name + definition in one pass. */}
+  1190→        <div className="mt-3 flex flex-wrap gap-2">
+  1191→          {COMPLIANCE_STATUSES.map((status) => {
+  1192→            const config = STATUS_CONFIG[status];
+  1193→            return (
+  1194→              <TooltipProvider key={status} delayDuration={0}>
+  1195→                <Tooltip>
+  1196→                  <TooltipTrigger asChild>
+  1197→                    <span
+  1198→                      tabIndex={0}
+  1199→                      role="img"
+  1200→                      aria-label={`${config.label}: ${config.definition}`}
+  1201→                      className="flex items-center gap-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-help"
+  1202→                    >
+  1203→                      <span
+  1204→                        className="h-3 w-3 shrink-0 rounded-sm"
+  1205→                        style={{ backgroundColor: config.colorToken }}
+  1206→                      />
+  1207→                      <span className="text-xs text-muted-foreground">{config.label}</span>
+  1208→                    </span>
+  1209→                  </TooltipTrigger>
+  1210→                  <TooltipContent side="top" className="max-w-xs">
+  1211→                    <p className="text-xs">
+  1212→                      <span className="font-medium">{config.label}</span>: {config.definition}
+  1213→                    </p>
+  1214→                  </TooltipContent>
+  1215→                </Tooltip>
+  1216→              </TooltipProvider>
+  1217→            );
+  1218→          })}
+  1219→        </div>
+  1220→      </CardContent>
+  1221→    </Card>
+  1222→  );
+  1223→}
+  1224→
+  1225→// =============================================================================
+  1226→// ExpiryForecast — forward-looking card: documents coming due in the
+  1227→// next 30/60/90 days, mutually exclusive buckets. Bucket boundaries from
+  1228→// FORECAST_BUCKETS in status config.
+  1229→//
+  1230→// The 30-day row routes via the filter helper ('EXPIRING') — it matches by
+  1231→// definition (any doc in the 30-day bucket is also "Expiring" since
+  1232→// 30 <= EXPIRING_WINDOW_DAYS). The 60/90 rows have no existing filter
+  1233→// target (the helper supports single-status only, not date ranges) —
+  1234→// they are non-interactive. The footer "N already overdue" links via
+  1235→// the filter helper ('OVERDUE').
+  1236→// =============================================================================
+  1237→
+  1238→interface ExpiryForecastCardProps {
+  1239→  forecast: ExpiryForecast;
+  1240→  onFilter?: (status: string) => void;
+  1241→}
+  1242→
+  1243→function ExpiryForecastCard({ forecast, onFilter }: ExpiryForecastCardProps) {
+  1244→  const allZero =
+  1245→    forecast.buckets.every((b) => b.count === 0) && forecast.overdueCount === 0;
+  1246→
+  1247→  return (
+  1248→    <Card>
+  1249→      <CardHeader>
+  1250→        <div className="flex items-center justify-between">
+  1251→          <div>
+  1252→            <CardTitle className="text-lg">Expiry Forecast</CardTitle>
+  1253→            <CardDescription>Documents coming due, by window.</CardDescription>
+  1254→          </div>
+  1255→          {!allZero && (
+  1256→            <a href="/api/export/expiry-forecast" target="_blank" rel="noopener noreferrer">
+  1257→              <Button variant="outline" size="sm" className="gap-1.5">
+  1258→                <FileDown className="h-3.5 w-3.5" />
+  1259→                Export CSV
+  1260→              </Button>
+  1261→            </a>
+  1262→          )}
+  1263→        </div>
+  1264→      </CardHeader>
+  1265→      <CardContent>
+  1266→        {allZero ? (
+  1267→          <p className="text-sm text-muted-foreground">
+  1268→            Nothing due in the next {FORECAST_BUCKETS[FORECAST_BUCKETS.length - 1]} days.
+  1269→          </p>
+  1270→        ) : (
+  1271→          <ul className="space-y-2" aria-label="Expiry forecast by time window">
+  1272→            {forecast.buckets.map((bucket, i) => {
+  1273→              const label =
+  1274→                i === 0
+  1275→                  ? `Within ${bucket.days} days`
+  1276→                  : `${bucket.fromDays + 1}–${bucket.days} days`;
+  1277→              const canFilter = i === 0 && !!onFilter; // only the 30-day row is interactive
+  1278→              return (
+  1279→                <li
+  1280→                  key={bucket.days}
+  1281→                  aria-label={`${label}: ${bucket.count} document${bucket.count === 1 ? "" : "s"}`}
+  1282→                  className="flex items-center justify-between text-sm"
+  1283→                >
+  1284→                  <span className="text-muted-foreground">{label}</span>
+  1285→                  {canFilter ? (
+  1286→                    <button
+  1287→                      type="button"
+  1288→                      onClick={() => onFilter!("EXPIRING")}
+  1289→                      className="font-medium text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+  1290→                      aria-label={`${label}: ${bucket.count} documents. Click to view expiring documents.`}
+  1291→                    >
+  1292→                      {bucket.count}
+  1293→                    </button>
+  1294→                  ) : (
+  1295→                    <span className="font-medium">{bucket.count}</span>
+  1296→                  )}
+  1297→                </li>
+  1298→              );
+  1299→            })}
+  1300→          </ul>
+  1301→        )}
+  1302→
+  1303→        {/* Footer: overdue count as a link */}
+  1304→        {forecast.overdueCount > 0 && (
+  1305→          <div className="mt-3 border-t pt-2">
+  1306→            <button
+  1307→              type="button"
+  1308→              onClick={() => onFilter?.("OVERDUE")}
+  1309→              disabled={!onFilter}
+  1310→              className="text-xs font-medium text-destructive hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded disabled:cursor-default"
+  1311→              aria-label={`${forecast.overdueCount} already overdue. Click to view overdue documents.`}
+  1312→            >
+  1313→              {forecast.overdueCount} already overdue
+  1314→            </button>
+  1315→          </div>
+  1316→        )}
+  1317→      </CardContent>
+  1318→    </Card>
+  1319→  );
+  1320→}
+  1321→
+  1322→// SEVERITY_COLORS removed in 5.2 — the panel now uses SEVERITY_BADGE_VARIANT
+  1323→// (event-type-based severity, attached by the selector via eventSeverity).
+  1324→// The AuditLog's server-set INFO/WARNING/CRITICAL severity is no longer
+  1325→// rendered in the panel. If a future chunk wants to display the raw
+  1326→// AuditLog severity somewhere else (e.g. the Audit page), define a fresh
+  1327→// map there — don't resurrect this one (it mapped to non-token colors
+  1328→// like `bg-destructive/10` which is a different system from the
+  1329→// design-token-based SEVERITY_BADGE_VARIANT).
+  1330→
+  1331→
+  1332→const ACTION_LABELS: Record<string, string> = {
+  1333→  user_login: "signed in",
+  1334→  user_login_2fa: "signed in (2FA)",
+  1335→  user_logout: "signed out",
+  1336→  user_create: "created user",
+  1337→  user_update: "updated user",
+  1338→  user_delete: "deleted user",
+  1339→  user_unlock: "unlocked user",
+  1340→  user_reset_2fa: "reset 2FA for user",
+  1341→  user_2fa_enable: "enabled 2FA",
+  1342→  user_2fa_disable: "disabled 2FA",
+  1343→  union_update: "updated union",
+  1344→  compliance_rule_edit: "edited compliance rule",
+  1345→  api_key_create: "created API key",
+  1346→  api_key_revoke: "revoked API key",
+  1347→  retention_dispose: "disposed document",
+  1348→  retention_snooze: "snoozed disposal",
+  1349→  document_upload: "uploaded document",
+  1350→  document_review_approve: "approved document",
+  1351→  document_review_reject: "rejected document",
+  1352→  document_restore: "restored document version",
+  1353→  document_download: "downloaded document",
+  1354→  document_text_extracted: "extracted text from document",
+  1355→  document_tamper_detected: "TAMPER DETECTED on document",
+  1356→  legal_hold_placed: "placed legal hold on document",
+  1357→  legal_hold_lifted: "lifted legal hold on document",
+  1358→  disposition_scheduled: "scheduled disposition (14-day cooldown)",
+  1359→  disposition_cancelled: "cancelled disposition",
+  1360→  disposition_executed: "EXECUTED disposition — document destroyed",
+  1361→  disposition_blocked_legal_hold: "disposition blocked by legal hold",
+  1362→  task_create: "created task",
+  1363→  task_update: "updated task",
+  1364→  task_delete: "deleted task",
+  1365→  session_revoke: "revoked session",
+  1366→};
+  1367→
+  1368→export function DashboardView({ user, onNavigate, onFilterCompliance }: {
+  1369→  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" };
+  1370→  onNavigate?: (view: string) => void;
+  1371→  onFilterCompliance?: (status: string) => void;
+  1372→}) {
+  1373→  const {
+  1374→    data: stats,
+  1375→    loading: statsLoading,
+  1376→    error: statsError,
+  1377→    refetch: refetchStats,
+  1378→  } = useFetch<StatsResponse>("/api/dashboard/stats");
+  1379→
+  1380→  const {
+  1381→    data: activityData,
+  1382→    loading: activityLoading,
+  1383→    error: activityError,
+  1384→    refetch: refetchActivity,
+  1385→  } = useFetch<{ activity: ActivityEntry[] }>("/api/dashboard/activity");
+  1386→
+  1387→  const {
+  1388→    data: docTypesData,
+  1389→    loading: docTypesLoading,
+  1390→    error: docTypesError,
+  1391→    refetch: refetchDocTypes,
+  1392→  } = useFetch<{
+  1393→    documentTypes: Array<{ documentType: string; count: number }>;
+  1394→    total: number;
+  1395→    requiredTypes: string[];
+  1396→    totalUnions: number;
+  1397→  }>("/api/dashboard/document-types");
+  1398→
+  1399→  // --- Fetch the full compliance matrix for the heatmap ---
+  1400→  // The /api/compliance endpoint returns the live matrix with per-cell
+  1401→  // status, documentId, and expiresAt. We map it to ComplianceCell[] for
+  1402→  // the getUnionDocMatrix selector.
+  1403→  const {
+  1404→    data: complianceMatrixData,
+  1405→    loading: complianceMatrixLoading,
+  1406→  } = useFetch<{
+  1407→    unions: Array<{
+  1408→      unionId: string;
+  1409→      unionName: string;
+  1410→      status: string;
+  1411→      scores: Array<{
+  1412→        documentType: string;
+  1413→        status: ComplianceStatus;
+  1414→        documentId: string | null;
+  1415→        expiresAt: string | null;
+  1416→      }>;
+  1417→    }>;
+  1418→    documentTypes: string[];
+  1419→  }>("/api/compliance");
+  1420→
+  1421→  // --- Fetch the compliance trend for the TrendChart + KPI sparklines (4.2b) ---
+  1422→  // The /api/dashboard/trend endpoint returns the historical daily snapshot
+  1423→  // points. Empty array = fresh deployment (no cron run yet) — the
+  1424→  // TrendChart's placeholder handles this. Trend fetch is independent of the
+  1425→  // stats fetch so a slow trend endpoint doesn't block the KPI band.
+  1426→  const {
+  1427→    data: trendData,
+  1428→    loading: trendLoading,
+  1429→    error: trendError,
+  1430→    refetch: refetchTrend,
+  1431→  } = useFetch<{ points: ComplianceTrendPoint[] }>("/api/dashboard/trend");
+  1432→
+  1433→  // --- Windowed trend for the chart + sparklines ---
+  1434→  // Both the TrendChart and the three sparklines consume the SAME windowed
+  1435→  // slice. Computed once here, passed to each renderer.
+  1436→  // The window is sliced via `sliceTrendToWindow` (pure function in
+  1437→  // snapshot.ts) — the chart does NOT re-slice internally. The sparklines
+  1438→  // extract their relevant numeric series via `extractSparklineSeries`.
+  1439→  const windowedTrend = trendData?.points
+  1440→    ? sliceTrendToWindow(trendData.points, TREND_WINDOW_DAYS)
+  1441→    : [];
+  1442→  const trendSufficient = hasSufficientHistory(windowedTrend, 2);
+  1443→  // Sparkline series — extracted here so the SAME windowed data feeds both
+  1444→  // the chart and the sparklines (no double-slicing).
+  1445→  const compliantSparklineValues = trendSufficient
+  1446→    ? extractSparklineSeries(windowedTrend, "compliant")
+  1447→    : [];
+  1448→  const missingSparklineValues = trendSufficient
+  1449→    ? extractSparklineSeries(windowedTrend, "missing")
+  1450→    : [];
+  1451→  const rateSparklineValues = trendSufficient
+  1452→    ? extractSparklineSeries(windowedTrend, "rate")
+  1453→    : [];
+  1454→
+  1455→  // --- Canonical compliance counts from the stats response ---
+  1456→  // Maps the API's lowercase keys to the canonical ComplianceCounts shape
+  1457→  // (uppercase, matching STATUS_CONFIG). This is a field mapping, not
+  1458→  // an aggregation — the counts come from the API route, not computed here.
+  1459→  const counts: ComplianceCounts | null = stats
+  1460→    ? {
+  1461→        COMPLIANT: stats.compliance.compliant,
+  1462→        EXPIRING: stats.compliance.expiring,
+  1463→        OVERDUE: stats.compliance.overdue,
+  1464→        AWAITING_REVIEW: stats.compliance.awaitingReview,
+  1465→        MISSING: stats.compliance.missing,
+  1466→        NOT_APPLICABLE: stats.compliance.notApplicable,
+  1467→      }
+  1468→    : null;
+  1469→
+  1470→  return (
+  1471→    <div className="space-y-6">
+  1472→      <div>
+  1473→        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+  1474→        <p className="text-sm text-muted-foreground">
+  1475→          Overview of the union registry and compliance status.
+  1476→        </p>
+  1477→      </div>
+  1478→
+  1479→      {/* === Row 1: Quick Actions (full width) === */}
+  1480→      {/* Quick Actions — derived from NAV_STRUCTURE via getQuickActions.
+  1481→          One source of truth: the destinations + their quickAction metadata
+  1482→          live in nav-structure.ts. The dashboard just renders whatever
+  1483→          getQuickActions returns for the current role. No hard-coded role
+  1484→          checks or button definitions here — those would drift from the
+  1485→          nav the moment someone adds a destination without updating this
+  1486→          block. */}
+  1487→      {onNavigate && (
+  1488→        <div data-testid="quick-actions" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+  1489→          {getQuickActions(user.role as StaffRole).map((action) => {
+  1490→            const Icon = action.icon;
+  1491→            if (action.kind === "external" && action.href) {
+  1492→              return (
+  1493→                <a
+  1494→                  key={`qa-${action.route}`}
+  1495→                  href={action.href}
+  1496→                  target="_blank"
+  1497→                  rel="noopener noreferrer"
+  1498→                >
+  1499→                  <Button variant="outline" className="h-auto w-full flex-col gap-1 py-3">
+  1500→                    <Icon className="h-5 w-5 text-primary" />
+  1501→                    <span className="text-xs font-medium">{action.label}</span>
+  1502→                  </Button>
+  1503→                </a>
+  1504→              );
+  1505→            }
+  1506→            return (
+  1507→              <Button
+  1508→                key={`qa-${action.route}`}
+  1509→                variant="outline"
+  1510→                className="h-auto flex-col gap-1 py-3"
+  1511→                onClick={() => onNavigate(action.route)}
+  1512→              >
+  1513→                <Icon className="h-5 w-5 text-primary" />
+  1514→                <span className="text-xs font-medium">{action.label}</span>
+  1515→              </Button>
+  1516→            );
+  1517→          })}
+  1518→        </div>
+  1519→      )}
+  1520→
+  1521→      {/* === Row 2: KPI band (7 cards) ===
+  1522→          6.1: rate promoted here as the 3rd card. auto-fit so the 7 cards
+  1523→          wrap responsively (never shrink below 140px wide — readability
+  1524→          floor). DOM order = reading order: Total Unions · Documents ·
+  1525→          Compliance Rate · Compliant · Expiring · Overdue · Missing. */}
+  1526→      {statsLoading ? (
+  1527→        <StatsSkeleton />
+  1528→      ) : statsError ? (
+  1529→        <ErrorState description={statsError} onRetry={refetchStats} />
+  1530→      ) : stats ? (
+  1531→        <div
+  1532→          data-testid="kpi-band"
+  1533→          className="grid gap-4"
+  1534→          style={{
+  1535→            gridTemplateColumns: `repeat(auto-fit, minmax(140px, 1fr))`,
+  1536→          }}
+  1537→        >
+  1538→          <StatCard
+  1539→            label="Total Unions"
+  1540→            value={stats.totalUnions}
+  1541→            icon={Building2}
+  1542→            color="bg-primary/10 text-primary"
+  1543→            href={unionsListUrl()}
+  1544→            ariaLabel={`Total Unions: ${stats.totalUnions} — view unions list`}
+  1545→            definition={DASHBOARD_KPI_DEFINITIONS["Total Unions"]}
+  1546→          />
+  1547→          <StatCard
+  1548→            label="Documents"
+  1549→            value={stats.activeCount}
+  1550→            icon={FileText}
+  1551→            color="bg-primary/10 text-primary"
+  1552→            href={complianceUnfilteredUrl()}
+  1553→            ariaLabel={`Documents: ${stats.activeCount} — view compliance overview`}
+  1554→            definition={DASHBOARD_KPI_DEFINITIONS["Documents"]}
+  1555→          />
+  1556→          {/* 6.1: Rate promoted to KPI band. All 1.2 content (tooltip, bar,
+  1557→              a11y reading) + 4.2b sparkline moved VERBATIM via RateKpiCard. */}
+  1558→          <RateKpiCard
+  1559→            numerator={stats.compliance.rate.numerator}
+  1560→            denominator={stats.compliance.rate.denominator}
+  1561→            percentage={stats.compliance.rate.percentage}
+  1562→            sparklineValues={rateSparklineValues}
+  1563→          />
+  1564→          {getTileStatuses().map((status) => {
+  1565→            // 4.2b: sparkline insertion for the COMPLIANT and MISSING cards
+  1566→            // only (per the 4.2b decision set — see handoff). EXPIRING and
+  1567→            // OVERDUE do NOT get sparklines. The sparkline is rendered ONLY
+  1568→            // when hasSufficientHistory() is true; otherwise the card
+  1569→            // shows just the value (no decorative line, no error).
+  1570→            const sparklineValues =
+  1571→              status === "COMPLIANT" ? compliantSparklineValues
+  1572→              : status === "MISSING" ? missingSparklineValues
+  1573→              : null;
+  1574→            const sparkline = sparklineValues && sparklineValues.length > 0
+  1575→              ? (
+  1576→                <Sparkline
+  1577→                  values={sparklineValues}
+  1578→                  width={100}
+  1579→                  height={24}
+  1580→                  // Use the same color token as the card's icon for visual
+  1581→                  // cohesion. The icon color is set via the `color` prop
+  1582→                  // above (e.g. "bg-chart-3/20 text-chart-3"); the sparkline
+  1583→                  // stroke uses just the text-* token via currentColor.
+  1584→                  stroke="currentColor"
+  1585→                  strokeWidth={1.5}
+  1586→                />
+  1587→              )
+  1588→              : undefined;
+  1589→            return (
+  1590→              <StatCard
+  1591→                key={status}
+  1592→                label={STATUS_CONFIG[status].label}
+  1593→                value={counts![status]}
+  1594→                icon={STATUS_CONFIG[status].icon}
+  1595→                color={
+  1596→                  status === "COMPLIANT" ? "bg-chart-3/20 text-chart-3" :
+  1597→                  status === "EXPIRING" ? "bg-accent/20 text-accent-foreground" :
+  1598→                  status === "OVERDUE" ? "bg-destructive/10 text-destructive" :
+  1599→                  "bg-muted text-muted-foreground"
+  1600→                }
+  1601→                href={complianceFilterUrl(status)}
+  1602→                ariaLabel={`${STATUS_CONFIG[status].label}: ${counts![status]} documents — view filtered list`}
+  1603→                sparkline={sparkline}
+  1604→                definition={STATUS_CONFIG[status].definition}
+  1605→              />
+  1606→            );
+  1607→          })}
+  1608→        </div>
+  1609→      ) : null}
+  1610→
+  1611→      {/* === Row 3: Needs Attention (wider) | Composition Bar ===
+  1612→          6.1 final layout. Two-column at >=1024px (Tailwind `lg:`); stacks
+  1613→          vertically below, with Needs Attention first (actionability first
+  1614→          per chunk spec). DOM order = reading order. The breakpoint value
+  1615→          (1024) is the canonical DASHBOARD_BREAKPOINT_PX in status-config.ts. */}
+  1616→      <div className="grid gap-6 lg:grid-cols-5 items-start">
+  1617→        {/* Needs Attention panel — wider (3/5 of the row at desktop). */}
+  1618→        {stats && (
+  1619→          <div data-testid="needs-attention" className="lg:col-span-3">
+  1620→            <NeedsAttentionPanel
+  1621→              items={stats.needsAttention || []}
+  1622→              total={stats.needsAttention?.length || 0}
+  1623→              onNavigate={onNavigate}
+  1624→            />
+  1625→          </div>
+  1626→        )}
+  1627→
+  1628→        {/* Compliance Composition Bar — narrower (2/5 of the row at desktop).
+  1629→            Fills the slot vacated by the deleted Compliance Status Distribution
+  1630→            tiles (chunk 1.3). */}
+  1631→        {stats && counts && (
+  1632→          <div data-testid="composition-bar" className="lg:col-span-2">
+  1633→            <ComplianceCompositionBar
+  1634→              counts={counts}
+  1635→              denominator={stats.compliance.rate.denominator}
+  1636→              totalUnions={stats.totalUnions}
+  1637→              onFilter={onFilterCompliance}
+  1638→            />
+  1639→          </div>
+  1640→        )}
+  1641→      </div>
+  1642→
+  1643→      {/* === Row 4: Compliance Heatmap (full width) ===
+  1644→          6.1 final layout. The heatmap is a wide table; at narrow widths it
+  1645→          scrolls internally (3.2b's `overflow-x-auto` wrapper INSIDE
+  1646→          ComplianceHeatmap + sticky union column keep the row labels visible).
+  1647→          The page must NEVER scroll horizontally at any breakpoint — the
+  1648→          internal scroll does the work; this outer wrapper is just the
+  1649→          testid anchor + full-width slot. */}
+  1650→      {!complianceMatrixLoading && complianceMatrixData && (() => {
+  1651→        // Map the /api/compliance response to ComplianceCell[] for the selector.
+  1652→        // This is a pure field mapping — no aggregation or status derivation here.
+  1653→        const cells: ComplianceCell[] = complianceMatrixData.unions.flatMap((row) =>
+  1654→          row.scores.map((score) => ({
+  1655→            unionId: row.unionId,
+  1656→            documentType: score.documentType,
+  1657→            status: score.status,
+  1658→            filedAt: null,
+  1659→            expiryDate: score.expiresAt ? new Date(score.expiresAt) : null,
+  1660→            documentId: score.documentId,
+  1661→          })),
+  1662→        );
+  1663→        const unions: UnionSummary[] = complianceMatrixData.unions.map((u) => ({
+  1664→          id: u.unionId,
+  1665→          name: u.unionName,
+  1666→          registrationNo: u.status,
+  1667→          status: u.status as "ACTIVE" | "SUSPENDED" | "DEREGISTERED",
+  1668→        }));
+  1669→        const matrix = getUnionDocMatrix(cells, unions, complianceMatrixData.documentTypes);
+  1670→        return (
+  1671→          <div data-testid="heatmap">
+  1672→            <ComplianceHeatmap matrix={matrix} />
+  1673→          </div>
+  1674→        );
+  1675→      })()}
+  1676→
+  1677→      {/* === Row 5: Required vs On-File Meters (wider) | Expiry Forecast ===
+  1678→          6.1 final layout. Meters are wider because they list per-type rows;
+  1679→          Expiry Forecast is a tighter card with 3 bucket rows. */}
+  1680→      <div className="grid gap-6 lg:grid-cols-5 items-start">
+  1681→        {/* Required vs On-File meters — wider (3/5). Replaces the lollipop
+  1682→            chart (chunk 2.2). */}
+  1683→        <div data-testid="required-vs-on-file" className="lg:col-span-3">
+  1684→          {docTypesLoading ? (
+  1685→            <Card>
+  1686→              <CardHeader>
+  1687→                <CardTitle className="text-lg">Required vs On-File by Type</CardTitle>
+  1688→              </CardHeader>
+  1689→              <CardContent>
+  1690→                <div className="h-[240px] animate-pulse rounded-md bg-muted" />
+  1691→              </CardContent>
+  1692→            </Card>
+  1693→          ) : docTypesError ? (
+  1694→            <ErrorState description={docTypesError} onRetry={refetchDocTypes} />
+  1695→          ) : docTypesData && docTypesData.requiredTypes && docTypesData.requiredTypes.length > 0 ? (
+  1696→            <RequiredVsOnFileMeters
+  1697→              onFileByType={docTypesData.documentTypes}
+  1698→              requiredTypes={docTypesData.requiredTypes}
+  1699→              totalUnions={docTypesData.totalUnions}
+
+[showing lines 1000-1699 of 1998; use offset=1700 with limit to continue reading]
