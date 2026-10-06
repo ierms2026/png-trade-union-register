@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
+import { buildDocumentTypesWhere } from "@/lib/dashboard/document-types-where";
 
 // =============================================================================
 // GET /api/dashboard/document-types
@@ -16,6 +17,10 @@ import { getAuthUser } from "@/lib/auth/auth-guard";
 //     requiredTypes: ["Constitution", "Financial Return", ...],  // from ComplianceRule
 //     totalUnions: 6,
 //   }
+//
+// The where-building logic lives in buildDocumentTypesWhere() (src/lib/
+// dashboard/document-types-where.ts) so tests can exercise the REAL scoping
+// code without spinning up a Next server.
 // =============================================================================
 
 export async function GET(req: NextRequest) {
@@ -24,39 +29,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Officer scoping: an Officer sees only their assigned union. The check
-  // for `user.assignedUnionId` also serves as the TypeScript narrowing guard
-  // — inside this branch, `assignedUnionId` is `string`, not `string | null`.
-  if (user.role === "OFFICER" && user.assignedUnionId) {
-    const scopedUnionId = user.assignedUnionId;
-    const [documents, rules, totalUnions] = await Promise.all([
-      db.document.findMany({
-        where: { disposedAt: null, unionId: scopedUnionId },
-        select: { documentType: true },
-      }),
-      db.complianceRule.findMany({ where: { required: true }, select: { documentType: true } }),
-      db.union.count({ where: { id: scopedUnionId } }),
-    ]);
-
-    const counts = new Map<string, number>();
-    for (const doc of documents) {
-      counts.set(doc.documentType, (counts.get(doc.documentType) || 0) + 1);
-    }
-    const result = Array.from(counts.entries())
-      .map(([documentType, count]) => ({ documentType, count }))
-      .sort((a, b) => b.count - a.count);
-
-    return NextResponse.json({
-      documentTypes: result,
-      total: documents.length,
-      requiredTypes: rules.map((r) => r.documentType),
-      totalUnions,
-    });
-  }
-
-  // Non-officer (REGISTRAR / INSPECTOR): no scoping
-  const unionWhere = {};
-  const docWhere = { disposedAt: null };
+  const { docWhere, unionWhere } = buildDocumentTypesWhere({
+    role: user.role,
+    assignedUnionId: user.assignedUnionId,
+  });
 
   // Fetch on-file doc counts + required rules + totalUnions in parallel
   const [documents, rules, totalUnions] = await Promise.all([
