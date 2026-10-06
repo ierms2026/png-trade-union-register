@@ -173,7 +173,7 @@ describe("dashboard tooltips — surface checklist (chunk 6.2)", () => {
       "KPI band — Overdue",
       "definition={STATUS_CONFIG[status].definition}",
     );
-    expect(STATUS_CONFIG.OVERDUE.definition).toMatch(/renewal date has passed/i);
+    expect(STATUS_CONFIG.OVERDUE.definition).toMatch(/renewal date.*has passed/i);
   });
 
   it("surface 7: KPI band — Missing card has a focus-accessible definition tooltip (definition mentions filing/disposed; review is now AWAITING_REVIEW)", () => {

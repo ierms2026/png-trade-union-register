@@ -1,7 +1,7 @@
 import { db } from "@/lib/prisma";
 import {
   calculateStatusFromRows,
-  computeExpiryDate,
+  computeExpiryDateFromApproval,
   computeUnionScore,
   type ComplianceStatus,
 } from "@/lib/compliance/calculator";
@@ -61,7 +61,7 @@ export interface MatrixData {
   unions: Array<{ id: string; unionName: string; status: string }>;
   rules: Array<ComplianceRule>;
   documents: Array<
-    Pick<Document, "id" | "unionId" | "documentType" | "currentVersionId" | "disposedAt" | "reviewStatus">
+    Pick<Document, "id" | "unionId" | "documentType" | "currentVersionId" | "disposedAt" | "reviewStatus" | "reviewedAt">
   >;
   versions: Array<Pick<DocumentVersion, "id" | "uploadedAt">>;
 }
@@ -95,6 +95,7 @@ export async function fetchMatrixData(): Promise<MatrixData> {
         currentVersionId: true,
         disposedAt: true,
         reviewStatus: true,
+        reviewedAt: true,
       },
     }),
   ]);
@@ -161,14 +162,13 @@ export function buildComplianceMatrix(
       // full rationale.
       //
       // T50: AWAITING_REVIEW is excluded because the renewal clock should
-      // not start until the Registrar approves the document. Computing an
-      // expiry date from the upload date would make a document that sat in
-      // review for 6 months show as "expires in 6 months" when finally
-      // approved — misleading, and it caused the compliance sweep to send
-      // renewal notices for un-approved documents.
+      // not start until the Registrar approves the document.
+      // T71 (D15): for APPROVED documents, the clock starts at reviewedAt
+      // (the approval date), falling back to uploadedAt if reviewedAt is
+      // null. Uses the SAME function as calculateStatus — no second copy.
       const expiresAt =
         latestVersion && status !== "NOT_APPLICABLE" && status !== "MISSING" && status !== "AWAITING_REVIEW"
-          ? computeExpiryDate(latestVersion.uploadedAt, rule.renewalYears).toISOString()
+          ? computeExpiryDateFromApproval(doc!, latestVersion, rule.renewalYears).toISOString()
           : null;
 
       return {

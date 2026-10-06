@@ -64,7 +64,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
     icon: CheckCircle2,
     cell: "bg-chart-3/15 text-chart-3 border-chart-3/30",
     dot: "bg-chart-3",
-    definition: "Document filed, approved by Registrar, with renewal date more than 90 days away.",
+    definition: "Document filed, approved by Registrar, with renewal date (counted from approval date) more than 90 days away.",
   },
   EXPIRING: {
     label: "Expiring",
@@ -72,7 +72,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
     icon: AlertTriangle,
     cell: "bg-chart-4/15 text-chart-4 border-chart-4/30",
     dot: "bg-chart-4",
-    definition: "Document filed and approved, but renewal date is within 90 days.",
+    definition: "Document filed and approved, but renewal date (counted from approval date) is within 90 days.",
   },
   OVERDUE: {
     label: "Overdue",
@@ -80,7 +80,7 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
     icon: XCircle,
     cell: "bg-destructive/15 text-destructive border-destructive/30",
     dot: "bg-destructive",
-    definition: "Document filed and approved, but renewal date has passed.",
+    definition: "Document filed and approved, but renewal date (counted from approval date) has passed.",
   },
   AWAITING_REVIEW: {
     label: "Awaiting Review",

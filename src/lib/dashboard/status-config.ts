@@ -165,19 +165,19 @@ export const STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
     // Template: interpolates EXPIRING_WINDOW_DAYS so a constant change
     // propagates to the definition text. Aligns with the calculator's
     // derivation (reviewStatus === "APPROVED" + expiryDate > now + window).
-    definition: `Document filed, approved by Registrar, with renewal date more than ${EXPIRING_WINDOW_DAYS} days away.`,
+    definition: `Document filed, approved by Registrar, with renewal date (counted from approval date) more than ${EXPIRING_WINDOW_DAYS} days away.`,
   },
   EXPIRING: {
     label: COMPLIANCE_STATUS_CONFIG.EXPIRING.label,
     colorToken: "var(--status-expiring)",
     icon: AlertTriangle,
-    definition: `Document filed and approved, but renewal date is within ${EXPIRING_WINDOW_DAYS} days.`,
+    definition: `Document filed and approved, but renewal date (counted from approval date) is within ${EXPIRING_WINDOW_DAYS} days.`,
   },
   OVERDUE: {
     label: COMPLIANCE_STATUS_CONFIG.OVERDUE.label,
     colorToken: "var(--status-overdue)",
     icon: XCircle,
-    definition: "Document filed and approved, but renewal date has passed.",
+    definition: "Document filed and approved, but renewal date (counted from approval date) has passed.",
   },
   AWAITING_REVIEW: {
     label: COMPLIANCE_STATUS_CONFIG.AWAITING_REVIEW.label,

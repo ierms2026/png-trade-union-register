@@ -208,7 +208,7 @@ describe("status-config", () => {
       // This test documents that: the definition is a pure boundary
       // statement, not a window with a constant.
       const def = STATUS_CONFIG.OVERDUE.definition;
-      expect(def).toMatch(/renewal date has passed/i);
+      expect(def).toMatch(/renewal date.*has passed/i);
       // No number should appear in the OVERDUE definition.
       expect(def).not.toMatch(/\b\d+\b/);
     });

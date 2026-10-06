@@ -171,12 +171,14 @@ export interface ComplianceRuleInput {
  * MISSING case.
  *
  * `disposedAt` is the only field the calculator reads (disposal = MISSING
- * per the spec). The other Document fields are present in the Prisma type
- * but ignored here.
+ * per the spec). `reviewedAt` is the approval date (D15: the renewal clock
+ * starts at approval, not upload). The other Document fields are present in
+ * the Prisma type but ignored here.
  */
 export interface DocumentInput {
   disposedAt: Date | null;
   reviewStatus?: "PENDING" | "APPROVED" | "REJECTED" | null;
+  reviewedAt?: Date | null;
 }
 
 /**
@@ -197,7 +199,7 @@ export interface DocumentVersionInput {
 // -----------------------------------------------------------------------------
 
 /**
- * Compute the expiry date for a document: filedAt + renewalYears.
+ * Compute the expiry date for a document: clockStart + renewalYears.
  *
  * Pure: clones the input date (doesn't mutate it). Uses calendar-year math
  * (setFullYear, not 365*N days) so a "1-year renewal filed Aug 15 2026"
@@ -207,10 +209,39 @@ export interface DocumentVersionInput {
  * compute the exact same date — no drift between the status calculation
  * and the `expiresAt` field shown in the matrix response.
  */
-export function computeExpiryDate(filedAt: Date, renewalYears: number): Date {
-  const expiryDate = new Date(filedAt.getTime());
+export function computeExpiryDate(clockStart: Date, renewalYears: number): Date {
+  const expiryDate = new Date(clockStart.getTime());
   expiryDate.setFullYear(expiryDate.getFullYear() + renewalYears);
   return expiryDate;
+}
+
+/**
+ * Compute the expiry date for an APPROVED document using the D15 rule:
+ * the renewal clock starts at the approval date (`document.reviewedAt`),
+ * falling back to the version's upload date if `reviewedAt` is null.
+ *
+ * This is the SINGLE function both `calculateStatus` and `matrix.ts` call
+ * to compute expiry — no second copy of the logic.
+ *
+ * D15: the renewal period starts on the approval date. A document that
+ * waits months for review doesn't look partly expired the moment it's
+ * approved. If `reviewedAt` is null (e.g., approved before the field
+ * existed), the fallback is the upload date — the old behavior.
+ *
+ * @param document     The Document row (must have reviewStatus APPROVED + reviewedAt)
+ * @param latestVersion The latest DocumentVersion (must have uploadedAt)
+ * @param renewalYears  The rule's renewal period in years
+ * @returns The expiry date (clockStart + renewalYears)
+ */
+export function computeExpiryDateFromApproval(
+  document: { reviewedAt?: Date | null },
+  latestVersion: { uploadedAt: Date },
+  renewalYears: number,
+): Date {
+  // D15: clock starts at reviewedAt (approval date). Fall back to uploadedAt
+  // if reviewedAt is null (e.g., approved before the field existed).
+  const clockStart = document.reviewedAt ?? latestVersion.uploadedAt;
+  return computeExpiryDate(clockStart, renewalYears);
 }
 
 /**
@@ -223,8 +254,8 @@ export function computeExpiryDate(filedAt: Date, renewalYears: number): Date {
  *   1. If `!rule.required`           → NOT_APPLICABLE
  *   2. If `!document` or disposedAt  → MISSING
  *   3. If reviewStatus !== APPROVED  → AWAITING_REVIEW (PENDING or REJECTED)
- *   4. filedAt = latestVersion.uploadedAt
- *   5. expiryDate = filedAt + renewalYears
+ *   4. clockStart = document.reviewedAt ?? latestVersion.uploadedAt (D15: approval date)
+ *   5. expiryDate = clockStart + renewalYears
  *   6. If expiryDate < now          → OVERDUE
  *   7. If expiryDate ≤ now + 90 days → EXPIRING
  *   8. Else                          → COMPLIANT
@@ -288,17 +319,15 @@ export function calculateStatus(
     return "MISSING";
   }
 
-  const filedAt = latestVersion.uploadedAt;
-
-  // 4. expiryDate = filedAt + renewalYears.
-  //    Using calendar-year math (add years, not 365*N days) because renewal
-  //    cycles are legal terms, not astronomical ones — a "1-year renewal"
-  //    means "filed Aug 15 2026, due Aug 15 2027", not "due Aug 14 2027
-  //    minus leap-day drift".
-  //    The computeExpiryDate helper is shared with the route layer so both
-  //    compute the exact same date — no drift between status calc and the
-  //    "expiresAt" field shown in the matrix response.
-  const expiryDate = computeExpiryDate(filedAt, rule.renewalYears);
+  // 4. expiryDate = clockStart + renewalYears.
+  //    D15: the renewal clock starts at the approval date (document.reviewedAt),
+  //    falling back to the upload date if reviewedAt is null. Using
+  //    calendar-year math (add years, not 365*N days) because renewal cycles
+  //    are legal terms, not astronomical ones.
+  //    The computeExpiryDateFromApproval helper is shared with the matrix
+  //    builder so both compute the exact same date — no drift between the
+  //    status calculation and the "expiresAt" field shown in the matrix.
+  const expiryDate = computeExpiryDateFromApproval(document, latestVersion, rule.renewalYears);
 
   // Edge case: renewalYears ≤ 0 means a misconfigured rule. The doc
   // can never be compliant — return OVERDUE so the matrix shows red and
@@ -468,7 +497,7 @@ export function computeUnionScore(
  */
 export function calculateStatusFromRows(
   rule: Pick<ComplianceRule, "required" | "renewalYears" | "retentionYrs"> | null,
-  document: Pick<Document, "disposedAt" | "reviewStatus"> | null,
+  document: Pick<Document, "disposedAt" | "reviewStatus" | "reviewedAt"> | null,
   latestVersion: Pick<DocumentVersion, "uploadedAt"> | null,
   now: Date = new Date(),
 ): ComplianceStatus {
