@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   reactStrictMode: false,
   // Allow the Z.ai preview-chat subdomain to load /_next/* resources.
   // Without this, Next.js 16 emits a cross-origin warning during local dev
