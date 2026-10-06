@@ -4,6 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/prisma";
 import { Role, NotificationType } from "@prisma/client";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
+import { collectDigestIssues, type DigestItem } from "@/lib/compliance/digest-issues";
 import { createNotification, getUserNotificationPrefs } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 
@@ -46,41 +47,11 @@ export async function POST(req: NextRequest) {
   const matrix = buildComplianceMatrix(data);
 
   // --- 3. Build system-wide issue list ---
-  const overdue: DigestItem[] = [];
-  const expiring30: DigestItem[] = [];
-  const expiring90: DigestItem[] = [];
-
+  // The issue-collection logic lives in collectDigestIssues() so it can be
+  // unit-tested directly. The route passes the built matrix + rules map +
+  // current time; the function returns the three buckets.
   const renewalByType = new Map(data.rules.map((r) => [r.documentType, r.renewalYears]));
-  const nowMs = now.getTime();
-  const msPerDay = 24 * 60 * 60 * 1000;
-
-  for (const row of matrix.unions) {
-    for (const cell of row.scores) {
-      if (!cell.expiresAt) continue;
-      const renewalYears = renewalByType.get(cell.documentType) ?? 1;
-      if (renewalYears >= 99) continue; // skip one-time filings
-
-      const expiryMs = new Date(cell.expiresAt).getTime();
-      const daysUntil = Math.floor((expiryMs - nowMs) / msPerDay);
-      const expiryStr = new Date(cell.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-
-      const item: DigestItem = {
-        unionName: row.unionName,
-        documentType: cell.documentType,
-        daysUntilExpiry: daysUntil,
-        expiryDate: expiryStr,
-      };
-
-      if (daysUntil < 0) overdue.push(item);
-      else if (daysUntil <= 30) expiring30.push(item);
-      else if (daysUntil <= 90) expiring90.push(item);
-    }
-  }
-
-  // Sort each bucket
-  overdue.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry); // most overdue first
-  expiring30.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry); // soonest first
-  expiring90.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+  const { overdue, expiring30, expiring90 } = collectDigestIssues(matrix, renewalByType, now);
 
   const totalIssues = overdue.length + expiring30.length + expiring90.length;
 
@@ -196,13 +167,6 @@ export async function POST(req: NextRequest) {
 // =============================================================================
 // Digest email template — renders a bucketed summary with tables.
 // =============================================================================
-
-interface DigestItem {
-  unionName: string;
-  documentType: string;
-  daysUntilExpiry: number;
-  expiryDate: string;
-}
 
 interface DigestEmailParams {
   recipientName: string;

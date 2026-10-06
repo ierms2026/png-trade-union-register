@@ -188,6 +188,8 @@ export function tallyStatuses(
  *
  * Pure: no I/O, no side effects.
  */
+// PROVISIONAL(D1): see docs/decisions-and-defaults.md
+// Rule: numerator = COMPLIANT; denominator = COMPLIANT + EXPIRING + OVERDUE + AWAITING_REVIEW + MISSING (NOT_APPLICABLE excluded).
 export function computeRateFromCounts(counts: ComplianceCounts): ComplianceRate {
   const numerator = counts.COMPLIANT;
   const denominator =
