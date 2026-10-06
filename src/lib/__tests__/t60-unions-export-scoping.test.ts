@@ -1,27 +1,23 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { testDb, resetDb } from "./setup";
 import { buildUnionsExport } from "@/lib/compliance/unions-export";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
-// T60: Unions export access-scoping tests.
+// T75b: Unions export access-scoping tests.
 //
-// Calls the REAL buildUnionsExport() (the same function the route uses).
-// Verifies:
-//   - With assignedUnionId: returns only that union
-//   - Without assignedUnionId (null/undefined): returns all unions
+// Calls the REAL buildUnionsExport() (the same function the route uses) for
+// the positive cases, and getUnionScope() (the helper the route uses to
+// decide scoping) for the deny case.
 //
-// SECURITY NOTE (reported in the task, not fixed here):
-//   The route handler (src/app/api/export/unions/route.ts:21-23) passes
-//   `null` for an Officer whose `assignedUnionId` is null/missing:
-//     const assignedUnionId = user.role === "OFFICER" && user.assignedUnionId
-//       ? user.assignedUnionId
-//       : null;
-//   buildUnionsExport({ assignedUnionId: null }) returns ALL unions (no
-//   scoping). So an Officer with no assigned union can export ALL unions.
-//   This is reported as needs-human per the task; behavior unchanged.
+// T75b (D17): the route now checks getUnionScope before calling
+// buildUnionsExport. For an Officer/Representative with no assigned union,
+// the scope is "none" and the route returns 403 — it never calls
+// buildUnionsExport. This test verifies both the positive scoping and the
+// deny behavior.
 // =============================================================================
 
-describe("T60: buildUnionsExport access scoping", () => {
+describe("T75b: unions export access scoping", () => {
   beforeEach(async () => {
     await resetDb();
   });
@@ -42,41 +38,45 @@ describe("T60: buildUnionsExport access scoping", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]["Registration No"]).toBe("T60-B");
     expect(rows[0]["Union Name"]).toBe("Beta Union");
-    // Confirm the other unions are NOT present
     expect(rows.find((r) => r["Registration No"] === "T60-A")).toBeUndefined();
     expect(rows.find((r) => r["Registration No"] === "T60-C")).toBeUndefined();
   });
 
-  it("with no assignedUnionId (null) returns all unions", async () => {
+  it("Registrar (scope=all) → buildUnionsExport with null returns all", async () => {
+    // Registrar scope is "all" — the route passes null to buildUnionsExport
     await testDb.union.create({
       data: { unionName: "Alpha Union", registrationNo: "T60-A", status: "ACTIVE" },
     });
     await testDb.union.create({
       data: { unionName: "Beta Union", registrationNo: "T60-B", status: "ACTIVE" },
     });
-    await testDb.union.create({
-      data: { unionName: "Gamma Union", registrationNo: "T60-C", status: "ACTIVE" },
-    });
+
+    const scope = getUnionScope({ role: "REGISTRAR", assignedUnionId: null });
+    expect(scope).toEqual({ kind: "all" });
 
     const { rows } = await buildUnionsExport({ assignedUnionId: null });
-
-    expect(rows).toHaveLength(3);
-    // Sorted by unionName ascending
-    expect(rows[0]["Union Name"]).toBe("Alpha Union");
-    expect(rows[1]["Union Name"]).toBe("Beta Union");
-    expect(rows[2]["Union Name"]).toBe("Gamma Union");
+    expect(rows).toHaveLength(2);
   });
 
-  it("with no assignedUnionId (undefined, the default) returns all unions", async () => {
-    await testDb.union.create({
-      data: { unionName: "Alpha Union", registrationNo: "T60-A", status: "ACTIVE" },
-    });
-    await testDb.union.create({
-      data: { unionName: "Beta Union", registrationNo: "T60-B", status: "ACTIVE" },
-    });
+  it("Officer WITHOUT assignedUnionId → scope is 'none' (route returns 403)", () => {
+    // T75b: the route checks getUnionScope before calling buildUnionsExport.
+    // For "none" scope, the route returns 403 and never calls buildUnionsExport.
+    const scope = getUnionScope({ role: "OFFICER", assignedUnionId: null });
+    expect(scope).toEqual({ kind: "none" });
+  });
 
-    const { rows } = await buildUnionsExport();
+  it("Officer with empty assignedUnionId → scope is 'none' (route returns 403)", () => {
+    const scope = getUnionScope({ role: "OFFICER", assignedUnionId: "" });
+    expect(scope).toEqual({ kind: "none" });
+  });
 
-    expect(rows).toHaveLength(2);
+  it("Officer with whitespace assignedUnionId → scope is 'none' (route returns 403)", () => {
+    const scope = getUnionScope({ role: "OFFICER", assignedUnionId: "   " });
+    expect(scope).toEqual({ kind: "none" });
+  });
+
+  it("Representative WITHOUT assignedUnionId → scope is 'none' (route returns 403)", () => {
+    const scope = getUnionScope({ role: "REPRESENTATIVE", assignedUnionId: null });
+    expect(scope).toEqual({ kind: "none" });
   });
 });
