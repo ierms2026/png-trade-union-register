@@ -35,9 +35,10 @@ OPEN item below is either answered, re-defaulted with a new date, or escalated.
 | D12 | Announcing the denominator change (58 → 78 on seed data) | Don't announce until D1 is confirmed | DEFAULTED | n/a | Stakeholder comms |
 | D13 | Public register crawlability (B15) | Server-render the list, keep the client filter; sitemap waits for the production URL | DEFAULTED | Low | T31 |
 | D14 | Rate limiting on public API routes | Deferred; low priority | DEFERRED | Low | Nothing |
-| D15 | When does a document's renewal clock start? | DECIDED 2026-10-06: the renewal period starts on the approval date. Needs a careful scoping task before code | DECIDED, not yet implemented | Medium | Expiry dates, statuses and the rate for approved documents |
+| D15 | When does a document's renewal clock start? | DECIDED 2026-10-06: the renewal period starts on the approval date. Scoped (T70); implementing the simple variant (T71) | DECIDED, implementation planned; one follow-up question open | Medium | Expiry dates, statuses and the rate for approved documents |
 | D16 | Will outside systems use webhooks or API keys? | YES (Registrar/owner, 2026-10-06). Treat `/api/v1/*` and webhook payloads as supported contracts | DECIDED | n/a | Integration docs, security review, contract tests |
-| D17 | Officers/Representatives with no assigned union | Fail closed: they see no data (a plain Forbidden), never everything | DEFAULTED | Low | T75 |
+| D17 | Officers/Representatives with no assigned union | Fail closed: they see no data (a plain Forbidden), never everything | DEFAULTED; helper built and applied to 2 routes; 13 more routes and the user-update gap still to fix | Low | T76, T77 |
+| D18 | External surface hardening defaults | No file paths or personal emails in external responses; correct webhook event header; webhook destinations must be public (no localhost, private or metadata addresses, no redirects) | DEFAULTED | Low | T78, T79 |
 
 ---
 
@@ -58,7 +59,7 @@ OPEN item below is either answered, re-defaulted with a new date, or escalated.
 - **Status:** the app is not live, so no figure has been published and nothing needs retracting. This is a launch gate: decide it with D1 before go-live.
 - **If the endpoint has been exposed anywhere already** (a staging or demo URL shared outside the team), treat it as live: compare its figure with the dashboard and check access logs.
 - **Escalation trigger:** evidence that an outside party already uses the endpoint.
-- **Update (2026-10-06):** the Registrar confirmed the D1 rule, so the public stats route will be aligned with it (it currently leaves Awaiting Review out of the denominator). This publishes nothing new; the route already serves a rate. Whether the public should be shown a rate on any page at all is still open (no page displays it today).
+- **Update (2026-10-06):** the Registrar confirmed the D1 rule, so the public stats route will be aligned with it (it currently leaves Awaiting Review out of the denominator). This publishes nothing new; the route already serves a rate. Whether the public should be shown a rate on any page at all is still open (no page displays it today). **Done (T72):** the route now follows the rule and matches the staff dashboard figure; its response fields are unchanged.
 
 ### D3: `db/custom.db`
 - **Default:** treat as possibly containing real records.
@@ -113,19 +114,37 @@ OPEN item below is either answered, re-defaulted with a new date, or escalated.
 - **Interim default (done in T50):** documents awaiting review have no expiry date and trigger no renewal notices.
 - **To find out before coding (scoping task):** whether the system records a reliable approval date; how already-approved documents should be treated if it doesn't (the fallback would be the upload date, flagged); and what the status should show while a renewal upload is awaiting approval but an older approved version is still valid. If that last point is ambiguous, it becomes one follow-up question for the Registrar.
 - **Reversal cost:** medium. It changes the expiry computation in `matrix.ts`, and the expiry dates, statuses and rate shown for already-approved documents would shift. The seed data has no approved documents, so tests must use constructed data.
-- **Status:** decided; not implemented. Plan: read-only scoping first, then implementation with tests.
+- **Scoping result (T70):** the approval date exists as `Document.reviewedAt` (one value per document, overwritten on each review, which fits how the system works: only the current version is used). Expiry is computed in two places (`calculator.ts` and inline in `matrix.ts`), both from the upload date. Uploading a renewal sets the document back to Pending and hides the earlier approved version. Rejected documents currently show as Awaiting Review.
+- **Plan (simple variant, T71):** the clock starts at `reviewedAt` for approved documents, falling back to the upload date if it is missing; one expiry function used everywhere; no new fields in any external response.
+- **Open question for the Registrar:** while a renewal is waiting for approval, should the status show the earlier approved document's status until the new one is approved, or just Awaiting Review (today's behavior)? Showing the earlier status would need a per-version approval date, a larger change, to be done only if the Registrar wants it.
+- **Optional second question:** a rejected document shows as Awaiting Review although nothing is under review and the union must resubmit. Should the union see something different?
+- **Status:** decided; scoped; implementation planned.
 
 ### D16: Outside systems will use webhooks and API keys
 - **Answer (2026-10-06):** yes, outside systems will use them. Which systems and when are not yet known.
 - **What this means:** the response shapes of `/api/v1/*` and the webhook payloads are now supported contracts. Changes must be additive or versioned, and every change to them (for example D15's effect on expiry dates, or the `awaitingReview` field) must be treated as a contract change.
 - **Required before launch:** (1) a security review of the external surface (API-key authentication and scopes, rate limiting on `/api/v1`, how API keys and webhook secrets are stored and shown, where webhooks are allowed to send); (2) an integration guide covering the endpoints, authentication, scopes, rate limits, error format, and the webhook events with payload examples and signature verification; (3) contract tests that fail if a documented response shape changes.
-- **Open:** who the outside systems are and their target date.
+- **Open:** who the outside systems are, their target date, and which webhook events they need. Three of the five declared events are never sent (document reviewed, contact update submitted, contact update reviewed); whether to build or remove them depends on that answer.
+- **Review result (T73):** real issues: webhook destinations are not checked (an address could point at internal systems), the event header always says "compliance-status-change", the v1 upload response exposes an internal file path, the uploaded-document webhook includes the uploader's email, and no tests lock the response shapes. Mis-rated in the review: unlimited failed key attempts (keys are 256-bit random, so guessing is not realistic; a limiter is hygiene), webhook signing secrets stored unhashed (they must be recoverable to sign), and replay protection (a receiver's duty; the guide must say so). The fix list is D18.
 
 ### D17: Officers and Representatives with no assigned union
 - **Finding (T60):** an Officer with no assigned union can currently export ALL unions and see document-type data for ALL unions, because the scoping code treats "no union" as "no restriction" (it fails open). The same pattern may exist elsewhere.
 - **Default:** fail closed. A user who is supposed to be limited to one union but has none assigned sees no data (a plain "Forbidden" response), never everything. Under the existing rule that Officers and Representatives are scoped to a union, an unassigned one is an invalid state.
 - **How:** one shared helper decides a user's union scope and every scoped route uses it. First applied to the two known routes (T75), then to any others the sweep finds.
 - **Also to check:** how a user can end up in that state (editing a user, deleting a union), and whether a user can reach another union's records by guessing an ID.
+- **Sweep result (T75a):** a user can be left with no union through the user-update screen (clearing the assignment is allowed; creating a user without one is not). Thirteen routes still show everything to a union-scoped user with no union: the unions list, compliance, dashboard stats and activity, calendar, search, documents, five exports, and the v1 unions export. Opening another union's record by its id is already well protected.
+- **Fix plan:** close the user-update gap (T76), then apply the shared helper to the 13 routes with route-level tests (T77).
+- **Reversal cost:** low.
+
+### D18: External surface hardening defaults
+- **Default (no outside system is connected yet, so changes are free):**
+  - external responses and webhook messages carry no internal file paths and no personal email addresses;
+  - the webhook event header names the real event;
+  - webhook destinations must be public http(s) addresses: loopback, private-network, link-local and cloud-metadata addresses are rejected, redirects are not followed, and the check runs both when a destination is saved and when a message is sent (a setting allows private destinations for local development only);
+  - failed API-key attempts get a per-address limiter (hygiene);
+  - contract tests lock the documented response shapes and webhook payloads.
+- **Not changed:** webhook signing secrets stay as they are (they must be recoverable to sign); replay protection stays the receiver's job and goes in the guide.
+- **Open:** whether to send the three unused webhook events (see D16).
 - **Reversal cost:** low.
 
 ---
@@ -165,6 +184,6 @@ OPEN item below is either answered, re-defaulted with a new date, or escalated.
 - [ ] Backup plan for the SQLite database
 - [ ] Accessibility check (B16) of public pages
 - [ ] Agent report files and the work log removed from the repository (automated commits added them)
-- [ ] External surface (D16, decided: yes): security review done; `/api/v1` rate limited; integration guide written; contract tests in place; outside systems and their dates identified
+- [ ] External surface (D16, D18): review done (T73); hardening fixes made (T78); contract tests in place (T79); integration guide written; the three never-sent webhook events built or removed; outside systems, their needs and their dates identified
 - [ ] D15 implemented and tested (renewal period starts at approval)
-- [ ] Union scoping fails closed everywhere (D17): sweep done, the shared helper used by every scoped route, record-level access checks confirmed
+- [ ] Union scoping fails closed everywhere (D17): sweep done; user-update gap closed (T76); shared helper used by all 13 remaining routes with route-level tests (T77); record-level access already confirmed
