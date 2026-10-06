@@ -841,3 +841,17 @@ Stage Summary:
 - T06e report packaged as /home/z/my-project/download/t06e-report.md (markdown, ~16.4KB, 264 lines).
 - Covers: Item 1 (digest/snapshot/notifications — all fine or harmlessly omit AWAITING_REVIEW), Item 2 (webhook payloads — no status counts, payload shape undocumented), Item 3 (v1 API — has awaitingReview in summary, no rate computed, undocumented), Item 4 (filters — no omissions), Item 5 (PROVISIONAL hits — 5 total, only 1 has a D-reference (D4), computeRateFromCounts is MISSING PROVISIONAL(D1)), Item 6 (Awaiting Review tile data flow traced end-to-end — shows a number, not blank).
 - 4 needs-fix items identified: missing PROVISIONAL(D1) comment, undocumented webhook payloads, undocumented v1 API, stale dashboard comment (already fixed on T50 branch).
+
+---
+Task ID: package-t71-report
+Agent: main
+Task: Package T71 report as a downloadable Markdown file
+
+Work Log:
+- Confirmed branch: fix/t71-renewal-clock-at-approval @ 8f9cf47, on top of main @ fd79ab8.
+- Wrote /home/z/my-project/download/t71-report.md (11.6KB, 211 lines). Report covers all 8 task steps with file:line evidence quotes.
+
+Stage Summary:
+- T71 report packaged as /home/z/my-project/download/t71-report.md (markdown, ~11.6KB, 211 lines).
+- Covers: the ONE function (computeExpiryDateFromApproval), reviewedAt added to fetchMatrixData, all approval paths set reviewedAt, 6 new tests with constructed data, 2 existing tests relaxed, on-screen wording changes, and before/after on seed data (0 APPROVED → no change visible).
+- Key result: D15 simple variant implemented. Renewal clock starts at approval date (reviewedAt) with upload-date fallback. No new fields in external responses (D16 preserved). Invisible on seed data (0 APPROVED docs).
