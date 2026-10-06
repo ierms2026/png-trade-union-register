@@ -13,7 +13,7 @@ import { ClickableRow } from "@/components/app/clickable-row";
 describe("ClickableRow", () => {
   it("renders a <button> by default", () => {
     const html = renderToStaticMarkup(
-      createElement(ClickableRow, { onClick: () => {} }, "Row content"),
+      createElement(ClickableRow, { onClick: () => {}, children: "Row content" }),
     );
     expect(html).toContain("<button");
     expect(html).toContain('type="button"');
@@ -22,7 +22,7 @@ describe("ClickableRow", () => {
 
   it("renders an <a> when href is provided", () => {
     const html = renderToStaticMarkup(
-      createElement(ClickableRow, { href: "/unions/123" }, "Link content"),
+      createElement(ClickableRow, { href: "/unions/123", children: "Link content" }),
     );
     expect(html).toContain("<a");
     expect(html).toContain('href="/unions/123"');
@@ -31,47 +31,47 @@ describe("ClickableRow", () => {
 
   it("includes focus-visible ring class", () => {
     const html = renderToStaticMarkup(
-      createElement(ClickableRow, { onClick: () => {} }, "Content"),
+      createElement(ClickableRow, { onClick: () => {}, children: "Content" }),
     );
     expect(html).toContain("focus-visible:ring");
   });
 
   it("renders disabled state on button", () => {
     const html = renderToStaticMarkup(
-      createElement(ClickableRow, { onClick: () => {}, disabled: true }, "Content"),
+      createElement(ClickableRow, { onClick: () => {}, disabled: true, children: "Content" }),
     );
     expect(html).toContain("disabled");
   });
 
   it("renders aria-label when provided", () => {
     const html = renderToStaticMarkup(
-      createElement(
-        ClickableRow,
-        { onClick: () => {}, "aria-label": "View Test Union" },
-        "Content",
-      ),
+      createElement(ClickableRow, {
+        onClick: () => {},
+        "aria-label": "View Test Union",
+        children: "Content",
+      }),
     );
     expect(html).toContain('aria-label="View Test Union"');
   });
 
   it("passes through custom className", () => {
     const html = renderToStaticMarkup(
-      createElement(
-        ClickableRow,
-        { onClick: () => {}, className: "grid grid-cols-2 gap-4" },
-        "Content",
-      ),
+      createElement(ClickableRow, {
+        onClick: () => {},
+        className: "grid grid-cols-2 gap-4",
+        children: "Content",
+      }),
     );
     expect(html).toContain("grid grid-cols-2 gap-4");
   });
 
   it("does not render href on <a> when disabled", () => {
     const html = renderToStaticMarkup(
-      createElement(
-        ClickableRow,
-        { href: "/unions/123", disabled: true },
-        "Content",
-      ),
+      createElement(ClickableRow, {
+        href: "/unions/123",
+        disabled: true,
+        children: "Content",
+      }),
     );
     expect(html).toContain("<a");
     expect(html).not.toContain('href="/unions/123"');

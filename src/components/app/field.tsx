@@ -109,9 +109,9 @@ export function Field({ error, hint, children, className }: FieldProps) {
  *   focusFirstInvalid(formRef);
  */
 export function focusFirstInvalid(
-  container: Ref<HTMLElement> | { current: HTMLElement | null },
+  container: { current: HTMLElement | null },
 ): void {
-  const el = "current" in container ? container.current : null;
+  const el = container.current;
   if (!el) return;
   const invalid = el.querySelector<HTMLElement>('[aria-invalid="true"]');
   if (invalid) {
