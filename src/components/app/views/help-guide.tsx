@@ -13,6 +13,7 @@ import {
   COMPLIANCE_STATUS_CONFIG,
   REVIEW_STATUS_CONFIG,
   UNION_STATUS_CONFIG,
+  ROLE_LABELS,
   type UserRole,
 } from "@/lib/dashboard/vocabulary";
 
@@ -52,7 +53,7 @@ interface RoleGuide {
 
 const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
   REGISTRAR: {
-    roleName: "Registrar",
+    roleName: ROLE_LABELS.REGISTRAR,
     summary:
       "You are the system administrator. You can do everything: manage unions, review documents, configure compliance rules, and manage users.",
     tasks: [
@@ -88,7 +89,7 @@ const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
     ],
   },
   INSPECTOR: {
-    roleName: "Inspector",
+    roleName: ROLE_LABELS.INSPECTOR,
     summary:
       "You oversee compliance across all unions. You can view everything, but you can't manage users or configure rules.",
     tasks: [
@@ -123,7 +124,7 @@ const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
     ],
   },
   OFFICER: {
-    roleName: "Officer",
+    roleName: ROLE_LABELS.OFFICER,
     summary:
       "You manage one or more assigned unions. You upload documents, create tasks, and track compliance for your unions.",
     tasks: [

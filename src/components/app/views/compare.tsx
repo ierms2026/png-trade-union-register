@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { GitCompare, Plus, X, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { type ComplianceStatus } from "@/lib/dashboard/status-config";
+import { COMPLIANCE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -223,7 +224,7 @@ export function CompareView() {
                     {letter}
                   </span>
                   <span className="text-muted-foreground">
-                    {status === "NOT_APPLICABLE" ? "Not Applicable" : status.charAt(0) + status.slice(1).toLowerCase()}
+                    {status === "NOT_APPLICABLE" ? COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.label : status.charAt(0) + status.slice(1).toLowerCase()}
                   </span>
                 </div>
               ))}

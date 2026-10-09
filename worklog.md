@@ -975,3 +975,31 @@ Stage Summary:
 - 7 new interactive tests lock the contract. The minimum testing-library infrastructure (@testing-library/react + user-event + jsdom + vitest.config.ts jsdom glob) is installed — B3 includes this because the original step0 setup was lost (Task B-Reconstruct-0 not yet done).
 - ConfirmDialog now has returnFocusRef prop + triggerRef/confirmSucceededRef focus-tracking + onOpenAutoFocus/onCloseAutoFocus + block-while-loading. This is the step0 hardening for the focus-return feature only; the full step0 hardening (testing-library setup, all interactive test files, phase2 keyboard work) is still Task B-Reconstruct-0.
 - NOTE: B3 includes the minimum interactive-test setup because the original step0 setup was lost. The full step0 hardening (all interactive .tsx test files, phase2 keyboard work, eslint react/no-children-prop scoping) remains Task B-Reconstruct-0.
+
+---
+Task ID: B4-label-source-guard
+Agent: main
+Task: Add label-source guard test + fix 4 hardcoded label violations
+
+Work Log:
+- R1 verified: HEAD at 73a0a47 (one automated UUID commit on top of B3's 249ccd2; 249ccd2 is an ancestor). Tree clean. Proceeded with 73a0a47 as actual base.
+- Step 3: inspected vocabulary.ts. Found canonical exports: COMPLIANCE_STATUS_CONFIG (6 labels: Compliant, Expiring, Overdue, Awaiting Review, Missing, Not Applicable), REVIEW_STATUS_CONFIG (3 labels: Pending Review, Approved, Rejected), ROLE_LABELS (3 labels: Registrar, Inspector, Officer), TASK_STATUS_CONFIG (4 labels: To Do, In Progress, Done, Cancelled), UNION_STATUS_CONFIG (3 labels: Active, Suspended, Deregistered). All labels extracted at test time via regex.
+- Step 4: created src/lib/__tests__/label-source-guard.test.ts. Node/source-text test (not jsdom). Scans .ts/.tsx files under src/components/ and src/app/. Skips __tests__/ directories, node_modules, .next. Allowlists src/app/api/export/ (CSV column headers — data format, not UI labels). Strips comments (// and /* */) before scanning. Matches labels as the ENTIRE quoted string content (avoids false positives on prose like "Approved by Registrar"). Also checks for old "Pending" label in review-context files (should be "Pending Review"). 5 tests: vocabulary defines compliance labels, vocabulary defines review labels, vocabulary defines role labels, no hardcoded label literals in scanned code, old "Pending" not used in review-context files.
+- Step 7: guard found 4 real violations:
+  * compare.tsx:226 — "Not Applicable" hardcoded in a ternary (should use COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.label)
+  * help-guide.tsx:55 — "Registrar" hardcoded as roleName (should use ROLE_LABELS.REGISTRAR)
+  * help-guide.tsx:91 — "Inspector" hardcoded as roleName (should use ROLE_LABELS.INSPECTOR)
+  * help-guide.tsx:126 — "Officer" hardcoded as roleName (should use ROLE_LABELS.OFFICER)
+  Stopped and reported per step 7. User approved Option 1: fix all 4 as part of B4.
+- Step 1 (fixes): fixed all 4 violations:
+  * compare.tsx: added import of COMPLIANCE_STATUS_CONFIG from vocabulary.ts; replaced "Not Applicable" with COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.label. No surrounding logic changed.
+  * help-guide.tsx: added ROLE_LABELS to existing vocabulary.ts import; replaced 3 roleName literals with ROLE_LABELS.REGISTRAR / .INSPECTOR / .OFFICER. No surrounding logic changed.
+- Step 6 (guard proof): injected scratch file src/components/app/__scratch-guard-probe.ts with `const scratch = "Pending";` + REVIEW_STATUS_CONFIG import (to trigger review-context). Guard FAILED with exact message: `components/app/__scratch-guard-probe.ts:1: old label "Pending" (should be "Pending Review" or use REVIEW_STATUS_CONFIG)`. Both the label-literal test and the old-Pending test failed. Removed scratch file. Guard PASSED with 5/5 tests.
+- Step 4 verification: guard test alone 5/5 pass; tsc 0 errors; full suite 701 tests / 48 files pass (was 696/47; +5 tests +1 file); build passes.
+- Allowlist: src/app/api/export/ — status labels used as CSV column headers in export routes (stats, compliance-matrix, expiry-forecast, compliance-report). These are data-format strings consumed by external systems, not rendered UI labels. Changing them would break the export format contract. Documented in the test with a comment.
+
+Stage Summary:
+- Label-source guard is now real enforcement. It catches: compliance status labels (6), review status labels (3), role labels (3), task status labels (4), union status labels (3) as hardcoded string literals in user-facing code (src/components/ + src/app/). Also catches the old "Pending" label in review-context files.
+- 4 real violations fixed: compare.tsx:226 ("Not Applicable" → COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.label), help-guide.tsx:55/91/126 ("Registrar"/"Inspector"/"Officer" → ROLE_LABELS.*). These were the same violations fixed in the lost commit 20519ce.
+- Allowlist: src/app/api/export/ (CSV headers — data format, not UI labels).
+- Guard proof: failed on scratch "Pending" in a review-context file, passed after scratch removal.
