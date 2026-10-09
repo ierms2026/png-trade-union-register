@@ -24,7 +24,37 @@ SELECT DISTINCT role FROM User;
 
 No `User` row references the rep role. The deletion is therefore **data-safe in dev** — nothing to migrate, nothing to archive.
 
-For other environments (staging/prod), re-run the same query before deploying. If any environment returns non-zero counts, run the **row-handling SQL in §3** before deploying this commit.
+### Staging + production — NOT YET CHECKED
+
+**Status as of 2026-10-09: staging and production have NOT been checked.** The dev environment has no remote DB access (no staging/prod `DATABASE_URL`, no SSH config, no deploy credentials, no Dockerfile beyond the historical one in `download/`). The check must be run by an operator with access to each environment before deploying commit `973d6cd`.
+
+**How to run the check** — pick whichever is easier:
+
+1. **Self-contained script** (recommended; uses the app's existing `DATABASE_URL` env var, so it works the same way inside a Docker container or on a host):
+
+   ```bash
+   # Staging
+   DATABASE_URL=<staging-DATABASE_URL> npx tsx scripts/preflight-check-representative-rows.ts
+
+   # Production
+   DATABASE_URL=<production-DATABASE_URL> npx tsx scripts/preflight-check-representative-rows.ts
+
+   # Inside a deployed container
+   docker exec -it <container> sh -c 'DATABASE_URL=$DATABASE_URL npx tsx scripts/preflight-check-representative-rows.ts'
+   ```
+
+   Exit code `0` = clean, safe to deploy. Exit code `1` = rep rows found, run the SQL in §3 first. Exit code `2` = could not connect, investigate before deploying.
+
+2. **Raw SQL** (run via `psql`, `sqlite3`, or your DB client of choice):
+
+   ```sql
+   SELECT DISTINCT role FROM User;                                -- eyeball what's there
+   SELECT COUNT(*) FROM User WHERE role = 'REPRESENTATIVE';       -- must be 0
+   SELECT COUNT(*) FROM ContactUpdateRequest;                     -- informational
+   SELECT COUNT(*) FROM ContactUpdateRequest WHERE status = 'PENDING'; -- informational
+   ```
+
+**Deploy gate:** do NOT deploy commit `973d6cd` to an environment until its pre-flight check returns 0 rep rows. If any environment returns non-zero, run the row-handling SQL in §3 against that environment first, re-run the pre-flight to confirm it now returns 0, then deploy.
 
 ---
 

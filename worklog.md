@@ -908,3 +908,32 @@ Stage Summary:
 - Pre-flight DB check: 0 rows have role='REPRESENTATIVE' in dev DB. Migration is data-safe in dev. Migration doc provides row-handling SQL for non-dev environments.
 - No prisma migrate needed: SQLite stores Role as TEXT; enum constraint lives only in Prisma schema; this commit's schema change is comments-only.
 - Out-of-scope findings (separate follow-up tasks): (1) portalLinkUrl/parsePortalLinkUrl/inferLinkAudience in vocabulary.ts are now effectively dead — only consumer of parsePortalLinkUrl was deleted PortalShell; portalLinkUrl still called by contact-requests approve/reject but no rep can receive the notification. (2) ContactUpdateRequest model + /api/contact-requests/* routes + ContactRequestsView still active on staff side but have no producer endpoint — review queue will always be empty. Retained deliberately so historical rows remain queryable.
+
+---
+Task ID: B2-preflight-script-runbook-d7-entry
+Agent: main
+Task: Add pre-flight check script, runbook section, + D7 decisions-register entry
+
+Work Log:
+- R1 verified: HEAD at 94339a2 (one automated UUID commit on top of B1's 973d6cd; 973d6cd is an ancestor, B1 work intact). Tree clean.
+- B1 assumptions confirmed: docs/migration-remove-representative-role.md exists; scripts/preflight-check-representative-rows.ts did NOT exist (pre-B2); portal dirs gone; prisma client available.
+- Created scripts/preflight-check-representative-rows.ts:
+  * Uses PrismaClient + $queryRawUnsafe (the typed client throws for role values outside the enum, so raw SQL is required for the check).
+  * UNION trick on the distinct-roles query handles both Postgres (quoted "User") and SQLite (unquoted User) by failing softly on the half that doesn't match.
+  * Reports: distinct roles present, User rows with role=REPRESENTATIVE, ContactUpdateRequest total + PENDING.
+  * Exit codes: 0 = clean (safe to deploy 973d6cd), 1 = rep rows found (run row-handling SQL first), 2 = cannot connect (investigate first).
+  * Header comment documents all 3 usage forms: host (DATABASE_URL=<env> npx tsx ...), production, docker exec.
+- Verified the script against the dev DB: exits 0, reports "Distinct roles present: INSPECTOR, OFFICER, REGISTRAR / User rows with role=REPRESENTATIVE: 0 / ContactUpdateRequest rows (total): 0 / ContactUpdateRequest rows (PENDING): 0 / PASS: no User rows reference the removed REPRESENTATIVE role."
+- Updated docs/migration-remove-representative-role.md §1: added "Staging + production — NOT YET CHECKED" subsection after the dev-DB results table. Documents: the dev environment has no remote DB access; the script run commands (host, production, docker exec forms); the raw-SQL alternative; the deploy gate (do NOT deploy 973d6cd to an environment until its pre-flight check returns 0 rep rows).
+- Updated docs/decisions-and-defaults.md D7 entry:
+  * Summary table row: DEFERRED → DECIDED 2026-10-09, with the round-by-round commit pointers (2f0e918 round 3 = enum narrowing; 973d6cd round 4 = dead-code deletion) and reversal cost (low: git revert + restart).
+  * D7 details section rewritten with: original deferred default, round 3 stop-the-bleeding, round 4 deletion, pre-flight row check results (dev clean, staging/prod NOT checked), row-handling SQL for non-dev environments, why no prisma migrate, reversal cost, pointer to migration doc, 2 open follow-up tasks (dead portalLinkUrl/parsePortalLinkUrl helpers; ContactUpdateRequest model with no producer endpoint).
+  * Checkpoint agenda item 4: "Hold one session with the Registrar's office on D6 and D7" → "Hold one session with the Registrar's office on D6. (D7 was decided 2026-10-09 ...)".
+  * Added a new pre-launch gate at the top of the checklist: "D7 pre-flight check run against staging AND production before deploying 973d6cd (run scripts/preflight-check-representative-rows.ts or the SQL in docs/migration-remove-representative-role.md; exit 0 = safe to deploy, exit 1 = run row-handling SQL first, exit 2 = investigate DB connection). Dev DB confirmed clean 2026-10-09; staging/prod NOT yet checked."
+- R3 verification: tsc 0 errors; vitest 689 tests / 46 files pass (unchanged from B1 — no test count change, this is a scripts/+docs-only commit); next build passes.
+
+Stage Summary:
+- Pre-flight check is now turnkey for an operator: one script, one DATABASE_URL, exit code gates the deploy. No remote DB access was fabricated.
+- Deploy gate is explicit in three places: the migration doc §1 "Staging + production — NOT YET CHECKED" subsection, the D7 entry in the decisions register, and the pre-launch gates checklist.
+- D7 is now fully recorded in the decisions register (was DEFERRED; now DECIDED with round-by-round progression, commit pointers, row-handling SQL, and 2 open follow-up tasks).
+- WHAT THE OPERATOR NEEDS TO DO: run 'DATABASE_URL=<staging> npx tsx scripts/preflight-check-representative-rows.ts' and 'DATABASE_URL=<prod> npx tsx scripts/preflight-check-representative-rows.ts'. If both exit 0, deploy 973d6cd. If either exits 1, run 'UPDATE User SET role=\'OFFICER\' WHERE role=\'REPRESENTATIVE\'' against that environment, re-run the script to confirm exit 0, then deploy. If either exits 2, investigate the DB connection before deploying.

@@ -27,7 +27,7 @@ OPEN item below is either answered, re-defaulted with a new date, or escalated.
 | D4 | "Not Applicable" label policy | Canonical "Not Applicable" + `shortLabel: "N/A"` for tight spaces | DEFAULTED | Low | B7 |
 | D5 | Retention flag off: behavior | Bare 404, no env-var text in responses | DEFAULTED | Low | T11 |
 | D6 | Public "Last updated" meaning | Deferred; no change | DEFERRED | n/a | Nothing |
-| D7 | Officer vs. Representative role model; Registrar-only bottleneck (B17, B18) | No structural change; proceed on current role model | DEFERRED | Medium if roles later merge | T23/T24 are label-only, so low impact |
+| D7 | Officer vs. Representative role model; Registrar-only bottleneck (B17, B18) | DECIDED 2026-10-09: remove the REPRESENTATIVE role + `/portal` app entirely; OFFICER is the only union-scoped staff role. The `Role` enum was narrowed in `2f0e918` (round 3); the `/portal` route, `PortalShell`, portal views, `/api/portal/*` stubs, and orphaned scripts deleted in `973d6cd` (round 4) | DECIDED | Low (deletion; reverting is `git revert` + restart) | None |
 | D8 | The 22 baseline type errors; `ignoreBuildErrors: true` | UPDATED: errors in src/ are cleared; fix the 13 non-src errors, then turn the flag off (T61) | DEFAULTED | Low (one line) | T61 |
 | D9 | Editing contact details without a rebuild (B14) | Documented rebuild process (README), no admin UI | DEFAULTED | Low | Nothing |
 | D10 | Legislation storage (B13) | Plan T30 (move to DB) before launch; no code yet | DEFAULTED, T02 = risk (deployment unconfirmed) | n/a | T30 |
@@ -80,7 +80,17 @@ OPEN item below is either answered, re-defaulted with a new date, or escalated.
 - **Deferred:** nothing depends on it. No change until the Registrar's session.
 
 ### D7: Role model and delegation
-- **Deferred:** T23 (portal nav) only aligns labels and T24 only adds discoverability. Neither depends on the answer. If the roles are later merged or restructured, expect small rework in those two areas.
+- **Original default (rounds 1–2):** deferred. T23 (portal nav) only aligned labels and T24 only added discoverability; neither depended on the answer, so the role model was left as REGISTRAR / INSPECTOR / OFFICER / REPRESENTATIVE.
+- **Round 3 — `2f0e918` (2026-10-06):** the REPRESENTATIVE value was removed from the Prisma `Role` enum. Every place that branched on `Role.REPRESENTATIVE` was rewritten to treat OFFICER as the only union-scoped staff role. The `/portal` route, `PortalShell`, the portal views, and the `/api/portal/*` routes were kept as dead code: the page bounced every authenticated user to `/`, and the API routes returned 403. This was a "stop the bleeding" commit — no rows were migrated, the dead code was left for a separate deletion pass.
+- **Round 4 — `973d6cd` (2026-10-09):** the dead code was deleted. The `/portal` route, `PortalShell`, the five portal views, the six `/api/portal/*` 403-stub routes, and the two orphaned scripts (`scripts/seed-demo-rep.ts`, `scripts/test-portal-contact-flow.ts`) were removed. 11 stale comment references to REPRESENTATIVE were cleaned up across `src/`. The `ContactUpdateRequest` model + `/api/contact-requests/*` review-queue routes were retained on the staff side so historical rows remain queryable (the model has no producer endpoint after the deletion — see "Open" below).
+- **Pre-flight row check (dev DB):** `SELECT COUNT(*) FROM User WHERE role = 'REPRESENTATIVE'` → 0. Distinct `User.role` values: REGISTRAR, INSPECTOR, OFFICER. The deletion is data-safe in dev. **Staging and production have NOT been checked** — the dev environment has no remote DB access. An operator must run `scripts/preflight-check-representative-rows.ts` (or the raw SQL in the migration doc) against each environment before deploying `973d6cd`. The script exits 0 on clean, 1 on rep rows found, 2 on connection failure.
+- **Row-handling for non-dev environments:** if any environment returns non-zero counts, run `UPDATE User SET role = 'OFFICER' WHERE role = 'REPRESENTATIVE'` BEFORE deploying `973d6cd` (the OFFICER code path is the only union-scoped staff role, and rep users already had `assignedUnionId` populated). `ContactUpdateRequest` rows need no migration — there is no FK from `ContactUpdateRequest.requestedById` to `User.role`, so converting the user row to OFFICER does not invalidate the request row.
+- **Why no `prisma migrate`:** SQLite stores `Role` as `TEXT` (no DB-level enum constraint); the enum constraint lives only in the Prisma schema. The schema change in round 4 is comments-only (the enum itself was narrowed in round 3). The project does not use `prisma migrate` — there is no `migrations/` directory; the DB schema is reconciled via `prisma db push` and the seed scripts.
+- **Reversal cost:** low. Reverting is `git revert 973d6cd` + `git revert 2f0e918` (or just `git revert 973d6cd` if round 3 is to be kept) + restart the dev server. No data migration to reverse — no rows were changed.
+- **Migration doc:** `docs/migration-remove-representative-role.md` covers the pre-flight check, schema state, row-handling SQL, why no `prisma migrate` is needed, and out-of-scope findings.
+- **Open (follow-up tasks, not blocking this decision):**
+  1. `portalLinkUrl` / `parsePortalLinkUrl` / `inferLinkAudience` in `src/lib/dashboard/vocabulary.ts` are now effectively dead. The only consumer of `parsePortalLinkUrl` was the deleted `PortalShell`. `portalLinkUrl` is still called by `/api/contact-requests/[id]/{approve,reject}/route.ts` to build notification linkUrls, but no rep user can exist to receive them, so those notifications are unreachable. Removing these helpers + rep-targeted notification creation is a separate cleanup task (it touches the email-template audience-aware button-label logic + the dashboard-links test).
+  2. The `ContactUpdateRequest` model + `/api/contact-requests/*` routes + `ContactRequestsView` are still active on the staff side (Registrar review queue), but they have no producer endpoint after this deletion — the review queue will always be empty. The model + routes are retained deliberately so any historical rows remain queryable; a future task can decide whether to drop the model entirely or repurpose the review-queue UI for a different submission flow.
 
 ### D8: Type errors and the build flag
 - **Original default:** don't flip `ignoreBuildErrors` until the type errors are understood.
@@ -166,12 +176,13 @@ OPEN item below is either answered, re-defaulted with a new date, or escalated.
 1. Registrar: D1 and D15 are answered (recorded above). Still open: D2 (show a public rate at all?) and, if the scoping task finds it ambiguous, what status a renewal awaiting approval should show.
 2. Project owner answers D3.
 3. Review results from T02, T08 and T07, and re-default or escalate what they surface.
-4. Hold one session with the Registrar's office on D6 and D7.
+4. Hold one session with the Registrar's office on D6. (D7 was decided 2026-10-09 — see the D7 entry above. The D7 follow-up cleanup tasks listed in the "Open" section can be scheduled once the session is over.)
 
 ---
 
 ## Pre-launch gates (the app is in dev mode; none of these block current work)
 
+- [ ] D7 pre-flight check run against staging AND production before deploying `973d6cd` (run `scripts/preflight-check-representative-rows.ts` or the SQL in `docs/migration-remove-representative-role.md`; exit 0 = safe to deploy, exit 1 = run row-handling SQL first, exit 2 = investigate DB connection). Dev DB confirmed clean 2026-10-09; staging/prod NOT yet checked.
 - [ ] D1 confirmed (done, provisional); public stats route aligned with the rule; D2 decided (should the public see a rate at all?)
 - [ ] D3: `db/custom.db` confirmed as seed data, untracked and gitignored
 - [ ] D10: legislation persistence resolved (T30 or a volume mount)
