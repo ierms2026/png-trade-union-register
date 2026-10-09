@@ -4,7 +4,7 @@ import Image from "next/image";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
-import { getExpiryForecast, getNeedsAttention, type ComplianceCell, type UnionSummary } from "@/lib/dashboard/metrics";
+import { getExpiryForecast, getNeedsAttention, tallyStatuses, computeRateFromCounts, type ComplianceCell, type UnionSummary } from "@/lib/dashboard/metrics";
 import { getComplianceTrend } from "@/lib/dashboard/snapshot";
 import { STATUS_CONFIG, EXPIRING_WINDOW_DAYS, COMPLIANCE_STATUSES } from "@/lib/dashboard/status-config";
 import { ArrowLeft, Printer, FileText, AlertTriangle, CheckCircle2, XCircle, FileQuestion, Ban, FileDown, Clock } from "lucide-react";
@@ -57,23 +57,23 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
   const matrix = buildComplianceMatrix(data);
   const now = new Date();
 
-  // --- 2. Build summary statistics ---
-  let compliant = 0, expiring = 0, overdue = 0, awaitingReview = 0, missing = 0, notApplicable = 0;
-  for (const row of matrix.unions) {
-    for (const cell of row.scores) {
-      switch (cell.status) {
-        case "COMPLIANT": compliant++; break;
-        case "EXPIRING": expiring++; break;
-        case "OVERDUE": overdue++; break;
-        case "AWAITING_REVIEW": awaitingReview++; break;
-        case "MISSING": missing++; break;
-        case "NOT_APPLICABLE": notApplicable++; break;
-      }
-    }
-  }
+  // --- 2. Build summary statistics via the canonical helpers --------------
+  // D1 rule lives in computeRateFromCounts (PROVISIONAL(D1) marker there) —
+  // do NOT re-implement it here. tallyStatuses accepts ComplianceScoreCell
+  // (which has a `status` field) and returns a ComplianceCounts object;
+  // computeRateFromCounts turns that into the rate.
+  const allScoreCells = matrix.unions.flatMap((row) => row.scores);
+  const counts = tallyStatuses(allScoreCells);
+  const rate = computeRateFromCounts(counts);
+  const compliant = counts.COMPLIANT;
+  const expiring = counts.EXPIRING;
+  const overdue = counts.OVERDUE;
+  const awaitingReview = counts.AWAITING_REVIEW;
+  const missing = counts.MISSING;
+  const notApplicable = counts.NOT_APPLICABLE;
   const totalCells = matrix.unions.length * matrix.documentTypes.length;
-  const applicableCells = compliant + expiring + overdue + awaitingReview + missing;
-  const complianceRate = applicableCells === 0 ? 0 : Math.round((compliant / applicableCells) * 100);
+  const applicableCells = rate.denominator;
+  const complianceRate = rate.percentage;
 
   // --- 3. Build needs attention + expiry forecast ---
   const cells: ComplianceCell[] = matrix.unions.flatMap((row) =>

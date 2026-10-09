@@ -1,5 +1,5 @@
 import { fetchMatrixData, buildComplianceMatrix, type ComplianceMatrixResponse, type ComplianceScoreCell } from "@/lib/compliance/matrix";
-import { getExpiryForecast, type ComplianceCell } from "@/lib/dashboard/metrics";
+import { getExpiryForecast, tallyStatuses, computeRateFromCounts, type ComplianceCell } from "@/lib/dashboard/metrics";
 import { STATUS_CONFIG, EXPIRING_WINDOW_DAYS, FORECAST_BUCKETS } from "@/lib/dashboard/status-config";
 import type { ComplianceStatus } from "@/lib/dashboard/status-config";
 
@@ -69,25 +69,27 @@ export async function buildComplianceReportHtml(options: ReportOptions = {}): Pr
   }
   const matrix = buildComplianceMatrix(data, now);
 
-  // --- Tally the status counts --------------------------------------------
-  let compliant = 0, expiring = 0, overdue = 0, awaitingReview = 0, missing = 0, notApplicable = 0;
+  // --- Tally the status counts via the canonical helpers -----------------
+  // D1 rule lives in computeRateFromCounts (PROVISIONAL(D1) marker there) —
+  // do NOT re-implement it here. tallyStatuses accepts ComplianceScoreCell
+  // (which has a `status` field) and returns a ComplianceCounts object;
+  // computeRateFromCounts turns that into the rate.
+  const allCells: Array<{ status: ComplianceStatus }> = [];
   for (const row of matrix.unions) {
     for (const cell of row.scores) {
-      switch (cell.status) {
-        case "COMPLIANT": compliant++; break;
-        case "EXPIRING": expiring++; break;
-        case "OVERDUE": overdue++; break;
-        case "AWAITING_REVIEW": awaitingReview++; break;
-        case "MISSING": missing++; break;
-        case "NOT_APPLICABLE": notApplicable++; break;
-      }
+      allCells.push(cell);
     }
   }
-  // Rate per the canonical rule (same as metrics.ts computeRateFromCounts):
-  // numerator = COMPLIANT; denominator = COMPLIANT + EXPIRING + OVERDUE +
-  // AWAITING_REVIEW + MISSING (NOT_APPLICABLE excluded).
-  const totalCells = compliant + expiring + overdue + awaitingReview + missing;
-  const overallRate = totalCells === 0 ? 0 : Math.round((compliant / totalCells) * 100);
+  const counts = tallyStatuses(allCells);
+  const rate = computeRateFromCounts(counts);
+  const compliant = counts.COMPLIANT;
+  const expiring = counts.EXPIRING;
+  const overdue = counts.OVERDUE;
+  const awaitingReview = counts.AWAITING_REVIEW;
+  const missing = counts.MISSING;
+  const notApplicable = counts.NOT_APPLICABLE;
+  const totalCells = rate.denominator;
+  const overallRate = rate.percentage;
 
   // --- Build the needs-attention list (overdue + expiring) ----------------
   const needsAttention: Array<{

@@ -1003,3 +1003,31 @@ Stage Summary:
 - 4 real violations fixed: compare.tsx:226 ("Not Applicable" → COMPLIANCE_STATUS_CONFIG.NOT_APPLICABLE.label), help-guide.tsx:55/91/126 ("Registrar"/"Inspector"/"Officer" → ROLE_LABELS.*). These were the same violations fixed in the lost commit 20519ce.
 - Allowlist: src/app/api/export/ (CSV headers — data format, not UI labels).
 - Guard proof: failed on scratch "Pending" in a review-context file, passed after scratch removal.
+
+---
+Task ID: B5-align-report-rate-with-shared-helper
+Agent: main
+Task: Align report compliance rate with shared helper (AWAITING_REVIEW audit fix reconstruction)
+
+Work Log:
+- R1 verified: HEAD at 950ee75 (exactly the expected base from B4). Tree clean.
+- Step 3: located shared helper. `computeRateFromCounts` at src/lib/dashboard/metrics.ts:193, with `tallyStatuses` at src/lib/dashboard/metrics.ts:162. Current callers: /api/dashboard/stats, /api/export/stats, /api/public/stats (via public-stats.ts). Formula: numerator = COMPLIANT, denominator = COMPLIANT + EXPIRING + OVERDUE + AWAITING_REVIEW + MISSING, percentage = Math.round(numerator/denominator * 100), 0 if denominator is 0. Marked PROVISIONAL(D1).
+- Step 4: found two hand-rolled rate computations:
+  * src/lib/compliance/report-html.ts:73-90 — hand-rolled switch+tally+rate block. Same formula as the helper but bypasses it.
+  * src/app/reports/compliance/page.tsx:61-76 — same pattern. Same formula, same bypass.
+  Both had a comment saying "same as metrics.ts computeRateFromCounts" but didn't actually call it — the D1 guardrail says "the rule lives in computeRateFromCounts() only... No new code may re-implement it."
+- Step 5: replaced both local computations with tallyStatuses() + computeRateFromCounts():
+  * report-html.ts: added tallyStatuses + computeRateFromCounts to imports; replaced the switch+tally+rate block with allCells array → tallyStatuses → computeRateFromCounts → local count variables read from the returned ComplianceCounts object. totalCells = rate.denominator, overallRate = rate.percentage.
+  * reports/compliance/page.tsx: same pattern. Added tallyStatuses + computeRateFromCounts to imports; replaced with allScoreCells flatMap → tallyStatuses → computeRateFromCounts → local count variables. applicableCells = rate.denominator, complianceRate = rate.percentage. totalCells (matrix.unions.length * matrix.documentTypes.length) kept as-is — it's a different metric (total grid cells including NOT_APPLICABLE) used for a different display purpose.
+- Step 6: before-and-after comparison. The hand-rolled formula was identical to computeRateFromCounts (same numerator, same denominator, same rounding). **Output values did NOT change.** This is a code-smell fix (single-source enforcement), not a behavior change.
+- Step 7: existing test src/lib/__tests__/report-html-awaiting-review.test.ts (3 tests) covers report-html generation. Ran it — passes with no changes needed. No test covers the reports/compliance page directly (dashboard-nav.test.ts only checks route coverage, not behavior). No test updates needed.
+- Step 8 verification: targeted test 3/3 pass; tsc 0 errors; full suite 701 tests / 48 files pass (unchanged from B4); build passes.
+- Helper used: src/lib/dashboard/metrics.ts#computeRateFromCounts (+ tallyStatuses from same file)
+- Files changed: src/lib/compliance/report-html.ts, src/app/reports/compliance/page.tsx
+- Output comparison: unchanged (both old and new use the same formula)
+- Tests: none updated (existing report-html-awaiting-review.test.ts passes as-is; no behavior test exists for the reports page)
+
+Stage Summary:
+- Both hand-rolled rate computations (report-html.ts + reports/compliance/page.tsx) now route through tallyStatuses() + computeRateFromCounts() from src/lib/dashboard/metrics.ts. The D1 rule now genuinely lives in one place.
+- Output values unchanged — the hand-rolled formula was identical to the helper's formula. This is a code-smell fix, not a behavior change.
+- No test updates needed — the existing report-html-awaiting-review.test.ts passes as-is.
