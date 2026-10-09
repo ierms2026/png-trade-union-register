@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { toCsv, CSV_HEADERS } from "@/lib/csv";
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Officer scoping: only their own actions
-  if (user.role === "OFFICER") {
+  if (user.role === Role.OFFICER) {
     where.actorId = user.id;
   }
 

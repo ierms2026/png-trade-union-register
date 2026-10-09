@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import { getExpiryForecast, type ComplianceCell } from "@/lib/dashboard/metrics";
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await fetchMatrixData();
-  if (user.role === "OFFICER" && user.assignedUnionId) {
+  if (user.role === Role.OFFICER && user.assignedUnionId) {
     data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
   }
   const matrix = buildComplianceMatrix(data);

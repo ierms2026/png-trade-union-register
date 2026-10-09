@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Severity } from "@prisma/client";
+import { Role, Severity } from "@prisma/client";
 
 // =============================================================================
 // PATCH /api/unions/[unionId]/documents/[documentId]/visibility
@@ -34,7 +34,7 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
-  if (user.role !== "REGISTRAR") {
+  if (user.role !== Role.REGISTRAR) {
     return NextResponse.json(
       { error: "Only Registrars can control document visibility." },
       { status: 403 },

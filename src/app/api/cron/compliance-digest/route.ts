@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing or invalid Authorization header." }, { status: 401 });
   }
   const token = authHeader.slice(7);
-  const secret = process.env.CRON_SECRET || (process.env.NODE_ENV !== "production" ? "dev-cron-secret-preview-only" : undefined);
+  const secret = process.env.CRON_SECRET;
   if (!secret || token.length !== secret.length || !timingSafeEqual(Buffer.from(token), Buffer.from(secret))) {
     return NextResponse.json({ error: "Invalid cron secret." }, { status: 401 });
   }

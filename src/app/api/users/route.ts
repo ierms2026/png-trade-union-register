@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
   // assignedUnionId — required for OFFICER, must be null for others.
   // Per spec, Officers are scoped to exactly one union; Registrars and
   // Inspectors have no scoping.
-  if (body.role === "OFFICER") {
+  if (body.role === Role.OFFICER) {
     if (
       typeof body.assignedUnionId !== "string" ||
       body.assignedUnionId.trim().length === 0

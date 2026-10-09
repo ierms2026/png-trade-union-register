@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
@@ -36,7 +37,7 @@ export async function GET() {
   // --- 1. Count unions + documents (parallel) ----------------------------
   // Officers see only their assigned union's counts.
   const unionWhere =
-    user.role === "OFFICER" && user.assignedUnionId
+    user.role === Role.OFFICER && user.assignedUnionId
       ? { id: user.assignedUnionId }
       : {};
 
@@ -47,7 +48,7 @@ export async function GET() {
     db.union.count({ where: unionWhere }),
     db.document.count({
       where:
-        user.role === "OFFICER" && user.assignedUnionId
+        user.role === Role.OFFICER && user.assignedUnionId
           ? { unionId: user.assignedUnionId, disposedAt: null }
           : { disposedAt: null },
     }),
@@ -58,7 +59,7 @@ export async function GET() {
   // Officers, we filter the unions list post-fetch (the matrix builder
   // iterates over `data.unions`, so filtering there scopes the result).
   const data = await fetchMatrixData();
-  if (user.role === "OFFICER" && user.assignedUnionId) {
+  if (user.role === Role.OFFICER && user.assignedUnionId) {
     data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
   }
   const matrix = buildComplianceMatrix(data);

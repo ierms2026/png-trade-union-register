@@ -47,11 +47,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const token = authHeader.slice(7);
-  const secret =
-    process.env.CRON_SECRET ||
-    (process.env.NODE_ENV !== "production"
-      ? "dev-cron-secret-preview-only"
-      : undefined);
+  const secret = process.env.CRON_SECRET;
   if (
     !secret ||
     token.length !== secret.length ||

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
-  if (user.role !== "REGISTRAR") {
+  if (user.role !== Role.REGISTRAR) {
     return NextResponse.json(
       {
         error:

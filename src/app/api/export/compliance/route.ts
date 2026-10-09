@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Role } from "@prisma/client";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import { toCSV, csvResponse } from "@/lib/csv";
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (!hasScope(user, "compliance:read")) return new Response("Forbidden", { status: 403 });
 
   const data = await fetchMatrixData();
-  if (user.role === "OFFICER" && user.assignedUnionId) {
+  if (user.role === Role.OFFICER && user.assignedUnionId) {
     data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
   }
   const matrix = buildComplianceMatrix(data);

@@ -1031,3 +1031,56 @@ Stage Summary:
 - Both hand-rolled rate computations (report-html.ts + reports/compliance/page.tsx) now route through tallyStatuses() + computeRateFromCounts() from src/lib/dashboard/metrics.ts. The D1 rule now genuinely lives in one place.
 - Output values unchanged — the hand-rolled formula was identical to the helper's formula. This is a code-smell fix, not a behavior change.
 - No test updates needed — the existing report-html-awaiting-review.test.ts passes as-is.
+
+---
+Task ID: B6-registrar-route-auth-hardening
+Agent: main
+Task: Harden registrar-only API route authorization (Role enum migration + cron secret fix)
+
+Work Log:
+- R1 verified: HEAD at 3baad47 (exactly the expected base from B5). Tree clean.
+- Step 3: identified auth helper pattern. getAuthUser from src/lib/auth/auth-guard.ts (session auth); getAuthUserOrApiKey (session OR API key). Role-check idiom: `if (user.role !== Role.REGISTRAR) { return 403 }` using Role enum from @prisma/client.
+- Step 4: audited all privileged API routes. Every Registrar-only route has a server-side role check (none rely on UI visibility alone). The audit found:
+  * 7 routes using string-literal `"REGISTRAR"` instead of `Role.REGISTRAR` (drift hazard — same behavior today, but if the Role enum values are ever renamed, the literal checks silently keep checking the old string)
+  * 12 routes using string-literal `"OFFICER"` / `"INSPECTOR"` for scoping checks (same hazard)
+  * 3 cron routes with a dev-secret fallback (`"dev-cron-secret-preview-only"` in non-production) — the other 3 cron routes require CRON_SECRET always
+- Step 5: fixed 25 string-literal role checks across 17 files → Role enum:
+  * 7 REGISTRAR-literal files: unions/route.ts, unions/[unionId]/documents/[documentId]/visibility/route.ts, legislation/route.ts, compliance/rules/[id]/route.ts, compliance/rules/preview/route.ts, users/route.ts (body.role === "OFFICER"), + the 12 OFFICER/INSPECTOR-literal files: unions/[unionId]/documents/[documentId]/versions/route.ts, unions/[unionId]/route.ts, dashboard/activity/route.ts, dashboard/stats/route.ts, export/expiry-forecast/route.ts, export/audit/route.ts, export/stats/route.ts, export/compliance/route.ts, export/compliance-matrix/route.ts, compliance/route.ts, calendar/route.ts. All reject with 403 for unauthorized roles.
+  * Added `import { Role } from "@prisma/client"` to each file that was missing it (16 files).
+- Step 6: Officer scoping verified. All routes that return union-scoped data filter by `user.assignedUnionId` server-side. No route exposes cross-union data to an Officer. Scoping mechanisms:
+  * Dashboard stats/activity: `user.role === Role.OFFICER && user.assignedUnionId` → filters unions to assignedUnionId
+  * Compliance/calendar/export: same pattern — filter matrix data to assignedUnionId
+  * Document routes: `user.assignedUnionId !== unionId` → 403
+  * Search: `isUnionScopedRole` → forced to assignedUnionId (ignores ?union= filter)
+- Step 7: cron endpoints verified. All 6 cron routes use `timingSafeEqual` with `CRON_SECRET` via Bearer header. Fixed 3 routes that had a dev-secret fallback (`"dev-cron-secret-preview-only"` in non-production) — standardized to fail-closed (require CRON_SECRET always, same as the other 3 routes). Files fixed: compliance-digest/route.ts, compliance-sweep/route.ts, compliance-snapshot/route.ts.
+- Step 8: REPRESENTATIVE check. Only 4 D7-history comments remain in src/ (tasks/route.ts, extract-text/route.ts, unions/[unionId]/documents/route.ts, search/route.ts). No route, guard, or schema path accepts REPRESENTATIVE. No action needed.
+- Step 9: route-coverage test unchanged — no routes added or removed in this task.
+- Step 10 verification: route-coverage test 4/4 pass; tsc 0 errors; full suite 701 tests / 48 files pass (unchanged); build passes.
+
+Route audit table (all checked — all have server-side role enforcement):
+| Route family | Auth check | Role check | Result |
+|---|---|---|---|
+| /api/users (GET, POST, [id] GET/PUT/DELETE, reset-password, reset-2fa) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/api-keys (GET, POST, [id] PATCH) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/webhooks (GET, POST, [id] DELETE/PATCH, [id]/deliveries GET) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/retention (GET, [id]/approve, [id]/reject) | getAuthUser | Role.REGISTRAR (approve) / Role.REGISTRAR+INSPECTOR (GET+reject) | ✓ (was already enum) |
+| /api/dispositions (GET, [id]/execute, [id]/cancel) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/legal-holds ([id]/place, [id]/lift) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/reviews (GET, [id]/approve, [id]/reject) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/contact-requests (GET, [id]/approve, [id]/reject) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/security (overview, unlock, login-trend) | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/tasks/assignees | getAuthUser | Role.REGISTRAR | ✓ (was already enum) |
+| /api/unions (POST create) | getAuthUser | Role.REGISTRAR | ✓ FIXED: "REGISTRAR" → Role.REGISTRAR |
+| /api/unions/[id]/documents/[id]/visibility | getAuthUser | Role.REGISTRAR | ✓ FIXED: "REGISTRAR" → Role.REGISTRAR |
+| /api/legislation (POST, PUT, DELETE) | getAuthUser | Role.REGISTRAR | ✓ FIXED: "REGISTRAR" → Role.REGISTRAR (3 sites) |
+| /api/compliance/rules/[id] (PUT) | getAuthUser | Role.REGISTRAR | ✓ FIXED: "REGISTRAR" → Role.REGISTRAR |
+| /api/compliance/rules/preview (POST) | getAuthUser | Role.REGISTRAR | ✓ FIXED: "REGISTRAR" → Role.REGISTRAR |
+| Officer scoping routes (12 files) | getAuthUser | "OFFICER"/"INSPECTOR" → Role.OFFICER/INSPECTOR | ✓ FIXED: 18 string-literal → enum |
+
+Stage Summary:
+- All Registrar-only API routes enforce role server-side. None rely on UI visibility alone.
+- 25 string-literal role checks across 17 files migrated to Role enum (compiler-enforced). If the Role enum values are ever renamed, the compiler will catch it — the string-literal form would have silently kept checking the old string.
+- 3 cron dev-secret fallbacks removed — all 6 cron routes now require CRON_SECRET always (fail-closed).
+- Officer scoping verified: all routes filter by assignedUnionId server-side. No cross-union data exposure.
+- REPRESENTATIVE not accepted anywhere — only D7-history comments remain.
+- Route-coverage test unchanged (no routes added/removed).

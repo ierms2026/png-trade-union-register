@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   if (!hasScope(user, "compliance:read")) return NextResponse.json({ error: "Your API key does not have the 'compliance:read' scope." }, { status: 403 });
 
   const data = await fetchMatrixData();
-  if (user.role === "OFFICER" && user.assignedUnionId) {
+  if (user.role === Role.OFFICER && user.assignedUnionId) {
     data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
   }
   const matrix = buildComplianceMatrix(data);

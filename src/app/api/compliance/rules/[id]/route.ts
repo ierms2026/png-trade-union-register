@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { Severity } from "@prisma/client";
+import { Role, Severity } from "@prisma/client";
 
 // =============================================================================
 // PUT /api/compliance/rules/[id]
@@ -93,7 +93,7 @@ export async function PUT(
       { status: 401 },
     );
   }
-  if (user.role !== "REGISTRAR") {
+  if (user.role !== Role.REGISTRAR) {
     // 403, not 404 — the rule's existence isn't secret (this is an
     // authenticated internal endpoint), and a 403 correctly signals
     // "you can see this rule exists, but you can't edit it."

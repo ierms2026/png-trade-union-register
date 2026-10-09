@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
   if (tab === "all" || tab === "tasks") {
     const taskWhere = {
       dueDate: { gte: monthStart, lte: monthEnd },
-      ...(user.role === "OFFICER" && user.assignedUnionId
+      ...(user.role === Role.OFFICER && user.assignedUnionId
         ? {
             OR: [
               { unionId: user.assignedUnionId },
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest) {
     for (const v of versions) {
       // Officer scoping
       if (
-        user.role === "OFFICER" &&
+        user.role === Role.OFFICER &&
         user.assignedUnionId &&
         v.document.unionId !== user.assignedUnionId
       ) {
@@ -125,7 +126,7 @@ export async function GET(req: NextRequest) {
   // --- Compliance issues (EXPIRING + OVERDUE) -----------------------------
   if (tab === "all" || tab === "compliance") {
     const data = await fetchMatrixData();
-    if (user.role === "OFFICER" && user.assignedUnionId) {
+    if (user.role === Role.OFFICER && user.assignedUnionId) {
       data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
     }
     const matrix = buildComplianceMatrix(data);

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
   // Officer scoping: filter the unions array to just their assigned union.
   // (We could also pass a where clause to fetchMatrixData, but filtering
   // post-fetch is simpler and the dataset is small — 6 demo unions.)
-  if (user.role === "OFFICER" && user.assignedUnionId) {
+  if (user.role === Role.OFFICER && user.assignedUnionId) {
     data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
   }
 

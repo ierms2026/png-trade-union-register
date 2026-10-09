@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { UnionStatus, Severity, Prisma } from "@prisma/client";
+import { Role, UnionStatus, Severity, Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope, getAuthUser } from "@/lib/auth/auth-guard";
 
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
   }
 
   const where: Record<string, unknown> =
-    user.role === "OFFICER" && user.assignedUnionId
+    user.role === Role.OFFICER && user.assignedUnionId
       ? { id: user.assignedUnionId }
       : {};
 
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     );
   }
   // Only Registrars can create new unions.
-  if (user.role !== "REGISTRAR") {
+  if (user.role !== Role.REGISTRAR) {
     return NextResponse.json(
       { error: "Only Registrars can register new unions." },
       { status: 403 },

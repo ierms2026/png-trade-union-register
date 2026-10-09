@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 
@@ -38,7 +39,7 @@ export async function GET() {
   // Officer scoping: only show audit entries related to their union
   // or their own actions. This prevents cross-union data leakage.
   const where =
-    user.role === "OFFICER" && user.assignedUnionId
+    user.role === Role.OFFICER && user.assignedUnionId
       ? {
           OR: [
             { entityId: user.assignedUnionId, entityType: "Union" },

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 
@@ -43,7 +44,7 @@ export async function GET(
   // version history by guessing IDs. The 403 (not 404) is intentional: by
   // the time we get here, we've already authenticated the user; we're
   // refusing to authorize cross-union access, not denying existence.
-  if (user.role === "OFFICER" && user.assignedUnionId !== unionId) {
+  if (user.role === Role.OFFICER && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only view documents in your own union." },
       { status: 403 },

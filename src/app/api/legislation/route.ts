@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { getAuthUser } from "@/lib/auth/auth-guard";
@@ -73,7 +74,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (user.role !== "REGISTRAR") return NextResponse.json({ error: "Only Registrars can edit legislation." }, { status: 403 });
+  if (user.role !== Role.REGISTRAR) return NextResponse.json({ error: "Only Registrars can edit legislation." }, { status: 403 });
 
   try {
     const body = await req.json();
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (user.role !== "REGISTRAR") return NextResponse.json({ error: "Only Registrars can edit legislation." }, { status: 403 });
+  if (user.role !== Role.REGISTRAR) return NextResponse.json({ error: "Only Registrars can edit legislation." }, { status: 403 });
 
   try {
     const body = await req.json();
@@ -142,7 +143,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (user.role !== "REGISTRAR") return NextResponse.json({ error: "Only Registrars can edit legislation." }, { status: 403 });
+  if (user.role !== Role.REGISTRAR) return NextResponse.json({ error: "Only Registrars can edit legislation." }, { status: 403 });
 
   try {
     const { searchParams } = new URL(req.url);

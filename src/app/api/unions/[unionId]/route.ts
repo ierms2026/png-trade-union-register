@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { UnionStatus } from "@prisma/client";
+import { Role, UnionStatus } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 
@@ -100,7 +100,7 @@ export async function PUT(
     );
   }
   // Inspectors are read-only — cannot update unions.
-  if (user.role === "INSPECTOR") {
+  if (user.role === Role.INSPECTOR) {
     return NextResponse.json(
       { error: "Inspectors have read-only access and cannot update unions." },
       { status: 403 },
@@ -133,7 +133,7 @@ export async function PUT(
   //    yours." The Officer shouldn't know other unions exist, but if they
   //    guess an ID and try to update it, we don't return 200 (which would
   //    imply success on a union they don't own).
-  if (user.role === "OFFICER" && user.assignedUnionId !== unionId) {
+  if (user.role === Role.OFFICER && user.assignedUnionId !== unionId) {
     return NextResponse.json(
       { error: "You can only update your own union." },
       { status: 403 },
@@ -153,7 +153,7 @@ export async function PUT(
   //    This is the core of the spec — restricted fields are SILENTLY
   //    dropped, not rejected. The Officer gets a 200 with the original
   //    values for those fields.
-  if (user.role === "OFFICER") {
+  if (user.role === Role.OFFICER) {
     for (const restricted of OFFICER_RESTRICTED_FIELDS) {
       delete updateData[restricted];
     }
