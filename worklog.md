@@ -855,3 +855,30 @@ Stage Summary:
 - T71 report packaged as /home/z/my-project/download/t71-report.md (markdown, ~11.6KB, 211 lines).
 - Covers: the ONE function (computeExpiryDateFromApproval), reviewedAt added to fetchMatrixData, all approval paths set reviewedAt, 6 new tests with constructed data, 2 existing tests relaxed, on-screen wording changes, and before/after on seed data (0 APPROVED → no change visible).
 - Key result: D15 simple variant implemented. Renewal clock starts at approval date (reviewedAt) with upload-date fallback. No new fields in external responses (D16 preserved). Invisible on seed data (0 APPROVED docs).
+
+---
+Task ID: A1-recover-phase0-phase1
+Agent: main
+Task: Recover phase0/phase1 commits by cherry-pick from dangling commits (environment revert recovery)
+
+Work Log:
+- R1 verified: HEAD at 01f47e2, working tree clean.
+- Confirmed via A0 that 4 dangling commits survived the environment revert: 6a9f5b7 (phase0 gap register), 8048df5 (ClickableRow), 81550ee (Field wrapper), eaf71ff (ConfirmDialog).
+- R7 reported: task prompt assumed eaf71ff included "step0 testing-library setup" but it does not — step0 commit 691340c is not in the object database. The 4 recoverable commits are self-contained (add new files + modify their own tests). User acknowledged R7 and directed proceeding without step0.
+- Cherry-picked all 4 commits in order: git cherry-pick 6a9f5b7 8048df5 81550ee eaf71ff. No conflicts. All 4 applied cleanly.
+- OLD→NEW hash mapping:
+  * 6a9f5b7 → 86b528d (phase0: usability gap register)
+  * 8048df5 → 7fcf347 (phase1: ClickableRow U-03/U-04)
+  * 81550ee → 3755b5d (phase1: Field wrapper U-14/U-15)
+  * eaf71ff → c38f4d2 (phase1: ConfirmDialog U-02)
+- R3 verification: tsc 0 errors; vitest 689 tests / 46 files pass (was 668/43, +21 tests +3 files from clickable-row.test.ts, field.test.ts, confirm-dialog.test.ts).
+- NOTE: Step0 interactive test setup (testing-library, jest-axe, jsdom, vitest.config.ts jsdom environmentMatchGlobs, eslint.config.mjs react/no-children-prop scope, interactive .tsx test files) is NOT recovered — scheduled for Task B-Reconstruct-0.
+
+Stage Summary:
+- Phase0 (usability gap register) + Phase1 (ClickableRow, Field, ConfirmDialog) restored to main.
+- 4 new commits on main: 86b528d, 7fcf347, 3755b5d, c38f4d2. HEAD at c38f4d2.
+- 3 new component files: src/components/app/{clickable-row,field,confirm-dialog}.tsx.
+- 3 new test files: src/lib/__tests__/{clickable-row,field,confirm-dialog}.test.ts.
+- 1 new doc: docs/usability-gap-register.md.
+- 21 new tests (668→689), 3 new test files (43→46), 0 tsc errors.
+- Missing (Task B-Reconstruct-0): @testing-library/react + user-event + jest-axe + jsdom deps; vitest.config.ts jsdom env glob; eslint.config.mjs react/no-children-prop scope; all interactive .tsx tests (confirm-dialog-interactive, confirm-dialog-loading, confirm-dialog-focus-return, confirm-dialog-initial-focus, field-interactive, clickable-row-interactive, heatmap-keyboard, u02-* interactive tests, etc.); phase2 keyboard work (U-07 heatmap roving tabindex, U-08 calendar tabs).
