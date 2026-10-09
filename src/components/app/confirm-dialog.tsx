@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useRef, type ReactNode } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -25,7 +25,8 @@ import { cn } from "@/lib/utils";
 // AlertDialog). Supports:
 //   - Destructive styling (red confirm button)
 //   - Async onConfirm (shows spinner, disables buttons during execution)
-//   - Type-to-confirm mode (modeled on retention.tsx's TypeToConfirmDialog)
+//   - Type-to-confirm mode (requireText prop — the retention disposal
+//     dialog was the original use case; it now uses this component)
 //   - Inline error display (stays open if onConfirm throws/returns error)
 //   - Default focus on Cancel for destructive actions
 //
@@ -74,6 +75,20 @@ interface ConfirmDialogProps {
   requireText?: string;
   /** Optional extra content between description and confirm/cancel (e.g. a summary card). */
   children?: ReactNode;
+  /**
+   * Optional ref to an element that should receive focus AFTER a successful
+   * confirm (onConfirm did not throw). Used when the action removes the
+   * trigger's row from the DOM (e.g. delete/revoke/approve/dispose) — the
+   * trigger will be gone, so focus goes to this element instead.
+   *
+   * On Cancel, Escape, or click-outside, focus returns to the trigger
+   * button (the row is still there). This ref is ONLY used after a
+   * successful confirm.
+   *
+   * If not provided after a successful confirm, falls back to the trigger
+   * (if still connected), then to <main>/<body>.
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function ConfirmDialog({
@@ -87,10 +102,17 @@ export function ConfirmDialog({
   onConfirm,
   requireText,
   children,
+  returnFocusRef,
 }: ConfirmDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typedText, setTypedText] = useState("");
+  // Track the trigger element so we can return focus to it on close.
+  const triggerRef = useRef<HTMLElement | null>(null);
+  // Track whether the dialog is closing because onConfirm succeeded.
+  // Set to true in handleConfirm (success path), checked in onCloseAutoFocus.
+  // Reset to false on open and on any non-confirm close (Cancel/Escape).
+  const confirmSucceededRef = useRef(false);
 
   const canConfirm = !requireText || typedText === requireText;
 
@@ -99,12 +121,14 @@ export function ConfirmDialog({
     setError(null);
     try {
       await onConfirm();
-      // Success — close + reset
+      // Success — mark for returnFocusRef, then close
+      confirmSucceededRef.current = true;
       setLoading(false);
       setTypedText("");
       onOpenChange(false);
     } catch (err) {
       // Error — stay open, show inline error
+      confirmSucceededRef.current = false;
       setLoading(false);
       setError(err instanceof Error ? err.message : "An error occurred. Please try again.");
     }
@@ -112,6 +136,8 @@ export function ConfirmDialog({
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
+      // Block close while loading (Escape, click-outside, etc.)
+      if (!next && loading) return;
       if (!next) {
         // Reset state on close
         setError(null);
@@ -120,12 +146,45 @@ export function ConfirmDialog({
       }
       onOpenChange(next);
     },
-    [onOpenChange],
+    [onOpenChange, loading],
   );
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent
+        className="max-w-md"
+        // Block Escape while loading
+        onEscapeKeyDown={(e) => { if (loading) e.preventDefault(); }}
+        // Capture the trigger element on open so we can return focus on close.
+        // Also reset the confirm-succeeded flag.
+        onOpenAutoFocus={() => {
+          triggerRef.current = document.activeElement as HTMLElement;
+          confirmSucceededRef.current = false;
+        }}
+        // Return focus on close.
+        // After a SUCCESSFUL confirm: if returnFocusRef is provided, use it
+        // (the trigger's row may be removed from the DOM by the action).
+        // After Cancel/Escape/click-outside: return focus to the trigger
+        // (the row is still there).
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          if (confirmSucceededRef.current && returnFocusRef?.current?.isConnected) {
+            returnFocusRef.current.focus();
+            return;
+          }
+          if (triggerRef.current && triggerRef.current.isConnected) {
+            triggerRef.current.focus();
+            return;
+          }
+          // Trigger gone (row removed) and no returnFocusRef — last resort
+          if (returnFocusRef?.current?.isConnected) {
+            returnFocusRef.current.focus();
+            return;
+          }
+          const main = document.querySelector<HTMLElement>("main, [role='main'], body");
+          if (main) main.focus();
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {destructive && <AlertTriangle className="h-5 w-5 text-red-500" />}
