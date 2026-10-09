@@ -43,7 +43,8 @@ export async function POST(
       { status: 403 },
     );
   }
-  // Chunk 5: REPRESENTATIVE scoping (same as OFFICER)
+  // OFFICER is the only union-scoped staff role (REPRESENTATIVE was removed
+  // in D7; it used to be scoped the same as OFFICER here).
   const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== unionId) {
     return NextResponse.json(

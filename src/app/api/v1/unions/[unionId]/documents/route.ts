@@ -27,7 +27,7 @@ import { dispatchEvent } from "@/lib/webhooks/dispatcher";
 // portal's programmatic uploads.
 //
 // AUTH: API key with `documents:write` scope (or session cookie with
-// OFFICER/REPRESENTATIVE/REGISTRAR role). Inspector is blocked.
+// OFFICER/REGISTRAR role). Inspector is blocked.
 //
 // REVIEW QUEUE: All external submissions enter PENDING status — the
 // Registrar must approve before the document is "official". This is the

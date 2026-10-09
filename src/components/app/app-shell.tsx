@@ -259,8 +259,8 @@ function NavDropdown({ group, activeView, onNavigate, hasActiveChild }: NavDropd
 interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view: string, params?: { unionId?: string; query?: string; documentId?: string }) => void; children: ReactNode; }
 
 export function AppShell({ user, activeView, onNavigate, children }: AppShellProps) {
-  // REPRESENTATIVE users are redirected to /portal before reaching here,
-  // so we can safely narrow to StaffRole for the nav structure.
+  // The Representative role was removed (D7) — every authenticated user is
+  // staff (REGISTRAR / INSPECTOR / OFFICER), so the cast to StaffRole is safe.
   const nav = getNavForRole(user.role as StaffRole, isRetentionEnabled());
   const crumbs = buildBreadcrumbs(activeView, user.role as StaffRole);
   const { data: notifData, loading: notifLoading, refetch: refetchNotifs } = useFetch<{ notifications: Notification[]; unreadCount: number; }>("/api/notifications");

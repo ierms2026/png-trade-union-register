@@ -140,8 +140,6 @@ describe("Route coverage — every UI-referenced API URL resolves to a route fil
       "/api/export/compliance-report", "/api/export/compliance-matrix",
       "/api/export/expiry-forecast", "/api/webhooks",
       "/api/v1/compliance/status", "/api/v1/unions/export",
-      "/api/portal/me", "/api/portal/dashboard", "/api/portal/documents",
-      "/api/portal/compliance", "/api/portal/contact",
       "/api/contact-requests", "/api/cron/compliance-sweep",
       "/api/cron/compliance-snapshot", "/api/cron/webhook-retry",
       "/api/cron/audit-retention-sweep", "/api/cron/snapshot-retention-sweep",

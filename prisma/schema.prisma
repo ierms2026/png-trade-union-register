@@ -429,9 +429,15 @@ model ComplianceSnapshot {
 // =============================================================================
 // Chunk 5 — Union self-service portal: ContactUpdateRequest
 //
-// Staged contact-info changes submitted by union representatives (Role =
-// REPRESENTATIVE) from the /portal/contact view. Each request is a SNAPSHOT
-// of the requested new values for the four Officer-allowed fields on Union:
+// Staged contact-info changes submitted from the /portal/contact view by
+// union representatives. NOTE: the REPRESENTATIVE role + /portal app were
+// removed in D7 — this model is now read-only on the staff side (Registrar
+// review queue at /api/contact-requests) and has no producer endpoint. It
+// is retained for now so any historical rows remain queryable; a future
+// task can drop the model + review routes once confirmed unused.
+//
+// Each request is a SNAPSHOT of the requested new values for the four
+// Officer-allowed fields on Union:
 //   address, contactPerson, contactEmail, contactPhone
 //
 // Lifecycle:

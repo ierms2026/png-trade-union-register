@@ -26,7 +26,7 @@ import {
 // This route resolves the versionId → looks up the file → serves it. It shares
 // the same auth, scoping, rate-limit, + audit-log logic as the existing route.
 //
-// AUTH: any authenticated role. OFFICER + REPRESENTATIVE scoped to their union.
+// AUTH: any authenticated role. OFFICER scoped to their union.
 // =============================================================================
 
 const STORAGE_ROOT =

@@ -393,7 +393,8 @@ export function getViewTitle(route: string): string {
 //   Portal notifications: /portal?view=<view> (e.g., /portal?view=contact)
 //
 // Every notification creator calls staffLinkUrl() or portalLinkUrl() — never
-// string-builds. Every consumer (AppShell, PortalShell) calls the matching
+// string-builds. Every consumer (AppShell, and historically PortalShell
+// before the /portal app was removed in D7) calls the matching
 // audience-aware parser. Email templates call resolveLinkUrlForEmail() to
 // get an absolute URL that works when clicked from an email client.
 //
@@ -469,7 +470,9 @@ export function parseStaffLinkUrl(linkUrl: string | null | undefined): string | 
 /**
  * Parse a PORTAL notification linkUrl — only honors /portal?view=X format.
  * Ignores staff links (/?view=X) to prevent cross-audience silent failures.
- * Used by PortalShell (the representative notification bell).
+ * Used historically by PortalShell (the representative notification bell,
+ * removed in D7). Kept because /api/contact-requests/[id]/{approve,reject}
+ * still calls portalLinkUrl() to build notification linkUrls.
  *
  * @returns The view key (e.g., "contact"), or null if the link is not a
  *          portal link or has no ?view= param.

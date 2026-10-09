@@ -32,9 +32,10 @@ import { extractSnippet } from "@/lib/search/search-utils";
 //
 // AUTH: Any authenticated role. Role-based scoping:
 //   - REGISTRAR + INSPECTOR → search across ALL unions' documents
-//   - OFFICER + REPRESENTATIVE → scoped to their assigned union only
-//     (same pattern as /api/tasks — see chunk 5). The ?union= filter is
-//     IGNORED for these roles (they can only search their own union).
+//   - OFFICER → scoped to their assigned union only. The ?union= filter
+//     is IGNORED for OFFICERs (they can only search their own union).
+//     (REPRESENTATIVE was removed in D7; OFFICER is the only union-scoped
+//     staff role.)
 //
 // RATE LIMIT: 30 queries/min per user (search bucket). X-RateLimit-* headers
 // on every response so polite clients can self-throttle.
@@ -131,8 +132,8 @@ export async function GET(req: NextRequest) {
   // --- Apply filters ------------------------------------------------------
   // Role-based scoping:
   //   REGISTRAR + INSPECTOR → all unions (the ?union= filter is honored)
-  //   OFFICER + REPRESENTATIVE → their assigned union only (the ?union=
-  //   filter is IGNORED — they can only search their own union)
+  //   OFFICER → their assigned union only (the ?union= filter is IGNORED
+  //   — they can only search their own union)
   const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId) {
     documentWhere.unionId = user.assignedUnionId;

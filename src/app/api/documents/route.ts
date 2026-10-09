@@ -11,7 +11,7 @@ import { Role, ReviewStatus } from "@prisma/client";
 //
 // AUTH: Session OR API key with `documents:read` scope. Role scoping:
 //   - REGISTRAR + INSPECTOR → all unions
-//   - OFFICER + REPRESENTATIVE → their assigned union only
+//   - OFFICER → their assigned union only
 //
 // QUERY PARAMS (all optional):
 //   unionId          — filter to a specific union

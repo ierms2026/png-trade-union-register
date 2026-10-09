@@ -882,3 +882,29 @@ Stage Summary:
 - 1 new doc: docs/usability-gap-register.md.
 - 21 new tests (668→689), 3 new test files (43→46), 0 tsc errors.
 - Missing (Task B-Reconstruct-0): @testing-library/react + user-event + jest-axe + jsdom deps; vitest.config.ts jsdom env glob; eslint.config.mjs react/no-children-prop scope; all interactive .tsx tests (confirm-dialog-interactive, confirm-dialog-loading, confirm-dialog-focus-return, confirm-dialog-initial-focus, field-interactive, clickable-row-interactive, heatmap-keyboard, u02-* interactive tests, etc.); phase2 keyboard work (U-07 heatmap roving tabindex, U-08 calendar tabs).
+
+---
+Task ID: B1-delete-portal-dead-code
+Agent: main
+Task: D7 round 4 — delete the /portal dead code + add migration doc
+
+Work Log:
+- R1 verified: HEAD at 2a92c6d (one automated UUID commit on top of the expected BASE c38f4d2; c38f4d2 is an ancestor, phase1 work intact). Tree clean. R7 reported: BASE mismatch is an automated commit, not a missing-files situation; proceeded with HEAD as actual base per R6 (no reset).
+- Confirmed all 6 deletion targets exist; confirmed no active importers of portal modules outside portal itself (PortalShell refs in vocabulary.ts are comments only).
+- Deleted: src/app/portal/, src/components/portal/, src/app/api/portal/, src/app/api/route.ts (Hello-world stub), scripts/seed-demo-rep.ts, scripts/test-portal-contact-flow.ts.
+- Cleaned up REPRESENTATIVE comment references in 9 src/ files (tasks, documents, documents/[id], search, unions/[unionId]/documents, extract-text, versions/download, v1/unions/[unionId]/documents, app-shell). Each now notes OFFICER is the only union-scoped staff role + references D7.
+- Updated prisma/schema.prisma comment on ContactUpdateRequest model: explains model is now read-only on staff side, no producer endpoint after /portal deletion.
+- Updated src/lib/dashboard/vocabulary.ts comments: PortalShell references now note it was removed in D7; parsePortalLinkUrl docstring notes it's kept because contact-requests approve/reject routes still call portalLinkUrl(). (Functions themselves NOT deleted — still wired to contact-requests routes; removing them is a separate follow-up task per the migration doc §7.)
+- Updated tsconfig.json: removed scripts/seed-demo-rep.ts + scripts/test-portal-contact-flow.ts from exclude list.
+- Updated src/lib/__tests__/route-coverage.test.ts: removed 5 /api/portal/* entries from keyRoutes allowlist.
+- label-source-guard.test.ts does NOT exist (created in a later session that got reverted). Recorded per task step 5; no ALLOWED_DIRS change needed.
+- DB check: SELECT COUNT(*) FROM User WHERE role='REPRESENTATIVE' → 0. Distinct roles: REGISTRAR, INSPECTOR, OFFICER. Data-safe in dev.
+- Created docs/migration-remove-representative-role.md: deleted files list, pre-flight row check results, schema state explanation (SQLite stores Role as TEXT, no DB-level enum constraint, no prisma migrate needed), row-handling SQL for non-dev environments (UPDATE User SET role='OFFICER' WHERE role='REPRESENTATIVE'), out-of-scope findings (portalLinkUrl/parsePortalLinkUrl helpers now effectively dead; ContactUpdateRequest has no producer endpoint but retained for historical row queryability).
+- R3 verification: tsc 0 errors; vitest 689 tests / 46 files pass (unchanged from A1 baseline — no test count change, route-coverage test auto-discovered 87 URL patterns across 186 files, was 87 across 187); next build passes with no /portal routes in output.
+
+Stage Summary:
+- /portal dead code deleted: 15 files removed, 12 files modified (comments + tests + tsconfig). Net code change: -2076 lines deleted + comment edits.
+- REPRESENTATIVE role was already absent from Prisma schema enum (since 2f0e918); this commit removes the leftover dead code that referenced it.
+- Pre-flight DB check: 0 rows have role='REPRESENTATIVE' in dev DB. Migration is data-safe in dev. Migration doc provides row-handling SQL for non-dev environments.
+- No prisma migrate needed: SQLite stores Role as TEXT; enum constraint lives only in Prisma schema; this commit's schema change is comments-only.
+- Out-of-scope findings (separate follow-up tasks): (1) portalLinkUrl/parsePortalLinkUrl/inferLinkAudience in vocabulary.ts are now effectively dead — only consumer of parsePortalLinkUrl was deleted PortalShell; portalLinkUrl still called by contact-requests approve/reject but no rep can receive the notification. (2) ContactUpdateRequest model + /api/contact-requests/* routes + ContactRequestsView still active on staff side but have no producer endpoint — review queue will always be empty. Retained deliberately so historical rows remain queryable.

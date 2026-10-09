@@ -43,9 +43,9 @@ export async function GET(req: NextRequest) {
   //   REGISTRAR     → all tasks
   //   INSPECTOR     → tasks assigned to them only (assigneeId = self)
   //   OFFICER       → tasks in their union OR assigned to them
-  //   REPRESENTATIVE → tasks in their union (chunk 5 — read-only view
-  //                   from the union self-service portal; reps don't get
-  //                   tasks assigned to them personally)
+  //   (The REPRESENTATIVE role was removed in D7 — it used to scope to
+  //   tasks in the rep's union, read-only. OFFICER scoping above covers
+  //   the only remaining union-scoped staff role.)
   const isUnionScopedRole = user.role === Role.OFFICER;
   const where: Record<string, unknown> =
     user.role === Role.REGISTRAR

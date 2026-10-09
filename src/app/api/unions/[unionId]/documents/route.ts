@@ -84,12 +84,13 @@ export async function POST(
 ) {
   const { unionId } = await params;
 
-  // 0. Auth check + INSPECTOR 403 + Officer/Representative scoping.
+  // 0. Auth check + INSPECTOR 403 + Officer scoping.
   //
-  // Chunk 5: REPRESENTATIVE role (union self-service portal) is now allowed
-  // to upload, with the same Officer-style scoping rule — reps can only
-  // upload to their own assigned union. The review-queue flow is identical:
-  // every upload enters PENDING state, Registrar approves from Reviews view.
+  // OFFICER is the only union-scoped staff role (REPRESENTATIVE was removed
+  // in D7; it used to upload with the same Officer-style scoping rule — reps
+  // could only upload to their own assigned union). The review-queue flow is
+  // identical: every upload enters PENDING state, Registrar approves from
+  // Reviews view.
   const user = await getAuthUser(req);
   if (!user) {
     return NextResponse.json(
@@ -103,7 +104,7 @@ export async function POST(
       { status: 403 },
     );
   }
-  // Both OFFICER and REPRESENTATIVE are scoped to their assigned union.
+  // OFFICER is scoped to their assigned union.
   // REGISTRAR can upload to any union.
   const isUnionScopedRole = user.role === Role.OFFICER;
   if (isUnionScopedRole && user.assignedUnionId !== unionId) {

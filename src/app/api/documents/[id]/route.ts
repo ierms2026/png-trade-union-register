@@ -10,7 +10,7 @@ import { Role } from "@prisma/client";
 //
 // AUTH: Session OR API key with `documents:read` scope. Role scoping:
 //   - REGISTRAR + INSPECTOR → any document
-//   - OFFICER + REPRESENTATIVE → only their own union's documents
+//   - OFFICER → only their own union's documents
 //
 // RESPONSE SHAPE:
 //   {
