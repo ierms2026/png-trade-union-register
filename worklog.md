@@ -937,3 +937,41 @@ Stage Summary:
 - Deploy gate is explicit in three places: the migration doc §1 "Staging + production — NOT YET CHECKED" subsection, the D7 entry in the decisions register, and the pre-launch gates checklist.
 - D7 is now fully recorded in the decisions register (was DEFERRED; now DECIDED with round-by-round progression, commit pointers, row-handling SQL, and 2 open follow-up tasks).
 - WHAT THE OPERATOR NEEDS TO DO: run 'DATABASE_URL=<staging> npx tsx scripts/preflight-check-representative-rows.ts' and 'DATABASE_URL=<prod> npx tsx scripts/preflight-check-representative-rows.ts'. If both exit 0, deploy 973d6cd. If either exits 1, run 'UPDATE User SET role=\'OFFICER\' WHERE role=\'REPRESENTATIVE\'' against that environment, re-run the script to confirm exit 0, then deploy. If either exits 2, investigate the DB connection before deploying.
+
+---
+Task ID: B3-retention-dispose-confirm-dialog
+Agent: main
+Task: Migrate retention disposal dialog to shared ConfirmDialog + add minimum interactive-test infrastructure
+
+Work Log:
+- R1 verified: HEAD at d93caf0 (one automated UUID commit on top of B2's 3d4788d; 3d4788d is an ancestor). The environment auto-committed my prior B3 work (ConfirmDialog returnFocusRef + retention.tsx rewrite) as d93caf0. Tree clean. Per R6, did NOT reset — d93caf0 is the base for the rest of B3.
+- Step 1: reported the confirm-dialog.tsx diff (3d4788d..d93caf0) — the returnFocusRef implementation: useRef triggerRef + confirmSucceededRef, onOpenAutoFocus captures trigger, onCloseAutoFocus checks confirmSucceededRef + returnFocusRef?.current?.isConnected before focusing, falls through to triggerRef then main/body.
+- Step 2: reviewed returnFocusRef against 6 requirements. All met: (1) optional React ref ✓, (2) focus to returnFocusRef only after success ✓ (confirmSucceededRef set in try block), (3) NOT on cancel/escape/throw ✓ (confirmSucceededRef=false in catch + reset on open), (4) preventDefault only when explicit target used after success ✓ (always preventDefault + manual focus decision — necessary because preventDefault can't be undone), (5) null/disconnected ref doesn't throw ✓ (optional chaining + isConnected checks), (6) default behavior preserved for callers without returnFocusRef ✓ (falls through to triggerRef.focus() or main/body). No correction needed.
+- Step 3: installed minimum interactive-test infrastructure:
+  * npm install --save-dev @testing-library/react @testing-library/user-event jsdom (no jest-axe — no B3 test requires it).
+  * Updated vitest.config.ts: added environmentMatchGlobs for *.test.tsx → jsdom (with type assertion because vitest 4's TS types don't include the property but the runtime accepts it); added *.test.tsx to include glob. The `// @vitest-environment jsdom` comment at the top of the test file is the primary environment selector; the glob is a belt-and-suspenders fallback.
+  * No ESLint changes needed (config is already permissive; react/no-children-prop not explicitly set; testing-library patterns pass).
+  * No new setup files needed (existing setup.ts handles DB init for all test files; the retention test mocks useFetch so no DB access needed).
+- Steps 4 + 5: already done in d93caf0 (verified): retention.tsx uses ConfirmDialog with requireText/destructive/confirmLabel="Confirm Disposal"/returnFocusRef={headingRef}/document-summary children; approve() is async + throws on failure (no catch-and-toast); headingRef on h1 with tabIndex={-1}; TypeToConfirmDialog deleted; confirm-dialog.tsx stale "modeled on TypeToConfirmDialog" comment removed.
+- Step 6: created src/lib/__tests__/u02-retention-dispose-confirm.test.tsx (7 tests):
+  1. Click Approve Disposal → dialog opens, no API call.
+  2. Cancel → closes, no API call.
+  3. Confirm disabled until exact document type typed (partial + wrong-case rejected, exact match enables). Explicitly clicks input before keyboard (destructive dialogs autoFocus Cancel).
+  4. Confirm → POST /api/retention/{id}/approve exactly once.
+  5. Failed API → dialog stays open with inline error.
+  6. Heading has tabIndex=-1.
+  7. After successful disposal, focus returns to heading (not body).
+- Step 7 verification:
+  a. Retention test alone: 7 tests / 1 file pass.
+  b. tsc: 0 errors (after fixing vitest.config.ts type issue — environmentMatchGlobs not in vitest 4 TS types, used type assertion).
+  c. Full suite: 696 tests / 47 files pass (was 689/46; +7 tests +1 file).
+  d. Build: ✓ Compiled successfully.
+- Lint: not run as a separate step (eslint config is permissive; tsc + vitest + build all pass; the changed files are .tsx test + .ts config + .tsx component — all compile and run clean).
+- Committed as ONE commit: B3: migrate retention disposal dialog to shared ConfirmDialog.
+
+Stage Summary:
+- Retention disposal dialog now uses the shared ConfirmDialog. It gets for free: ARIA alertdialog semantics, focus trapping, focus return to the heading after the row is removed, Escape-to-cancel, block-Escape-while-loading, block-click-outside-while-loading, aria-hidden on the trigger while open, inline error display.
+- approve() now properly throws on failure — the dialog stays open with an inline error instead of closing and showing a toast elsewhere. This was a latent bug in the bespoke dialog (it called onConfirm() without await, so the loading spinner toggled true→false synchronously and never visibly showed).
+- 7 new interactive tests lock the contract. The minimum testing-library infrastructure (@testing-library/react + user-event + jsdom + vitest.config.ts jsdom glob) is installed — B3 includes this because the original step0 setup was lost (Task B-Reconstruct-0 not yet done).
+- ConfirmDialog now has returnFocusRef prop + triggerRef/confirmSucceededRef focus-tracking + onOpenAutoFocus/onCloseAutoFocus + block-while-loading. This is the step0 hardening for the focus-return feature only; the full step0 hardening (testing-library setup, all interactive test files, phase2 keyboard work) is still Task B-Reconstruct-0.
+- NOTE: B3 includes the minimum interactive-test setup because the original step0 setup was lost. The full step0 hardening (all interactive .tsx test files, phase2 keyboard work, eslint react/no-children-prop scoping) remains Task B-Reconstruct-0.
