@@ -1022,7 +1022,7 @@ function NeedsAttentionPanel({
                         {formatDueDate(expiryDate, now)}
                       </span>
                       <a
-                        href={`/unions/${item.unionId}`}
+                        href={`/?view=unions&union=${item.unionId}&unionTab=compliance`}
                         className="text-xs font-medium text-primary hover:underline"
                         aria-label={`View ${item.documentType} for ${item.unionName}`}
                       >
@@ -1141,7 +1141,7 @@ function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <a
-                            href={`/unions/${row.unionId}`}
+                            href={`/?view=unions&union=${row.unionId}&unionTab=compliance`}
                             role="gridcell"
                             tabIndex={-1} // roving tabindex — only one cell is tabbable at a time via JS
                             aria-label={accessibleName}

@@ -111,7 +111,8 @@ export const NAV_STRUCTURE: NavGroup[] = [
       { label: "Unions", route: "unions", icon: Building2, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Register Union"], quickAction: { kind: "navigate", shortLabel: "Register Union", roles: ["REGISTRAR"] } },
       { label: "My Union", route: "my-union", icon: Home, roles: ["OFFICER"], quickAction: { kind: "navigate", shortLabel: "Upload Document" } },
       { label: "Documents", route: "documents", icon: FileText, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Upload Document"], quickAction: { kind: "navigate", shortLabel: "Upload Document", roles: ["REGISTRAR"] } },
-      { label: "Compare", route: "compare", icon: GitCompare, roles: ["REGISTRAR", "INSPECTOR"], aliases: ["Compare Unions"] },
+      // IA-2: Compare is now a tab inside Compliance. Keep the route in
+      // aliases so the palette still finds it, but remove it from the nav.
     ],
   },
 
@@ -120,8 +121,9 @@ export const NAV_STRUCTURE: NavGroup[] = [
     label: "Compliance",
     icon: CheckCircle2,
     destinations: [
-      { label: "Compliance", route: "compliance", icon: CheckCircle2, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Compliance Matrix", "Compliance Status"] },
-      { label: "Rules", route: "configure-rules", icon: Settings2, roles: ["REGISTRAR"], aliases: ["Configure Rules"] },
+      // IA-2: Compare + Rules are now tabs inside the Compliance view.
+      // The compliance destination covers all three tabs.
+      { label: "Compliance", route: "compliance", icon: CheckCircle2, roles: ["REGISTRAR", "INSPECTOR", "OFFICER"], aliases: ["Compliance Matrix", "Compliance Status", "Compare Unions", "Compare", "Configure Rules", "Rules"] },
     ],
   },
 

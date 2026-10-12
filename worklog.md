@@ -1386,3 +1386,54 @@ Stage Summary:
 - 4 label renames applied consistently across nav, page headings, breadcrumbs, VIEW_TITLES, help guide, content definitions, and CONTENT.md.
 - No routes renamed — every URL works without redirects.
 - 47 tests cover: group structure, route preservation, label renames, VIEW_TITLES mirroring, per-role visibility, empty-group hiding, retention flag, standalone items, reachability, palette/quick actions, findDestination/findGroupForRoute, server-side route rejection.
+
+---
+Task ID: IA-2-compliance-tabs-union-hub
+Agent: main
+Task: IA-2: Consolidate Compliance + add Union Hub (tabs, deep-linking, redirects)
+
+Work Log:
+- Step 1 (Compliance tabs): restructured src/components/app/views/compliance.tsx to have 3 tabs: Overview (existing matrix), Compare (existing CompareView, no new scoring), Rules (existing ConfigureRulesView, registrar only). Extracted the original matrix content into a ComplianceOverviewTab component. The ComplianceView wrapper renders the tab bar + delegates to the right tab. Rules tab is hidden for non-registrars. Compare + ConfigureRules are imported directly (no circular dep — they're separate files).
+- Step 2 (redirects): updated src/app/page.tsx handleNavigate to redirect view=compare → compliance&tab=compare, view=configure-rules → compliance&tab=rules. The renderView switch also has case handlers for compare + configure-rules that render ComplianceView with the right initialTab (for direct URL landings). Old URLs work — they just land on the tab.
+- Step 3 (Union Hub): restructured src/components/app/views/unions.tsx union detail into a tabbed hub: Overview (contact info), Documents (existing DocumentTile grid), Compliance (new UnionComplianceTab — fetches /api/compliance, filters to this union's row, renders a table), Tasks (new UnionTasksTab — fetches /api/tasks, filters by unionId), History (new UnionHistoryTab — fetches /api/audit?unionId=X, REGISTRAR+INSPECTOR only). History tab is hidden for Officers (isOfficer check on the hubTabs array + !isOfficer guard on the tab content).
+- Step 4 (Officers use same layout): UnionsView already handles both "unions" and "my-union" routes (IA-1). The new tab structure applies to both — an Officer's My Union page has the same tabs as a Registrar's union detail, minus History. No separate component needed.
+- Step 5 (deep-linking):
+  * Dashboard: needs-attention "View" link + heatmap cell now use ?view=unions&union=ID&unionTab=compliance (was the buggy /unions/${unionId} public-portal route that expected registrationNo, not the DB id). Fixed the pre-existing bug too.
+  * Calendar: handleEventClick now extracts unionId from e.meta + passes { unionId, unionTab } to onNavigate (was discarding meta + navigating to the bare view). Calendar's onNavigate type signature updated to accept params.
+  * Notifications: app-shell markAsRead now parses the full linkUrl with `new URL()` to extract union + unionTab + status params (was calling parseStaffLinkUrl which only returns the view name, discarding all params). AppShell's onNavigate type signature updated to accept status + tab + unionTab.
+  * page.tsx: readUrlState now parses `tab` (compliance tab) + `unionTab` (union hub tab) from the URL. handleNavigate accepts + pushes both params. renderView passes initialTab to ComplianceView + initialTab + onNavigate to UnionsView.
+- Step 6 (audit API): added ?unionId= filter to src/app/api/audit/route.ts. Officers still get 403 (existing auth check). The Union Hub's History tab uses this filter to show only this union's audit entries.
+- Step 7 (nav structure): removed Compare + Rules from the nav as standalone destinations (they're now tabs inside Compliance). Added their names as aliases to the compliance destination so the palette still finds them.
+- Step 8 (tests): created src/lib/__tests__/ia2-compliance-tabs-union-hub.test.ts — 27 tests in 6 describe blocks:
+  * Officers never see History tab (3 tests): hubTabs conditional excludes "history" for officers; history tab content guarded by !isOfficer; officers don't see Audit nav item.
+  * Officers never see another union's tabs (3 tests): /api/unions is the endpoint; /api/audit rejects officers with 403; /api/audit supports ?unionId= filter.
+  * Compare uses same /api/compliance endpoint (4 tests): compliance.tsx imports CompareView + ConfigureRulesView; compare.tsx fetches /api/compliance; overview tab fetches /api/compliance (same endpoint, no new scoring).
+  * Old URLs redirect (5 tests): handleNavigate rewrites compare→compliance&tab=compare + configure-rules→compliance&tab=rules; renderView has case handlers; compliance.tsx accepts initialTab; Rules tab is registrar-only.
+  * Union Hub tab structure (6 tests): all 5 tabs defined; initialTab prop; UnionComplianceTab + UnionTasksTab + UnionHistoryTab components exist; history tab fetches /api/audit?unionId=.
+  * Deep-linking (6 tests): dashboard links use ?view=unions&union=ID&unionTab=compliance + don't use old /unions/ID route; calendar passes unionTab; app-shell extracts unionTab from notifications; page.tsx accepts + parses tab + unionTab.
+  Also updated existing tests: dashboard-nav.test.ts (removed compare/configure-rules from expected routes + per-role assertions), t20-label-source-contract.test.ts (compliance view no longer has h1 — uses tabs now).
+
+Verification:
+- tsc --noEmit: 0 errors.
+- Full suite: 824 tests / 57 files pass (was 797/56; +27 tests +1 file).
+- Build: compiles successfully.
+
+Files changed (IA-2):
+- MOD src/app/api/audit/route.ts (added ?unionId= filter)
+- MOD src/app/page.tsx (readUrlState parses tab + unionTab; handleNavigate redirects compare/configure-rules to compliance tabs + accepts tab/unionTab params; renderView passes new props)
+- MOD src/components/app/app-shell.tsx (markAsRead extracts union+unionTab+status from notification linkUrl; onNavigate type signature expanded)
+- MOD src/components/app/views/calendar.tsx (handleEventClick deep-links with unionId+unionTab; onNavigate type signature expanded)
+- MOD src/components/app/views/compliance.tsx (3-tab structure: Overview/Compare/Rules; ComplianceOverviewTab extracted; imports CompareView + ConfigureRulesView; Rules tab registrar-only)
+- MOD src/components/app/views/dashboard.tsx (needs-attention + heatmap links use ?view=unions&union=ID&unionTab=compliance; fixed pre-existing /unions/ID bug)
+- MOD src/components/app/views/unions.tsx (Union Hub: 5 tabs — Overview/Documents/Compliance/Tasks/History; History hidden for officers; UnionComplianceTab + UnionTasksTab + UnionHistoryTab components; accepts initialTab + onNavigate props)
+- MOD src/lib/dashboard/nav-structure.ts (removed Compare + Rules as standalone nav destinations — now tabs inside Compliance; added as aliases)
+- MOD src/lib/__tests__/dashboard-nav.test.ts (updated expected routes + per-role assertions for IA-2)
+- MOD src/lib/__tests__/t20-label-source-contract.test.ts (compliance view heading test updated for tab structure)
+- NEW src/lib/__tests__/ia2-compliance-tabs-union-hub.test.ts (27 tests)
+
+Stage Summary:
+- Compliance consolidated: one page with 3 tabs (Overview/Compare/Rules). Old /compare and /configure-rules URLs redirect to the tabs. No new scoring logic — Compare reuses the same /api/compliance endpoint.
+- Union Hub: union detail is now a tabbed page (Overview/Documents/Compliance/Tasks/History). History (audit) is hidden for Officers. Officers use the same layout for My Union.
+- Deep-linking: dashboard cards, calendar events, and notifications all deep-link to the right union tab (?view=unions&union=ID&unionTab=X). Fixed a pre-existing bug where dashboard links used the public-portal route with the DB id.
+- Audit API: supports ?unionId= filter for the History tab.
+- 27 new tests cover: officers don't see History/other unions, Compare uses same endpoint, redirects work, Union Hub tab structure, deep-linking.

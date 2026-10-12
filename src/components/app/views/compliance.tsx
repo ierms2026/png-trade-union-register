@@ -1,6 +1,9 @@
 "use client";
 
 import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG, VIEW_TITLES } from "@/lib/dashboard/vocabulary";
+// IA-2: Compare + ConfigureRules are now tabs inside ComplianceView.
+import { CompareView } from "@/components/app/views/compare";
+import { ConfigureRulesView } from "@/components/app/views/configure-rules";
 import { type ComplianceStatus } from "@/lib/dashboard/status-config";
 import { useState } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, FileText, Loader2, Clock } from "lucide-react";
@@ -72,7 +75,76 @@ const STATUS_VISUAL: Record<string, { cell: string; dot: string; icon: typeof Ch
   NOT_APPLICABLE: { cell: "bg-muted/50 text-muted-foreground border-border", dot: "bg-muted-foreground/20", icon: Ban },
 };
 
-export function ComplianceView({ initialFilter }: { initialFilter?: string | null }) {
+// IA-2: Compliance view now has tabs: Overview, Compare, Rules.
+// - Overview: the existing matrix (this component's original content)
+// - Compare: the existing CompareView (no new scoring logic, same /api/compliance)
+// - Rules: the existing ConfigureRulesView (registrar only; includes retention periods)
+type ComplianceTab = "overview" | "compare" | "rules";
+
+const COMPLIANCE_TAB_LABELS: Record<ComplianceTab, string> = {
+  overview: "Overview",
+  compare: "Compare",
+  rules: "Rules",
+};
+
+export function ComplianceView({
+  initialFilter,
+  initialTab,
+  user,
+  onNavigate,
+}: {
+  initialFilter?: string | null;
+  initialTab?: string | null;
+  user?: { role: string };
+  onNavigate?: (view: string, params?: { unionId?: string; unionTab?: string }) => void;
+}) {
+  // IA-2: tab state. Rules tab is REGISTRAR-only — if a non-registrar
+  // lands on ?tab=rules via URL, fall back to overview.
+  const isRegistrar = user?.role === "REGISTRAR";
+  const validInitialTab: ComplianceTab =
+    initialTab === "compare" ? "compare" :
+    initialTab === "rules" && isRegistrar ? "rules" :
+    "overview";
+  const [tab, setTab] = useState<ComplianceTab>(validInitialTab);
+
+  const tabs: ComplianceTab[] = isRegistrar
+    ? ["overview", "compare", "rules"]
+    : ["overview", "compare"];
+
+  return (
+    <div className="space-y-6">
+      {/* Tab bar */}
+      <div className="flex gap-1 rounded-md border p-1">
+        {tabs.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            aria-current={tab === t ? "page" : undefined}
+            className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              tab === t
+                ? "bg-accent/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            {COMPLIANCE_TAB_LABELS[t]}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && <ComplianceOverviewTab initialFilter={initialFilter} />}
+      {tab === "compare" && <CompareView />}
+      {tab === "rules" && isRegistrar && <ConfigureRulesView />}
+    </div>
+  );
+}
+
+// =============================================================================
+// ComplianceOverviewTab — the original ComplianceView content (matrix,
+// charts, legend, filter, generate report). Extracted as a tab component.
+// =============================================================================
+
+function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | null }) {
   const { data, loading, error, refetch } = useFetch<ComplianceMatrixResponse>("/api/compliance");
   const [filter, setFilter] = useState<StatusFilter>(
     (initialFilter as StatusFilter) || "ALL"
@@ -168,13 +240,9 @@ export function ComplianceView({ initialFilter }: { initialFilter?: string | nul
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{VIEW_TITLES.compliance}</h1>
-          <p className="text-sm text-muted-foreground">
-            Live compliance status for every union and document type.
-          </p>
-        </div>
+      {/* IA-2: h1 removed — the tab bar above replaces the page heading.
+          The breadcrumb still shows "Compliance" for the page title. */}
+      <div className="flex items-start justify-end gap-4">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

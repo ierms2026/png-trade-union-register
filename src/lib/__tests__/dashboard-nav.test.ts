@@ -89,14 +89,14 @@ describe("IA-1: NAV_STRUCTURE group structure", () => {
 // =============================================================================
 
 describe("IA-1: route preservation (no routes renamed)", () => {
+  // IA-2: compare + configure-rules are now tabs inside Compliance (not
+  // standalone nav routes). They still exist as URL routes for redirect.
   const EXPECTED_ROUTES = [
     "dashboard",
     "unions",
     "my-union",
     "documents",
-    "compare",
     "compliance",
-    "configure-rules",
     "tasks",
     "calendar",
     "retention",
@@ -215,7 +215,9 @@ describe("IA-1: per-role nav visibility", () => {
     expect(allDestRoutes).toContain("unions");
     expect(allDestRoutes).toContain("documents");
     expect(allDestRoutes).toContain("compliance");
-    expect(allDestRoutes).toContain("configure-rules");
+    // IA-2: compare + configure-rules are now tabs inside Compliance, not nav routes
+    expect(allDestRoutes).not.toContain("configure-rules");
+    expect(allDestRoutes).not.toContain("compare");
     expect(allDestRoutes).toContain("tasks");
     expect(allDestRoutes).toContain("calendar");
     expect(allDestRoutes).toContain("retention");
@@ -245,13 +247,14 @@ describe("IA-1: per-role nav visibility", () => {
     // No Administration group
     expect(labels).not.toContain("Administration");
 
-    // Inspector sees Unions (not My Union), Compare, but not Rules
+    // IA-2: Inspector sees Unions (not My Union), Compliance (which now
+    // includes the Compare tab), but not Rules (Registrar-only tab).
     const allDestRoutes = nav.flatMap((g) => g.destinations.map((d) => d.route));
     expect(allDestRoutes).toContain("unions");
     expect(allDestRoutes).toContain("documents");
-    expect(allDestRoutes).toContain("compare");
     expect(allDestRoutes).toContain("compliance");
-    expect(allDestRoutes).not.toContain("configure-rules"); // Registrar-only
+    expect(allDestRoutes).not.toContain("compare"); // IA-2: now a tab
+    expect(allDestRoutes).not.toContain("configure-rules"); // IA-2: now a tab
     expect(allDestRoutes).toContain("retention"); // reject-only
     expect(allDestRoutes).toContain("audit");
     expect(allDestRoutes).toContain("search");
@@ -281,9 +284,9 @@ describe("IA-1: per-role nav visibility", () => {
     expect(allDestRoutes).toContain("my-union");
     expect(allDestRoutes).toContain("documents");
     expect(allDestRoutes).not.toContain("unions"); // Registrar+Inspector only
-    expect(allDestRoutes).not.toContain("compare"); // Registrar+Inspector only
+    expect(allDestRoutes).not.toContain("compare"); // IA-2: now a tab inside Compliance
     expect(allDestRoutes).toContain("compliance");
-    expect(allDestRoutes).not.toContain("configure-rules"); // Registrar-only
+    expect(allDestRoutes).not.toContain("configure-rules"); // IA-2: now a tab inside Compliance
     expect(allDestRoutes).toContain("tasks");
     expect(allDestRoutes).toContain("calendar");
     // No oversight items

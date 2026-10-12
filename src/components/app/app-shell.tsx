@@ -183,7 +183,7 @@ function SidebarNav({ nav, standalone, activeView, onNavigate }: SidebarNavProps
   );
 }
 
-interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view: string, params?: { unionId?: string; query?: string; documentId?: string }) => void; children: ReactNode; }
+interface AppShellProps { user: AuthUser; activeView: string; onNavigate: (view: string, params?: { unionId?: string; query?: string; documentId?: string; status?: string; tab?: string; unionTab?: string }) => void; children: ReactNode; }
 
 export function AppShell({ user, activeView, onNavigate, children }: AppShellProps) {
   // The Representative role was removed (D7) — every authenticated user is
@@ -214,12 +214,23 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
       await fetch(`/api/notifications/${id}/read`, { method: "PATCH", credentials: "include" });
       refetchNotifs();
       if (linkUrl) {
-        // Use the audience-aware staff parser — only honors /?view=X,
-        // ignores /portal?view=X. This prevents a portal link from
-        // silently landing on the Dashboard (the staff app has no
-        // "contact" view, so onNavigate("contact") would fall through).
+        // IA-2: parse the full URL to extract union + unionTab params for
+        // deep-linking into the Union Hub. The audience-aware parser
+        // (parseStaffLinkUrl) extracts the view; we extract the rest here.
         const view = parseStaffLinkUrl(linkUrl);
-        if (view) onNavigate(view);
+        if (view) {
+          // Extract additional params from the linkUrl.
+          let unionId: string | undefined;
+          let unionTab: string | undefined;
+          let status: string | undefined;
+          try {
+            const url = new URL(linkUrl, window.location.origin);
+            unionId = url.searchParams.get("union") ?? undefined;
+            unionTab = url.searchParams.get("unionTab") ?? undefined;
+            status = url.searchParams.get("status") ?? undefined;
+          } catch { /* not a valid URL — just navigate to the view */ }
+          onNavigate(view, { unionId, unionTab, status });
+        }
       }
     } catch { toast.error("Failed to mark notification as read."); }
   }

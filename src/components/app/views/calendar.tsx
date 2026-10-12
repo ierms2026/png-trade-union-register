@@ -61,7 +61,7 @@ const EVENT_LINKS: Record<string, string> = {
   compliance: "/?view=compliance",
 };
 
-export function CalendarView({ onNavigate }: { onNavigate?: (view: string) => void }) {
+export function CalendarView({ onNavigate }: { onNavigate?: (view: string, params?: { unionId?: string; unionTab?: string }) => void }) {
   const [tab, setTab] = useState<Tab>("all");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<{ dateStr: string; events: CalendarEvent[] } | null>(null);
@@ -122,11 +122,21 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string) => vo
   }
 
   function handleEventClick(e: CalendarEvent) {
-    // Navigate to the relevant view based on event type
+    // IA-2: deep-link to the right union tab when the event has a unionId.
+    // Falls back to the bare view if no unionId in meta.
     if (onNavigate) {
-      if (e.type === "task") onNavigate("tasks");
-      else if (e.type === "document") onNavigate("unions");
-      else if (e.type === "compliance") onNavigate("compliance");
+      const meta = e.meta as Record<string, unknown> | undefined;
+      const unionId = typeof meta?.unionId === "string" ? meta.unionId : null;
+      if (e.type === "task") {
+        if (unionId) onNavigate("unions", { unionId, unionTab: "tasks" });
+        else onNavigate("tasks");
+      } else if (e.type === "document") {
+        if (unionId) onNavigate("unions", { unionId, unionTab: "documents" });
+        else onNavigate("unions");
+      } else if (e.type === "compliance") {
+        if (unionId) onNavigate("unions", { unionId, unionTab: "compliance" });
+        else onNavigate("compliance");
+      }
     }
   }
 

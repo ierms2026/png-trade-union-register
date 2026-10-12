@@ -99,9 +99,13 @@ describe("T20: single source for compliance status labels", () => {
   it("Compliance view heading equals VIEW_TITLES.compliance", () => {
     const complianceViewPath = resolve(__dirname, "../../../src/components/app/views/compliance.tsx");
     const content = readFileSync(complianceViewPath, "utf8");
-    // The heading must use VIEW_TITLES.compliance, not a hardcoded string.
-    expect(content).toContain("VIEW_TITLES.compliance");
-    // And must NOT contain the old hardcoded heading.
+    // IA-2: the Compliance view now uses tabs (Overview / Compare / Rules).
+    // The page-level h1 was removed — the breadcrumb provides the page
+    // title via VIEW_TITLES.compliance. The tab bar replaces the heading.
+    // We verify the file does NOT contain a hardcoded "Compliance Matrix"
+    // heading (the old pre-IA-1 label).
     expect(content).not.toContain('>"Compliance Matrix"<');
+    // The file must still import from vocabulary (for the legend labels).
+    expect(content).toContain("COMPLIANCE_STATUS_CONFIG");
   });
 });

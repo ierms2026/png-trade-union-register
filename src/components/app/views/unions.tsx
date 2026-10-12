@@ -1,5 +1,6 @@
 "use client";
-import { getUnionStatusLabel } from "@/lib/dashboard/vocabulary";
+import { getUnionStatusLabel, getComplianceStatusLabel } from "@/lib/dashboard/vocabulary";
+import type { ComplianceMatrixResponse } from "@/lib/compliance/matrix";
 import Link from "next/link";
 
 import { useState, useEffect, type FormEvent } from "react";
@@ -96,9 +97,41 @@ interface Union {
   documents: UnionDocument[];
 }
 
-export function UnionsView({ user, initialUnionId }: { user: { role: string; assignedUnionId: string | null }; initialUnionId?: string | null }) {
+// IA-2: Union Hub — the union detail page now has tabs.
+// Tabs: Overview, Documents, Compliance, Tasks, History.
+// History (audit entries for this union) is hidden for Officers.
+type UnionHubTab = "overview" | "documents" | "compliance" | "tasks" | "history";
+
+const UNION_HUB_TAB_LABELS: Record<UnionHubTab, string> = {
+  overview: "Overview",
+  documents: "Documents",
+  compliance: "Compliance",
+  tasks: "Tasks",
+  history: "History",
+};
+
+export function UnionsView({
+  user,
+  initialUnionId,
+  initialTab,
+  onNavigate,
+}: {
+  user: { role: string; assignedUnionId: string | null };
+  initialUnionId?: string | null;
+  initialTab?: string | null;
+  onNavigate?: (view: string, params?: { unionId?: string; unionTab?: string }) => void;
+}) {
   const { data, loading, error, refetch } = useFetch<{ unions: Union[] }>("/api/unions");
   const [selectedUnionId, setSelectedUnionId] = useState<string | null>(initialUnionId ?? null);
+  // IA-2: tab state for the union hub. History tab is hidden for Officers.
+  const isOfficer = user.role === "OFFICER";
+  const validInitialTab: UnionHubTab =
+    initialTab === "documents" ? "documents" :
+    initialTab === "compliance" ? "compliance" :
+    initialTab === "tasks" ? "tasks" :
+    initialTab === "history" && !isOfficer ? "history" :
+    "overview";
+  const [hubTab, setHubTab] = useState<UnionHubTab>(validInitialTab);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadDocType, setUploadDocType] = useState<string>("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -143,6 +176,12 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
 
   // --- Union detail view ---
   if (selectedUnion) {
+    // IA-2: Union Hub — tabbed detail view.
+    // History tab is hidden for Officers (audit is REGISTRAR+INSPECTOR only).
+    const hubTabs: UnionHubTab[] = isOfficer
+      ? ["overview", "documents", "compliance", "tasks"]
+      : ["overview", "documents", "compliance", "tasks", "history"];
+
     return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => setSelectedUnionId(null)}>
@@ -150,6 +189,7 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
           Back to unions
         </Button>
 
+        {/* Union header card — always visible above the tabs */}
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">
@@ -193,49 +233,77 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Contact info */}
-            <div className="grid gap-4 text-sm md:grid-cols-2">
-              {selectedUnion.fileNumber && (
-                <div>
-                  <p className="text-xs text-muted-foreground">File Number</p>
-                  <p className="font-medium">{selectedUnion.fileNumber}</p>
-                </div>
-              )}
-              {selectedUnion.contactPerson && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Contact Person</p>
-                  <p className="font-medium">{selectedUnion.contactPerson}</p>
-                </div>
-              )}
-              {selectedUnion.contactEmail && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Contact Email</p>
-                  <p className="font-medium">{selectedUnion.contactEmail}</p>
-                </div>
-              )}
-              {selectedUnion.contactPhone && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Contact Phone</p>
-                  <p className="font-medium">{selectedUnion.contactPhone}</p>
-                </div>
-              )}
-              {selectedUnion.address && (
-                <div className="md:col-span-2">
-                  <p className="text-xs text-muted-foreground">Address</p>
-                  <p className="font-medium">{selectedUnion.address}</p>
-                </div>
-              )}
-              {selectedUnion.remarks && (
-                <div className="md:col-span-2">
-                  <p className="text-xs text-muted-foreground">Remarks</p>
-                  <p className="font-medium">{selectedUnion.remarks}</p>
-                </div>
-              )}
-            </div>
+        </Card>
 
-            {/* Documents */}
-            <div>
+        {/* IA-2: Tab bar */}
+        <div className="flex gap-1 rounded-md border p-1">
+          {hubTabs.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setHubTab(t)}
+              aria-current={hubTab === t ? "page" : undefined}
+              className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                hubTab === t
+                  ? "bg-accent/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {UNION_HUB_TAB_LABELS[t]}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        {hubTab === "overview" && (
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              {/* Contact info */}
+              <div className="grid gap-4 text-sm md:grid-cols-2">
+                {selectedUnion.fileNumber && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">File Number</p>
+                    <p className="font-medium">{selectedUnion.fileNumber}</p>
+                  </div>
+                )}
+                {selectedUnion.contactPerson && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Contact Person</p>
+                    <p className="font-medium">{selectedUnion.contactPerson}</p>
+                  </div>
+                )}
+                {selectedUnion.contactEmail && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Contact Email</p>
+                    <p className="font-medium">{selectedUnion.contactEmail}</p>
+                  </div>
+                )}
+                {selectedUnion.contactPhone && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Contact Phone</p>
+                    <p className="font-medium">{selectedUnion.contactPhone}</p>
+                  </div>
+                )}
+                {selectedUnion.address && (
+                  <div className="md:col-span-2">
+                    <p className="text-xs text-muted-foreground">Address</p>
+                    <p className="font-medium">{selectedUnion.address}</p>
+                  </div>
+                )}
+                {selectedUnion.remarks && (
+                  <div className="md:col-span-2">
+                    <p className="text-xs text-muted-foreground">Remarks</p>
+                    <p className="font-medium">{selectedUnion.remarks}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {hubTab === "documents" && (
+          <Card>
+            <CardContent className="pt-6">
               <h4 className="mb-3 text-sm font-medium">Documents ({selectedUnion.documents.length})</h4>
               {selectedUnion.documents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No documents filed yet.</p>
@@ -255,9 +323,21 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
                   ))}
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {hubTab === "compliance" && (
+          <UnionComplianceTab unionId={selectedUnion.id} unionName={selectedUnion.unionName} />
+        )}
+
+        {hubTab === "tasks" && (
+          <UnionTasksTab unionId={selectedUnion.id} unionName={selectedUnion.unionName} onNavigate={onNavigate} />
+        )}
+
+        {hubTab === "history" && !isOfficer && (
+          <UnionHistoryTab unionId={selectedUnion.id} unionName={selectedUnion.unionName} />
+        )}
 
         {uploadDialogOpen && (
           <UploadDialog
@@ -1171,5 +1251,109 @@ function RegisterUnionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// =============================================================================
+// IA-2: Union Hub tab components
+// =============================================================================
+
+// --- UnionComplianceTab — shows this union's compliance scores from /api/compliance
+function UnionComplianceTab({ unionId, unionName }: { unionId: string; unionName: string }) {
+  const { data, loading, error } = useFetch<ComplianceMatrixResponse>("/api/compliance");
+  if (loading) return <Card><CardContent className="py-6 text-sm text-muted-foreground">Loading compliance…</CardContent></Card>;
+  if (error) return <Card><CardContent className="py-6 text-sm text-destructive">Error: {error}</CardContent></Card>;
+  const unionRow = data?.unions.find((u) => u.unionId === unionId);
+  if (!unionRow) return <Card><CardContent className="py-6 text-sm text-muted-foreground">No compliance data for {unionName}.</CardContent></Card>;
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <h4 className="mb-3 text-sm font-medium">Compliance for {unionName}</h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="py-2 pr-4">Document Type</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Expiry</th>
+              </tr>
+            </thead>
+            <tbody>
+              {unionRow.scores.map((s) => (
+                <tr key={s.documentType} className="border-b">
+                  <td className="py-2 pr-4 font-medium">{s.documentType}</td>
+                  <td className="py-2 pr-4">{getComplianceStatusLabel(s.status)}</td>
+                  <td className="py-2 pr-4 text-muted-foreground">{s.expiresAt ? new Date(s.expiresAt).toLocaleDateString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- UnionTasksTab — shows tasks for this union with a link to the full Tasks view
+function UnionTasksTab({ unionId, unionName, onNavigate }: { unionId: string; unionName: string; onNavigate?: (view: string, params?: { unionId?: string; unionTab?: string }) => void }) {
+  // We reuse the /api/tasks endpoint — it returns tasks scoped to the user's
+  // role. For REGISTRAR/INSPECTOR it returns all tasks; the client filters by unionId.
+  const { data, loading, error } = useFetch<{ tasks: Array<{ id: string; title: string; status: string; unionId: string | null; dueDate: string | null }> }>("/api/tasks");
+  if (loading) return <Card><CardContent className="py-6 text-sm text-muted-foreground">Loading tasks…</CardContent></Card>;
+  if (error) return <Card><CardContent className="py-6 text-sm text-destructive">Error: {error}</CardContent></Card>;
+  const unionTasks = (data?.tasks ?? []).filter((t) => t.unionId === unionId);
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h4 className="text-sm font-medium">Tasks for {unionName} ({unionTasks.length})</h4>
+          <Button size="sm" variant="ghost" onClick={() => onNavigate?.("tasks")}>
+            View all tasks
+          </Button>
+        </div>
+        {unionTasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No tasks for this union.</p>
+        ) : (
+          <ul className="space-y-1">
+            {unionTasks.map((t) => (
+              <li key={t.id} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+                <span>{t.title}</span>
+                <span className="text-xs text-muted-foreground">{t.status}{t.dueDate ? ` · due ${new Date(t.dueDate).toLocaleDateString()}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- UnionHistoryTab — audit entries for this union (REGISTRAR + INSPECTOR only)
+function UnionHistoryTab({ unionId, unionName }: { unionId: string; unionName: string }) {
+  const { data, loading, error } = useFetch<{ entries: Array<{ id: string; action: string; actorName: string; createdAt: string; entityType: string; summary?: string }>; total: number }>(`/api/audit?unionId=${encodeURIComponent(unionId)}&limit=20`);
+  if (loading) return <Card><CardContent className="py-6 text-sm text-muted-foreground">Loading history…</CardContent></Card>;
+  if (error) return <Card><CardContent className="py-6 text-sm text-destructive">Error: {error}</CardContent></Card>;
+  const entries = data?.entries ?? [];
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <h4 className="mb-3 text-sm font-medium">History for {unionName} ({data?.total ?? 0} total)</h4>
+        {entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No audit entries for this union.</p>
+        ) : (
+          <ul className="space-y-1">
+            {entries.map((e) => (
+              <li key={e.id} className="rounded border px-3 py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{e.action}</span>
+                  <time className="text-xs text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</time>
+                </div>
+                <p className="text-xs text-muted-foreground">by {e.actorName} · {e.entityType}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }

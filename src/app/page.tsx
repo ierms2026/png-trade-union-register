@@ -68,6 +68,10 @@ interface UrlState {
   unionId: string | null;
   documentId: string | null;
   query: string | null;
+  /** IA-2: compliance tab (overview / compare / rules). */
+  complianceTab: string | null;
+  /** IA-2: union hub tab (overview / documents / compliance / tasks / history). */
+  unionTab: string | null;
 }
 
 function readUrlState(urlParams: URLSearchParams): UrlState {
@@ -79,6 +83,8 @@ function readUrlState(urlParams: URLSearchParams): UrlState {
     unionId: urlParams.get("union"),
     documentId: urlParams.get("id"),
     query: urlParams.get("q"),
+    complianceTab: urlParams.get("tab"),
+    unionTab: urlParams.get("unionTab"),
   };
 }
 
@@ -89,18 +95,19 @@ export default function Home() {
   const [initialUnionId, setInitialUnionId] = useState<string | null>(null);
   const [initialStatusFilter, setInitialStatusFilter] = useState<string | null>(null);
   const [documentDetailId, setDocumentDetailId] = useState<string | null>(null);
+  const [initialComplianceTab, setInitialComplianceTab] = useState<string | null>(null);
+  const [initialUnionTab, setInitialUnionTab] = useState<string | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(null);
 
   // --- Apply URL state to React state -------------------------------------
-  // Called from both the mount effect + the urlchange listener. Centralizing
-  // this ensures Back/Forward/Refresh all produce the same view + filter
-  // state — the URL is the single source of truth.
   const applyUrlState = useCallback((urlParams: URLSearchParams) => {
     const state = readUrlState(urlParams);
     setActiveView(state.view);
     setInitialStatusFilter(state.statusFilter);
     setInitialUnionId(state.unionId);
     setDocumentDetailId(state.documentId);
+    setInitialComplianceTab(state.complianceTab);
+    setInitialUnionTab(state.unionTab);
   }, []);
 
   useEffect(() => {
@@ -223,16 +230,25 @@ export default function Home() {
   //   status     → ?status=X (for compliance filtered by status)
   // =============================================================================
 
-  function handleNavigate(view: string, params?: { unionId?: string; query?: string; documentId?: string; status?: string }) {
+  function handleNavigate(view: string, params?: { unionId?: string; query?: string; documentId?: string; status?: string; tab?: string; unionTab?: string }) {
+    // IA-2: redirect old /compare and /configure-rules routes to the
+    // compliance tab equivalent. The URL changes to ?view=compliance&tab=X
+    // so the old bookmark/share still works, just lands on the tab.
+    if (view === "compare") {
+      view = "compliance";
+      params = { ...params, tab: "compare" };
+    } else if (view === "configure-rules") {
+      view = "compliance";
+      params = { ...params, tab: "rules" };
+    }
+
     if (params?.unionId) setInitialUnionId(params.unionId);
     if (params?.documentId) setDocumentDetailId(params.documentId);
     if (params?.status) setInitialStatusFilter(params.status);
+    if (params?.tab) setInitialComplianceTab(params.tab);
+    if (params?.unionTab) setInitialUnionTab(params.unionTab);
 
-    // Build a fresh URL with only the relevant params for the target view.
-    // This prevents stale params (e.g. audit's ?action=) from leaking into
-    // other views' URLs.
     if (view === "dashboard") {
-      // Dashboard uses a clean URL (no params) — the canonical "home" address.
       window.history.pushState({}, "", "/");
     } else {
       const url = new URL(window.location.origin + "/");
@@ -241,12 +257,10 @@ export default function Home() {
       if (params?.unionId) url.searchParams.set("union", params.unionId);
       if (params?.documentId) url.searchParams.set("id", params.documentId);
       if (params?.query) url.searchParams.set("q", params.query);
+      if (params?.tab) url.searchParams.set("tab", params.tab);
+      if (params?.unionTab) url.searchParams.set("unionTab", params.unionTab);
       window.history.pushState({}, "", url.toString());
     }
-    // The pushState monkey-patch dispatches `urlchange`, which triggers
-    // applyUrlState — so we don't need to call setActiveView here.
-    // But we DO set it directly as well, for immediate UI response before
-    // the urlchange event fires (React batches both updates).
     setActiveView(view);
   }
 
@@ -271,14 +285,19 @@ export default function Home() {
       // the new union/document/filter from the URL-derived initial state.
       case "unions":
       case "my-union":
-        return <UnionsView key={`unions-${initialUnionId ?? "none"}`} user={currentUser} initialUnionId={initialUnionId} />;
+        return <UnionsView key={`unions-${initialUnionId ?? "none"}-${initialUnionTab ?? "default"}`} user={currentUser} initialUnionId={initialUnionId} initialTab={initialUnionTab} onNavigate={handleNavigate} />;
       case "documents": return <DocumentsView />;
       case "document-detail":
         return <DocumentDetailView key={`doc-${documentDetailId ?? "none"}`} documentId={documentDetailId ?? ""} />;
       case "compliance":
-        return <ComplianceView key={`compliance-${initialStatusFilter ?? "all"}`} initialFilter={initialStatusFilter} />;
-      case "configure-rules": return <ConfigureRulesView />;
-      case "compare": return <CompareView />;
+        return <ComplianceView key={`compliance-${initialStatusFilter ?? "all"}-${initialComplianceTab ?? "overview"}`} initialFilter={initialStatusFilter} initialTab={initialComplianceTab} user={currentUser} onNavigate={handleNavigate} />;
+      // IA-2: compare + configure-rules are now tabs inside ComplianceView.
+      // If someone lands on ?view=compare or ?view=configure-rules via a
+      // stale bookmark, redirect to the compliance tab.
+      case "compare":
+        return <ComplianceView key="compliance-redirect-compare" initialTab="compare" user={currentUser} onNavigate={handleNavigate} />;
+      case "configure-rules":
+        return <ComplianceView key="compliance-redirect-rules" initialTab="rules" user={currentUser} onNavigate={handleNavigate} />;
       case "tasks": return <TasksView />;
       case "reviews": return <ReviewsView />;
       case "retention":
