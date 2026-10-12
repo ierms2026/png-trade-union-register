@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
 // GET /api/compliance
@@ -51,8 +52,12 @@ export async function GET(req: Request) {
   // Officer scoping: filter the unions array to just their assigned union.
   // (We could also pass a where clause to fetchMatrixData, but filtering
   // post-fetch is simpler and the dataset is small — 6 demo unions.)
-  if (user.role === Role.OFFICER && user.assignedUnionId) {
-    data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
+  }
+  if (scope.kind === "union") {
+    data.unions = data.unions.filter((u) => u.id === scope.unionId);
   }
 
   const matrix = buildComplianceMatrix(data);

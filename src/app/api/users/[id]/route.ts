@@ -206,6 +206,23 @@ export async function PUT(
     );
   }
 
+  // --- D17: fail closed for unassigned Officers (C10) ---
+  const effectiveRole =
+    updateData.role !== undefined ? updateData.role : existingUser.role;
+  const effectiveUnionId =
+    updateData.assignedUnionId !== undefined
+      ? updateData.assignedUnionId
+      : existingUser.assignedUnionId;
+  if (
+    effectiveRole === Role.OFFICER &&
+    (!effectiveUnionId || effectiveUnionId.trim().length === 0)
+  ) {
+    return NextResponse.json(
+      { error: "An Officer must have an assigned union. Assign a union before saving." },
+      { status: 400 },
+    );
+  }
+
   // --- Last-Registrar protection ----------------------------------------
   // Triggers if the action would leave the system with 0 active Registrars.
   // Two action types can trigger it:

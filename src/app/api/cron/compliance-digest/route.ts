@@ -7,6 +7,7 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 import { collectDigestIssues, type DigestItem } from "@/lib/compliance/digest-issues";
 import { createNotification, getUserNotificationPrefs } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
 // POST /api/cron/compliance-digest
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
   });
 
   let digestsSent = 0;
+  let skippedUnassigned = 0;
 
   for (const recipient of recipients) {
     // For Officers: filter to their union only
@@ -85,9 +87,14 @@ export async function POST(req: NextRequest) {
     let recipientExpiring30 = expiring30;
     let recipientExpiring90 = expiring90;
 
-    if (recipient.role === Role.OFFICER && recipient.assignedUnionId) {
+    const scope = getUnionScope({ role: recipient.role, assignedUnionId: recipient.assignedUnionId });
+    if (scope.kind === "none") {
+      skippedUnassigned++;
+      continue;
+    }
+    if (scope.kind === "union") {
       // Find the union name for this officer
-      const officerUnion = matrix.unions.find((u) => u.unionId === recipient.assignedUnionId);
+      const officerUnion = matrix.unions.find((u) => u.unionId === scope.unionId);
       if (!officerUnion) continue; // union not in the matrix
       const unionName = officerUnion.unionName;
       recipientOverdue = overdue.filter((i) => i.unionName === unionName);
@@ -156,6 +163,7 @@ export async function POST(req: NextRequest) {
     totalIssues,
     recipients: recipients.length,
     digestsSent,
+    skippedUnassigned,
     breakdown: {
       overdue: overdue.length,
       expiring30: expiring30.length,

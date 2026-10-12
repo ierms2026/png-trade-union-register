@@ -9,6 +9,7 @@ import {
   RATE_LIMITS,
 } from "@/lib/rate-limit";
 import { extractSnippet } from "@/lib/search/search-utils";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
 // GET /api/search?q=...&union=ID&documentType=X&reviewStatus=Y&page=N&limit=M
@@ -68,6 +69,11 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
   }
 
   // --- Rate limit: 30/min per user ---------------------------------------
@@ -134,9 +140,8 @@ export async function GET(req: NextRequest) {
   //   REGISTRAR + INSPECTOR → all unions (the ?union= filter is honored)
   //   OFFICER → their assigned union only (the ?union= filter is IGNORED
   //   — they can only search their own union)
-  const isUnionScopedRole = user.role === Role.OFFICER;
-  if (isUnionScopedRole && user.assignedUnionId) {
-    documentWhere.unionId = user.assignedUnionId;
+  if (scope.kind === "union") {
+    documentWhere.unionId = scope.unionId;
   } else if (unionFilter) {
     // Registrar/Inspector: honor the ?union= filter if set.
     documentWhere.unionId = unionFilter;

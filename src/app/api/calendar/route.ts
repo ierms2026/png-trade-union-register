@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
 // GET /api/calendar?tab=all|documents|tasks|compliance&month=YYYY-MM
@@ -52,16 +53,20 @@ export async function GET(req: NextRequest) {
   const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
 
    
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
+  }
   const events: any[] = [];
 
   // --- Tasks (due dates) --------------------------------------------------
   if (tab === "all" || tab === "tasks") {
     const taskWhere = {
       dueDate: { gte: monthStart, lte: monthEnd },
-      ...(user.role === Role.OFFICER && user.assignedUnionId
+      ...(scope.kind === "union"
         ? {
             OR: [
-              { unionId: user.assignedUnionId },
+              { unionId: scope.unionId },
               { assigneeId: user.id },
             ],
           }
@@ -103,11 +108,7 @@ export async function GET(req: NextRequest) {
     });
     for (const v of versions) {
       // Officer scoping
-      if (
-        user.role === Role.OFFICER &&
-        user.assignedUnionId &&
-        v.document.unionId !== user.assignedUnionId
-      ) {
+      if (scope.kind === "union" && v.document.unionId !== scope.unionId) {
         continue;
       }
       events.push({
@@ -126,8 +127,8 @@ export async function GET(req: NextRequest) {
   // --- Compliance issues (EXPIRING + OVERDUE) -----------------------------
   if (tab === "all" || tab === "compliance") {
     const data = await fetchMatrixData();
-    if (user.role === Role.OFFICER && user.assignedUnionId) {
-      data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
+    if (scope.kind === "union") {
+      data.unions = data.unions.filter((u) => u.id === scope.unionId);
     }
     const matrix = buildComplianceMatrix(data);
     for (const row of matrix.unions) {

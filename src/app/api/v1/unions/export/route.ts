@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
-import { Role } from "@prisma/client";
+import { getUnionScope } from "@/lib/auth/union-scope";
 import {
   checkRateLimit,
   rateLimitedResponse,
@@ -70,10 +70,11 @@ export async function GET(req: NextRequest) {
   const hasPiiScope = hasScope(user, "unions:read:pii");
 
   // Build the where clause with Officer/Representative scoping
-  const isUnionScopedRole = user.role === Role.OFFICER;
-  const where = isUnionScopedRole && user.assignedUnionId
-    ? { id: user.assignedUnionId }
-    : {};
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
+  }
+  const where = scope.kind === "union" ? { id: scope.unionId } : {};
 
   // Select fields based on PII scope
   const select = hasPiiScope

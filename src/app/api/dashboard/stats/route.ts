@@ -4,6 +4,7 @@ import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import { tallyStatuses, computeRateFromCounts } from "@/lib/dashboard/metrics";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
 // GET /api/dashboard/stats
@@ -36,10 +37,11 @@ export async function GET() {
 
   // --- 1. Count unions + documents (parallel) ----------------------------
   // Officers see only their assigned union's counts.
-  const unionWhere =
-    user.role === Role.OFFICER && user.assignedUnionId
-      ? { id: user.assignedUnionId }
-      : {};
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
+  }
+  const unionWhere = scope.kind === "union" ? { id: scope.unionId } : {};
 
   // Per chunk 0.1 audit: "Documents" = active (non-disposed) docs only.
   // disposedAt: null excludes the 2 disposed docs, giving 21 (matching
@@ -47,10 +49,9 @@ export async function GET() {
   const [totalUnions, activeCount] = await Promise.all([
     db.union.count({ where: unionWhere }),
     db.document.count({
-      where:
-        user.role === Role.OFFICER && user.assignedUnionId
-          ? { unionId: user.assignedUnionId, disposedAt: null }
-          : { disposedAt: null },
+      where: scope.kind === "union"
+        ? { unionId: scope.unionId, disposedAt: null }
+        : { disposedAt: null },
     }),
   ]);
 
@@ -59,8 +60,8 @@ export async function GET() {
   // Officers, we filter the unions list post-fetch (the matrix builder
   // iterates over `data.unions`, so filtering there scopes the result).
   const data = await fetchMatrixData();
-  if (user.role === Role.OFFICER && user.assignedUnionId) {
-    data.unions = data.unions.filter((u) => u.id === user.assignedUnionId);
+  if (scope.kind === "union") {
+    data.unions = data.unions.filter((u) => u.id === scope.unionId);
   }
   const matrix = buildComplianceMatrix(data);
 

@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
 import { buildComplianceReportHtml } from "@/lib/compliance/report-html";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 const execFileAsync = promisify(execFile);
 
@@ -48,9 +49,12 @@ export async function GET(req: NextRequest) {
   let unionId = url.searchParams.get("unionId");
 
   // Officer/Representative scoping — force their union
-  const isUnionScopedRole = user.role === Role.OFFICER;
-  if (isUnionScopedRole && user.assignedUnionId) {
-    unionId = user.assignedUnionId;
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
+  }
+  if (scope.kind === "union") {
+    unionId = scope.unionId;
   }
 
   // --- Build the report HTML ------------------------------------------------

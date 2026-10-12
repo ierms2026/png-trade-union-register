@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser, getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { Role, ReviewStatus } from "@prisma/client";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
 // GET /api/documents
@@ -61,12 +62,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Build the where clause with role scoping
-  const isUnionScopedRole = user.role === Role.OFFICER;
   const where: Record<string, unknown> = {};
 
-  // Role scoping: Officers/Reps can only see their own union's documents
-  if (isUnionScopedRole && user.assignedUnionId) {
-    where.unionId = user.assignedUnionId;
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
+  }
+  if (scope.kind === "union") {
+    where.unionId = scope.unionId;
   } else if (unionId) {
     where.unionId = unionId;
   }

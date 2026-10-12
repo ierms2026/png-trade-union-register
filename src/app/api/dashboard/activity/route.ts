@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
+import { getUnionScope } from "@/lib/auth/union-scope";
 
 // =============================================================================
 // GET /api/dashboard/activity
@@ -38,15 +39,18 @@ export async function GET() {
 
   // Officer scoping: only show audit entries related to their union
   // or their own actions. This prevents cross-union data leakage.
-  const where =
-    user.role === Role.OFFICER && user.assignedUnionId
-      ? {
-          OR: [
-            { entityId: user.assignedUnionId, entityType: "Union" },
-            { actorId: user.id },
-          ],
-        }
-      : {};
+  const scope = getUnionScope({ role: user.role, assignedUnionId: user.assignedUnionId });
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Forbidden: your account is not assigned to a union." }, { status: 403 });
+  }
+  const where = scope.kind === "union"
+    ? {
+        OR: [
+          { entityId: scope.unionId, entityType: "Union" },
+          { actorId: user.id },
+        ],
+      }
+    : {};
 
   const entries = await db.auditLog.findMany({
     where,
