@@ -27,14 +27,14 @@ interface Props { onStaffLogin: () => void; }
 // These match the tab labels shown to the user (Register / Resources / Help).
 // The URL param is ?tab=<value>. Refresh, Back/Forward, + sharing all work.
 // =============================================================================
-type PublicTab = "register" | "resources" | "help";
+type PublicTab = "register" | "resources" | "about" | "help";
 
 /** Read the ?tab= param from the URL. Falls back to "register" (the default). */
 function readTabFromUrl(): PublicTab {
   if (typeof window === "undefined") return "register";
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
-  if (tab === "register" || tab === "resources" || tab === "help") return tab;
+  if (tab === "register" || tab === "resources" || tab === "about" || tab === "help") return tab;
   // Legacy values: "search" → register, "legislation" → resources.
   // Kept for backward compat so old bookmarks don't break.
   if (tab === "search") return "register";
@@ -111,6 +111,12 @@ export function PublicPortal({ onStaffLogin }: Props) {
         <p className="mx-auto max-w-xl text-xs italic text-muted-foreground/80">
           This register is published in accordance with Section 5 of the Industrial Organizations Act, which requires the Registrar to maintain a public register of registered trade unions.
         </p>
+        {/* IA-4: quick links to Resources + About from the hero. */}
+        <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
+          <button onClick={() => handleTabChange("resources")} className="font-medium text-primary underline decoration-accent decoration-2 underline-offset-4 hover:decoration-accent/60">View resources</button>
+          <span className="text-muted-foreground/40">·</span>
+          <button onClick={() => handleTabChange("about")} className="font-medium text-primary underline decoration-accent decoration-2 underline-offset-4 hover:decoration-accent/60">About this register</button>
+        </div>
       </div>
     );
   }
@@ -121,6 +127,20 @@ export function PublicPortal({ onStaffLogin }: Props) {
         <div className="space-y-2 text-center">
           <h2 className="text-lg font-semibold">Registered Unions</h2>
           <p className="text-sm text-muted-foreground">All trade unions currently on the public register. Click a union to view its published documents.</p>
+        </div>
+        {/* IA-4: status key — explains the 3 union status badges shown in the list. */}
+        <div className="flex flex-wrap items-center justify-center gap-4 rounded-md border bg-muted/30 px-4 py-2 text-xs">
+          <span className="font-medium text-muted-foreground">Status key:</span>
+          {Object.values(UNION_STATUS_CONFIG).map((cfg) => {
+            const Icon = cfg.icon;
+            return (
+              <span key={cfg.label} className="flex items-center gap-1.5">
+                <Icon className="h-3 w-3" aria-hidden="true" />
+                <span className="font-medium">{cfg.label}</span>
+                <span className="text-muted-foreground">— {cfg.plainLanguage}</span>
+              </span>
+            );
+          })}
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -162,6 +182,54 @@ export function PublicPortal({ onStaffLogin }: Props) {
           <Card key={entry.id}><CardContent className="p-4"><div className="flex items-start justify-between gap-4"><div className="flex-1"><div className="mb-1 flex items-center gap-2"><h3 className="font-medium">{entry.title}</h3><Badge variant="outline" className="text-xs">{entry.category}</Badge></div><p className="mb-2 text-sm text-muted-foreground">{entry.summary}</p><p className="text-xs text-muted-foreground">{entry.jurisdiction} · {entry.year} · Last updated {new Date(entry.lastUpdated).toLocaleDateString()}</p></div><Button asChild size="sm" variant="outline"><a href={entry.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1 h-3 w-3" />View PDF</a></Button></div></CardContent></Card>
         ))}</div>)
         : <EmptyState icon={Scale} title="No resources available" description="The resources library is empty. Please check back later." />}
+      </div>
+    );
+  }
+
+  // IA-4: About & contact page — explains what this portal is, who runs it,
+  // and how to get in touch. Uses the RegistrarContactInfo component for the
+  // contact details (env-configured via NEXT_PUBLIC_REGISTRAR_*).
+  function renderAbout() {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <h2 className="text-lg font-semibold">About this Register</h2>
+          <p className="text-sm text-muted-foreground">What this portal is, who runs it, and how to contact us.</p>
+        </div>
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <div>
+              <h3 className="mb-2 text-base font-medium">What is the Register of Trade Unions?</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                The Register of Trade Unions is the official public registry of trade unions registered under the
+                Industrial Organizations Act of Papua New Guinea. It is published by the Office of The Industrial
+                Registrar, within the Department of Labour &amp; Industrial Relations. Every trade union that is
+                registered in PNG appears on this register with its registration number, current status, and
+                published documents.
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-2 text-base font-medium">What can I do here?</h3>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li><strong className="text-foreground">Register tab:</strong> search the full list of registered trade unions by name or registration number. Click a union to see its public documents.</li>
+                <li><strong className="text-foreground">Resources tab:</strong> read the acts and regulations that govern trade unions in PNG.</li>
+                <li><strong className="text-foreground">Help tab:</strong> learn what the status badges (Active, Suspended, Deregistered) and compliance statuses mean.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="mb-2 text-base font-medium">Who runs this register?</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                The Industrial Registrar is responsible for the registration, regulation, and oversight of trade
+                unions in Papua New Guinea. The Registrar operates under the Industrial Organizations Act and
+                is part of the Department of Labour &amp; Industrial Relations.
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-2 text-base font-medium">Contact us</h3>
+              <RegistrarContactInfo variant="card" className="text-sm" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -247,12 +315,13 @@ export function PublicPortal({ onStaffLogin }: Props) {
         <div className="mx-auto flex max-w-4xl gap-1 px-4">
           <button onClick={() => handleTabChange("register")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "register" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Register</button>
           <button onClick={() => handleTabChange("resources")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "resources" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Resources</button>
+          <button onClick={() => handleTabChange("about")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "about" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>About</button>
           <button onClick={() => handleTabChange("help")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "help" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Help</button>
         </div>
       </div>
       <main className="mx-auto max-w-4xl space-y-10 p-4 py-10">
         {renderHero()}
-        {tab === "register" ? renderSearch() : tab === "resources" ? renderLegislation() : renderHelp()}
+        {tab === "register" ? renderSearch() : tab === "resources" ? renderLegislation() : tab === "about" ? renderAbout() : renderHelp()}
       </main>
       <footer className="border-t bg-card">
         <div className="mx-auto max-w-4xl space-y-3 px-4 py-6 text-center text-xs text-muted-foreground">
