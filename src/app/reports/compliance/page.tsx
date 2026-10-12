@@ -53,10 +53,9 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
   const data = await fetchMatrixData();
   // Officer scoping via the canonical helper (D17 fail-closed). An Officer
   // with no assigned union sees NO data (notFound), never everything.
-  // STEP 8 (pre-demo gate): was `if (role === "OFFICER" && assignedUnionId)`
-  // — a fail-open truthiness gate that let an unassigned Officer see ALL
-  // unions. Now uses getUnionScope which returns { kind: "none" } for that
-  // case, triggering notFound().
+  // Previously this used a truthiness gate that failed open; now uses
+  // getUnionScope which returns { kind: "none" } for the unassigned case,
+  // triggering notFound().
   const scope = getUnionScope({ role: authUser.role, assignedUnionId: authUser.assignedUnionId });
   if (scope.kind === "none") {
     notFound();

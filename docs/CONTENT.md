@@ -161,7 +161,7 @@ Documents filed on a yearly cycle. Must be renewed each year to stay
 compliant.
 
 #### Financial Return
-- **What it is:** The union's annual financial statements. Shows income, expenses, assets, and liabilities.
+- **What it is:** The union's annual financial return. Shows income, expenses, assets, and liabilities.
 - **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
 - **How often:** Annually (renewal period = 1 year).
 - **Compliant:** Filed + approved, renewal date more than 90 days away.

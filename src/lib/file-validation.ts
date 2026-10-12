@@ -11,7 +11,7 @@ const execFileP = promisify(execFile);
 //
 // WHY MAGIC-BYTES + PDFINFO:
 //   - The upload route accepts any file extension, but PDFs are by far the
-//     most common document type (constitutions, bylaws, annual returns are
+//     most common document type (constitutions, financial returns are
 //     all PDFs). A corrupt PDF — truncated upload, network garble, a .doc
 //     renamed to .pdf — would otherwise be stored, linked to a Document
 //     row, and only discovered broken when a user tries to open it. By

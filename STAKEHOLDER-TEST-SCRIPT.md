@@ -289,7 +289,7 @@ This account is assigned to **Papua Maritime Workers Union**.
   Ballots, General Secretary Appointments), Oversight (Inspection
   Reports, Awards, General Matters).
 - **Do:** select **Financial Return** from the Annual Filings group.
-  Enter a title (e.g. "2025 Annual Return"). Choose any PDF file from
+  Enter a title (e.g. "2025 Financial Return"). Choose any PDF file from
   your computer. Click **Upload**.
 - **What you should see:** the upload completes. The document appears
   in your My filings tab under the Annual Filings category with

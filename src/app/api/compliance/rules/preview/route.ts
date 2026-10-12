@@ -12,7 +12,7 @@ import type { ComplianceRule } from "@prisma/client";
 // Compute the impact of a hypothetical rule change WITHOUT persisting it.
 //
 // USE CASE:
-// Before a Registrar saves a rule edit (e.g. "raise Meeting Minutes
+// Before a Registrar saves a rule edit (e.g. "raise Financial Return
 // renewalYears from 1 to 3"), they want to see exactly which unions would
 // change status. This endpoint runs the compliance matrix TWICE:
 //

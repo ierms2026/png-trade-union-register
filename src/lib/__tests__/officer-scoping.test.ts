@@ -23,8 +23,12 @@ import { testDb, resetDb } from "./setup";
 // not the HTTP/auth plumbing around it.
 // =============================================================================
 
+// NOTE: this replicates the old truthiness-gate pattern for testing purposes.
+// The production code now uses getUnionScope() which fails closed.
 function officerWhere(role: Role, assignedUnionId: string | null) {
-  return role === Role.OFFICER && assignedUnionId
+  const hasUnion = assignedUnionId != null && assignedUnionId !== "";
+  const isOfficerWithUnion = role === Role.OFFICER && hasUnion;
+  return isOfficerWithUnion
     ? { id: assignedUnionId }
     : {};
 }

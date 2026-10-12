@@ -352,7 +352,7 @@ export const CONTENT_DEFINITIONS = {
   "document-type.financial-return": {
     title: "Financial Return",
     body:
-      "The union's annual financial statements. Shows income, expenses, assets, and liabilities. " +
+      "The union's annual financial return. Shows income, expenses, assets, and liabilities. " +
       "Renewed annually (1 year). " +
       "DRAFT: needs Industrial Registrar review.",
   },

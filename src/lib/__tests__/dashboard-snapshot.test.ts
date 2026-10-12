@@ -76,8 +76,8 @@ const DAY_AFTER_TODAY = new Date("2026-06-16T12:00:00Z");
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const SEED_RULES = [
-  { documentType: "Annual Return", renewalYears: 1, required: true },
-  { documentType: "Financial Statement", renewalYears: 1, required: true },
+  { documentType: "Financial Return", renewalYears: 1, required: true },
+  { documentType: "Financial Membership List", renewalYears: 1, required: true },
 ];
 
 interface SeedDoc {
@@ -89,13 +89,13 @@ interface SeedDoc {
 
 const SEED_DOCS: SeedDoc[] = [
   // Union A: both rules COMPLIANT (uploaded 30 days ago — well within 1 year)
-  { unionId: "union-A", documentType: "Annual Return", uploadedDaysAgo: 30, approved: true },
-  // Union B: Annual Return EXPIRING (uploaded 335 days ago — expires in 30 days, within the 90-day window)
-  { unionId: "union-B", documentType: "Annual Return", uploadedDaysAgo: 335, approved: true },
-  // Union B: Financial Statement OVERDUE (uploaded 380 days ago — past 1-year renewal)
-  { unionId: "union-B", documentType: "Financial Statement", uploadedDaysAgo: 380, approved: true },
-  // Union A: Financial Statement COMPLIANT (uploaded 100 days ago)
-  { unionId: "union-A", documentType: "Financial Statement", uploadedDaysAgo: 100, approved: true },
+  { unionId: "union-A", documentType: "Financial Return", uploadedDaysAgo: 30, approved: true },
+  // Union B: Financial Return EXPIRING (uploaded 335 days ago — expires in 30 days, within the 90-day window)
+  { unionId: "union-B", documentType: "Financial Return", uploadedDaysAgo: 335, approved: true },
+  // Union B: Financial Membership List OVERDUE (uploaded 380 days ago — past 1-year renewal)
+  { unionId: "union-B", documentType: "Financial Membership List", uploadedDaysAgo: 380, approved: true },
+  // Union A: Financial Membership List COMPLIANT (uploaded 100 days ago)
+  { unionId: "union-A", documentType: "Financial Membership List", uploadedDaysAgo: 100, approved: true },
   // Union C: both MISSING (no document rows seeded)
 ];
 
@@ -498,9 +498,9 @@ describe("compliance snapshot — chunk 4.2a", () => {
       // `documentByUnionAndType` map keyed by `unionId::documentType`, and
       // the calculator.ts `calculateStatusFromRows` checks disposal.
       // Actually let me just delete the document row entirely — that's the
-      // simplest mutation: union-A "Annual Return" goes from COMPLIANT → MISSING.
+      // simplest mutation: union-A "Financial Return" goes from COMPLIANT → MISSING.
       const target = await testDb.document.findFirst({
-        where: { unionId: "union-A", documentType: "Annual Return" },
+        where: { unionId: "union-A", documentType: "Financial Return" },
       });
       expect(target).not.toBeNull();
       // Delete the version first (FK constraint), then the doc.
@@ -512,8 +512,8 @@ describe("compliance snapshot — chunk 4.2a", () => {
       // Step 4: Re-trigger TODAY's snapshot. It MUST reflect the new state.
       const r = await ensureSnapshotForToday(FROZEN_NOW);
       expect(r.action).toBe("updated");
-      // New counts: COMPLIANT=1 (was 2, lost union-A's Annual Return),
-      //            MISSING=3 (was 2, gained union-A's Annual Return as MISSING).
+      // New counts: COMPLIANT=1 (was 2, lost union-A's Financial Return),
+      //            MISSING=3 (was 2, gained union-A's Financial Return as MISSING).
       // EXPIRING/OVERDUE unchanged.
       expect(r.counts).toEqual({
         compliant: 1, expiring: 1, overdue: 1, awaitingReview: 0, missing: 3,

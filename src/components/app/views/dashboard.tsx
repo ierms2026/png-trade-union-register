@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, ArrowRight, FileDown, ChevronRight } from "lucide-react";
+import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, ArrowRight, FileDown, ChevronRight, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1449,10 +1449,44 @@ function DocumentsByCategoryRow({
 }
 
 export function DashboardView({ user, onNavigate, onFilterCompliance }: {
-  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" };
+  user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER"; assignedUnionId?: string | null };
   onNavigate?: (view: string) => void;
   onFilterCompliance?: (status: string) => void;
 }) {
+  // IA-4: friendly "no union assigned" screen for Union Officials with no
+  // assigned union. They can't see any data (all scoped endpoints return 403).
+  // Instead of showing error toasts + an empty dashboard, show a clear message.
+  if (user.role === "OFFICER" && !user.assignedUnionId) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Building2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+            </div>
+            <CardTitle className="text-2xl">No union assigned</CardTitle>
+            <CardDescription>
+              Your account is not assigned to a union. You won&apos;t be able to view
+              any union data until the Industrial Registrar assigns you to one.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Please contact the Industrial Registrar&apos;s office to have your account
+              assigned to a union. Once assigned, you&apos;ll be able to see your union&apos;s
+              compliance status, file documents, and manage tasks.
+            </p>
+            {onNavigate && (
+              <Button onClick={() => onNavigate("help")} variant="outline" className="w-full">
+                <HelpCircle className="mr-2 h-4 w-4" />
+                View Help &amp; Guide
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const {
     data: stats,
     loading: statsLoading,
