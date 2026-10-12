@@ -346,16 +346,20 @@ export const VIEW_TITLES: Record<string, string> = {
   tasks: "Tasks",
   search: "Search",
   reviews: "Review Queue",
-  retention: "Retention Queue",
+  // IA-1: "Retention Queue" → "Retention & Disposal"
+  retention: "Retention & Disposal",
   "contact-requests": "Contact Updates",
   calendar: "Calendar",
-  audit: "Audit",
+  // IA-1: "Audit" → "Audit Log" (matches the nav label)
+  audit: "Audit Log",
   users: "Users",
-  security: "Security",
+  // IA-1: "Security" → "Access Monitoring"
+  security: "Access Monitoring",
   "api-keys": "API Keys",
   webhooks: "Webhooks",
   legislation: "Resources",
-  "account-security": "Account Security",
+  // IA-1: "Account Security" → "My sign-in & 2FA"
+  "account-security": "My sign-in & 2FA",
   help: "Help & Guide",
 };
 

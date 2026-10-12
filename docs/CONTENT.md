@@ -141,12 +141,12 @@ rules say how long it must be kept before disposal.
 - **retentionYrs** (Retention Years) — the number of years a
   document of a given type must be kept after it is superseded or
   expired. The default is 7 years for most document types.
-- **Retention Queue** — the staff view that lists documents that
+- **Retention & Disposal** — the staff view that lists documents that
   have reached the end of their retention period and are ready for
   disposal. The Registrar must approve each disposal before it
   happens.
 
-A document does **not** go to the Retention Queue the moment it
+A document does **not** go to the Retention & Disposal the moment it
 expires. It goes there once its retention period has also elapsed
 (i.e. it has been historical for `retentionYrs` years).
 
@@ -160,7 +160,7 @@ active register once its retention period has ended. Disposal is
 period, and then be executed by the Registrar.
 
 - **Disposition Request** — a formal request to dispose of a
-  document. Created from the Retention Queue.
+  document. Created from the Retention & Disposal.
 - **Cooldown** — a mandatory waiting period between requesting a
   disposal and executing it. This gives interested parties a chance
   to object. The cooldown length is configured per system.

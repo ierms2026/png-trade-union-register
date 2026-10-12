@@ -108,7 +108,7 @@ export function SecurityView() {
   if (loading) return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Security</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Access Monitoring</h1>
         <p className="text-sm text-muted-foreground">Auth health metrics and account management.</p>
       </div>
       <StatsSkeleton />
@@ -141,7 +141,7 @@ export function SecurityView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Security</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Access Monitoring</h1>
         <p className="text-sm text-muted-foreground">
           Auth health metrics and account management. Generated at{" "}
           {new Date(data.generatedAt).toLocaleString()}.

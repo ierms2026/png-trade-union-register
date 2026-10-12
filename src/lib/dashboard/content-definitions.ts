@@ -201,7 +201,7 @@ export const CONTENT_DEFINITIONS = {
       "A document does NOT go to the Retention Queue the moment it expires — it goes there once its retention period has also elapsed.",
   },
   "retention.queue": {
-    title: "Retention Queue",
+    title: "Retention & Disposal",
     body:
       "The staff view that lists documents that have reached the end of their retention period and are ready for disposal. " +
       "The Registrar must approve each disposal before it happens.",

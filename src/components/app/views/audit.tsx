@@ -194,7 +194,7 @@ export function AuditView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Audit</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
           <p className="text-sm text-muted-foreground">
             Complete record of all system actions. Filterable by entity, action, actor, and date range.
           </p>

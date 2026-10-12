@@ -1317,3 +1317,72 @@ Stage Summary:
   2. api/dashboard/document-types/route.ts — API endpoint leaked all unions' document-type counts to an unassigned Officer.
 - Guard test extended to scan src/app/reports/ (was api-only) — prevents this class of regression.
 - All 5 gate items PASS.
+
+---
+Task ID: IA-1-navigation
+Agent: main
+Task: IA-1: Restructure navigation (6 groups, sidebar, label renames, per-role tests)
+
+Work Log:
+- Step 1 (config file): rewrote src/lib/dashboard/nav-structure.ts with 6 groups:
+  1. Dashboard (all roles)
+  2. Registry (Unions/My Union, Documents, Compare)
+  3. Compliance (Compliance, Rules)
+  4. Work (Tasks, Calendar)
+  5. Oversight (Retention & Disposal, Review Queue, Contact Updates, Audit Log, Search)
+  6. Administration (Users, Access Monitoring, API Keys, Webhooks, Resources)
+  Plus STANDALONE_NAV_ITEMS (Help & Guide) — rendered at the bottom of the sidebar.
+  Added getStandaloneNavItems() helper. Updated getPaletteEntries() to include standalone items.
+- Step 2 (sidebar rendering): replaced HorizontalNav + NavDropdown with SidebarNav in app-shell.tsx. SidebarNav renders group headings as <h3> (uppercase, muted) above each group's destinations. Empty groups are filtered out by getNavForRole (existing behavior). Layout changed from top-nav to sidebar+main: <aside className="w-60"> on lg+, hidden on mobile (mobile uses Cmd+K palette + user menu). Removed unused Popover/ChevronDown imports.
+- Step 3 (label renames):
+  * Security → Access Monitoring (nav label + VIEW_TITLES + h1 in security.tsx)
+  * Account Security → My sign-in & 2FA (VIEW_TITLES + h1 in account-security.tsx + user menu item in app-shell)
+  * Active Sessions → My sessions (CardTitle in account-security.tsx)
+  * Retention Queue → Retention & Disposal (nav label + VIEW_TITLES + h1 in retention.tsx + content-definitions.ts title + CONTENT.md)
+  * Audit → Audit Log (nav label + VIEW_TITLES + h1 in audit.tsx)
+  * Updated help-guide.tsx accessibleAreas to use the new labels.
+- Step 4 (URLs preserved): no routes renamed. Every route string is byte-identical to pre-IA-1. No redirects needed. Verified by the route-preservation test (getAllRoutes returns all 20 expected routes, every route has a matching case in page.tsx).
+- Step 5 (Inspector rules): Inspector sees no Administration group (filtered out — zero INSPECTOR-accessible destinations). Inspector sees Retention & Disposal (roles: REGISTRAR, INSPECTOR) — the approve button is server-enforced as REGISTRAR-only (existing behavior). Inspector does NOT see Rules (REGISTRAR-only).
+- Step 6 (Officer visibility): Officer sees exactly 5 items: Dashboard, My Union, Compliance, Tasks, Calendar. No Oversight, no Administration. Search is REGISTRAR+INSPECTOR only in the sidebar (Officer accesses search via Cmd+K palette). Verified by per-role nav test.
+- Step 7 (tests): rewrote src/lib/__tests__/dashboard-nav.test.ts with 47 tests:
+  * Group structure (4 tests): 6 groups, correct labels, every group/destination has required fields.
+  * Route preservation (3 tests): every expected route present, unique, has a case in page.tsx.
+  * Label renames (8 tests): Security→Access Monitoring, Account Security→My sign-in & 2FA, Retention→Retention & Disposal, Audit→Audit Log — in both nav labels + VIEW_TITLES.
+  * VIEW_TITLES mirrors nav (2 tests): no drift between nav labels + page titles.
+  * Per-role nav visibility (3 tests): REGISTRAR sees all 6 groups + all destinations; INSPECTOR sees 5 groups (no Admin); OFFICER sees 4 groups (Dashboard, Registry, Compliance, Work) with exactly the 5 specified items.
+  * Empty groups hidden (2 tests): OFFICER doesn't see Oversight/Administration; INSPECTOR doesn't see Administration.
+  * Retention flag (3 tests): hidden when disabled, visible when enabled (REGISTRAR), hidden for OFFICER even when enabled.
+  * Standalone items (2 tests): Help & Guide present, visible to all roles.
+  * Reachability (3 tests): dashboard=0 clicks, everything else=1 click (sidebar), account-security=Infinity.
+  * Palette + quick actions (3 tests): derived from NAV_STRUCTURE, role-filtered.
+  * findDestination + findGroupForRoute (5 tests): finds group/standalone destinations, returns null for nonexistent.
+  * Server-side route rejection (7 tests): static check that role-restricted API files contain role checks; OFFICER not in any Administration/Oversight destination roles; INSPECTOR not in any Administration destination roles.
+  Also fixed u02-retention-dispose-confirm.test.tsx (was asserting "Retention Queue" text — updated to "Retention & Disposal").
+
+Verification:
+- tsc --noEmit: 0 errors.
+- Full suite: 797 tests / 56 files pass.
+- Build: compiles successfully.
+
+Files changed (IA-1):
+- MOD src/lib/dashboard/nav-structure.ts (rewritten: 6 groups + standalone items + helpers)
+- MOD src/lib/dashboard/vocabulary.ts (VIEW_TITLES: 4 label renames)
+- MOD src/components/app/app-shell.tsx (SidebarNav replaces HorizontalNav; sidebar+main layout; label renames in breadcrumbs + user menu; removed unused Popover/ChevronDown imports)
+- MOD src/components/app/views/security.tsx (h1: Security → Access Monitoring)
+- MOD src/components/app/views/account-security.tsx (h1: Account Security → My sign-in & 2FA; CardTitle: Active Sessions → My sessions)
+- MOD src/components/app/views/retention.tsx (h1: Retention Queue → Retention & Disposal)
+- MOD src/components/app/views/audit.tsx (h1: Audit → Audit Log)
+- MOD src/components/app/views/help-guide.tsx (accessibleAreas updated with new labels; Officer areas trimmed to 5 items)
+- MOD src/lib/dashboard/content-definitions.ts (retention.queue title: Retention Queue → Retention & Disposal)
+- MOD docs/CONTENT.md (Retention Queue → Retention & Disposal)
+- MOD src/lib/__tests__/dashboard-nav.test.ts (rewritten: 47 tests for new structure)
+- MOD src/lib/__tests__/u02-retention-dispose-confirm.test.tsx (updated heading text assertion)
+
+Stage Summary:
+- Nav restructured into 6 groups (Dashboard, Registry, Compliance, Work, Oversight, Administration) in one config file.
+- Sidebar renders group headings; empty groups hidden.
+- Officer sees exactly: Dashboard, My Union, Compliance, Tasks, Calendar (5 items, 4 groups).
+- Inspector sees no Administration; Retention is visible (reject-only, server-enforced).
+- 4 label renames applied consistently across nav, page headings, breadcrumbs, VIEW_TITLES, help guide, content definitions, and CONTENT.md.
+- No routes renamed — every URL works without redirects.
+- 47 tests cover: group structure, route preservation, label renames, VIEW_TITLES mirroring, per-role visibility, empty-group hiding, retention flag, standalone items, reachability, palette/quick actions, findDestination/findGroupForRoute, server-side route rejection.

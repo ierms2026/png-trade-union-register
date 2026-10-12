@@ -176,7 +176,7 @@ describe("Retention disposal dialog: focus return", () => {
     render(<RetentionView user={REGISTRAR} />);
     await waitFor(() => expect(screen.getByText("Constitution")).toBeTruthy());
 
-    const heading = screen.getByText("Retention Queue");
+    const heading = screen.getByText("Retention & Disposal");
     expect(heading.getAttribute("tabindex")).toBe("-1");
   });
 
@@ -199,7 +199,7 @@ describe("Retention disposal dialog: focus return", () => {
     await user.click(screen.getByRole("button", { name: /Confirm Disposal/i }));
 
     await waitFor(() => {
-      const heading = screen.getByText("Retention Queue");
+      const heading = screen.getByText("Retention & Disposal");
       expect(document.activeElement).toBe(heading);
     }, { timeout: 3000 });
   });

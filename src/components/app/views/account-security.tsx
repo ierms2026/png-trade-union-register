@@ -62,7 +62,7 @@ export function AccountSecurityView({ user }: { user: AuthUser }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Account Security</h1>
+        <h1 className="text-3xl font-bold tracking-tight">My sign-in & 2FA</h1>
         <p className="text-sm text-muted-foreground">
           Manage your two-factor authentication and active sessions.
         </p>
@@ -408,7 +408,8 @@ function SessionsSection() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Monitor className="h-5 w-5" />
-          Active Sessions
+          {/* IA-1: "Active Sessions" → "My sessions" */}
+          My sessions
         </CardTitle>
         <CardDescription>Devices currently signed in to your account.</CardDescription>
       </CardHeader>

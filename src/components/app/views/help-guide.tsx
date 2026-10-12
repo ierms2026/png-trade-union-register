@@ -84,8 +84,8 @@ const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
     ],
     accessibleAreas: [
       "Dashboard", "Unions", "Documents", "Compare", "Compliance", "Rules",
-      "Tasks", "Calendar", "Review Queue", "Contact Updates", "Retention Queue",
-      "Search", "Audit", "Users", "Security", "API Keys", "Webhooks", "Resources",
+      "Tasks", "Calendar", "Review Queue", "Contact Updates", "Retention & Disposal",
+      "Search", "Audit Log", "Users", "Access Monitoring", "API Keys", "Webhooks", "Resources",
     ],
   },
   INSPECTOR: {
@@ -120,7 +120,7 @@ const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
     ],
     accessibleAreas: [
       "Dashboard", "Unions", "Documents", "Compare", "Compliance",
-      "Tasks", "Calendar", "Search", "Audit",
+      "Tasks", "Calendar", "Search", "Audit Log",
     ],
   },
   OFFICER: {
@@ -154,8 +154,8 @@ const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
       },
     ],
     accessibleAreas: [
-      "Dashboard", "My Union", "Documents", "Compliance",
-      "Tasks", "Calendar", "Search",
+      "Dashboard", "My Union", "Compliance",
+      "Tasks", "Calendar",
     ],
   },
 };

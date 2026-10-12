@@ -98,7 +98,7 @@ export function RetentionView({ user }: { user: User }) {
     <div className="space-y-6">
       <div>
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight">
-          Retention Queue
+          Retention & Disposal
           <span className="ml-2 align-middle"><DefinitionPopover termKey="retention.queue" size="sm" align="start" /></span>
         </h1>
         <p className="text-sm text-muted-foreground">
