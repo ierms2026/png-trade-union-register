@@ -441,6 +441,18 @@ export interface DocumentTypeCategory {
   /** Short plain-language description of what this category covers. */
   description: string;
   documentTypes: string[];
+  /**
+   * Whether this category is "internal" — produced by the Industrial
+   * Registrar's office, not filed by unions. Internal categories are
+   * hidden from Union Officials (they can't upload these types, can't
+   * see them in their Documents tab, and don't see them in their
+   * compliance matrix). The Industrial Registrar + Inspector still see
+   * them.
+   *
+   * IA-4: the "Oversight" category (Inspection Reports, Awards, General
+   * Matters) is internal. The other 3 categories are union-filed.
+   */
+  internal?: boolean;
 }
 
 export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
@@ -484,6 +496,9 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
       "Awards",
       "General Matters",
     ],
+    // IA-4: internal — these types are produced by the Industrial
+    // Registrar, not filed by unions. Hidden from Union Officials.
+    internal: true,
   },
 ];
 
@@ -514,6 +529,49 @@ export function groupDocumentTypesByCategory(
   }
 
   return grouped;
+}
+
+/**
+ * The set of document types that are "internal" (produced by the
+ * Industrial Registrar, not filed by unions). Union Officials should
+ * not see these in their upload picker, Documents tab, or compliance
+ * matrix.
+ *
+ * IA-4: derived from DOCUMENT_TYPE_CATEGORIES where `internal: true`.
+ */
+export const INTERNAL_DOCUMENT_TYPES: ReadonlySet<string> = new Set(
+  DOCUMENT_TYPE_CATEGORIES
+    .filter((cat) => cat.internal)
+    .flatMap((cat) => cat.documentTypes),
+);
+
+/**
+ * Check if a document type is internal (Industrial Registrar only).
+ */
+export function isInternalDocumentType(documentType: string): boolean {
+  return INTERNAL_DOCUMENT_TYPES.has(documentType);
+}
+
+/**
+ * Filter a list of document types to exclude internal types.
+ * Used by the Union Official's upload picker, Documents tab, + compliance
+ * matrix to hide Oversight-category types (Inspection Reports, Awards,
+ * General Matters).
+ *
+ * @param documentTypes The full list of document types.
+ * @returns The list with internal types removed.
+ */
+export function filterOutInternalTypes(documentTypes: string[]): string[] {
+  return documentTypes.filter((t) => !INTERNAL_DOCUMENT_TYPES.has(t));
+}
+
+/**
+ * Filter a list of document types to only include internal types.
+ * Used by the Industrial Registrar's views when they want to see only
+ * the internal (Oversight) types.
+ */
+export function filterToInternalTypes(documentTypes: string[]): string[] {
+  return documentTypes.filter((t) => INTERNAL_DOCUMENT_TYPES.has(t));
 }
 
 // =============================================================================

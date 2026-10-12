@@ -213,6 +213,21 @@ export async function POST(
       { status: 400 },
     );
   }
+  // IA-4: Union Officials cannot upload internal document types (Inspection
+  // Reports, Awards, General Matters). These are produced by the Industrial
+  // Registrar, not filed by unions. Server-side enforcement — the UI also
+  // hides these types, but this prevents API callers from bypassing the UI.
+  if (user.role === Role.OFFICER) {
+    const { isInternalDocumentType } = await import("@/lib/dashboard/vocabulary");
+    if (isInternalDocumentType(trimmedDocType)) {
+      return NextResponse.json(
+        {
+          error: `Union Officials cannot upload "${trimmedDocType}". This document type is produced by the Industrial Registrar, not filed by unions.`,
+        },
+        { status: 403 },
+      );
+    }
+  }
   // Validate `title` — non-empty string (this becomes DocumentVersion.fileName,
   // the user-facing name shown in the UI; the original uploaded filename is
   // used only for extension extraction)

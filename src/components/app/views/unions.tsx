@@ -1,5 +1,5 @@
 "use client";
-import { getUnionStatusLabel, getComplianceStatusLabel, groupDocumentTypesByCategory } from "@/lib/dashboard/vocabulary";
+import { getUnionStatusLabel, getComplianceStatusLabel, groupDocumentTypesByCategory, filterOutInternalTypes, isInternalDocumentType } from "@/lib/dashboard/vocabulary";
 import type { ComplianceMatrixResponse } from "@/lib/compliance/matrix";
 import Link from "next/link";
 
@@ -124,13 +124,18 @@ export function UnionsView({
   onNavigate?: (view: string, params?: { unionId?: string; unionTab?: string }) => void;
 }) {
   const { data, loading, error, refetch } = useFetch<{ unions: Union[] }>("/api/unions");
+  // IA-2: tab state for the union hub. History tab is hidden for Officers.
+  const isOfficer = user.role === "OFFICER";
   // IA-3: fetch the full compliance matrix to get the complete list of required
   // document types per category (for "x of y current" counts in the Documents tab).
   const { data: complianceData } = useFetch<{ documentTypes: string[] }>("/api/compliance");
-  const allRequiredTypes = complianceData?.documentTypes ?? [];
+  // IA-4: filter out internal types (Inspection Reports, Awards, General
+  // Matters) for Union Officials — they can't file these types and shouldn't
+  // see them in their Documents tab or "x of y" counts.
+  const allRequiredTypes = isOfficer
+    ? filterOutInternalTypes(complianceData?.documentTypes ?? [])
+    : (complianceData?.documentTypes ?? []);
   const [selectedUnionId, setSelectedUnionId] = useState<string | null>(initialUnionId ?? null);
-  // IA-2: tab state for the union hub. History tab is hidden for Officers.
-  const isOfficer = user.role === "OFFICER";
   const validInitialTab: UnionHubTab =
     initialTab === "documents" ? "documents" :
     initialTab === "compliance" ? "compliance" :
@@ -389,7 +394,7 @@ export function UnionsView({
         )}
 
         {hubTab === "compliance" && (
-          <UnionComplianceTab unionId={selectedUnion.id} unionName={selectedUnion.unionName} />
+          <UnionComplianceTab unionId={selectedUnion.id} unionName={selectedUnion.unionName} userRole={user.role} />
         )}
 
         {hubTab === "tasks" && (
@@ -405,6 +410,7 @@ export function UnionsView({
             unionId={selectedUnion.id}
             defaultDocType={uploadDocType}
             open={uploadDialogOpen}
+            userRole={user.role}
             onClose={() => {
               setUploadDialogOpen(false);
               setUploadDocType("");
@@ -992,17 +998,22 @@ interface UploadDialogProps {
   open: boolean;
   onClose: () => void;
   onUploaded: () => void;
+  userRole: string;
 }
 
-function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded }: UploadDialogProps) {
+function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded, userRole }: UploadDialogProps) {
   const [documentType, setDocumentType] = useState(defaultDocType);
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Fetch compliance rules for the document-type dropdown
+  // Fetch compliance rules for the document-type dropdown.
+  // IA-4: filter out internal types (Inspection Reports, Awards, General
+  // Matters) for Union Officials — they can't file these types.
   const { data: complianceData } = useFetch<{ documentTypes: string[] }>("/api/compliance");
-  const documentTypes = complianceData?.documentTypes ?? [];
+  const documentTypes = userRole === "OFFICER"
+    ? filterOutInternalTypes(complianceData?.documentTypes ?? [])
+    : (complianceData?.documentTypes ?? []);
 
   // Sync the doc type when the default changes
   useEffect(() => {
@@ -1327,12 +1338,17 @@ function RegisterUnionDialog({
 // =============================================================================
 
 // --- UnionComplianceTab — shows this union's compliance scores from /api/compliance
-function UnionComplianceTab({ unionId, unionName }: { unionId: string; unionName: string }) {
+function UnionComplianceTab({ unionId, unionName, userRole }: { unionId: string; unionName: string; userRole: string }) {
   const { data, loading, error } = useFetch<ComplianceMatrixResponse>("/api/compliance");
   if (loading) return <Card><CardContent className="py-6 text-sm text-muted-foreground">Loading compliance…</CardContent></Card>;
   if (error) return <Card><CardContent className="py-6 text-sm text-destructive">Error: {error}</CardContent></Card>;
   const unionRow = data?.unions.find((u) => u.unionId === unionId);
   if (!unionRow) return <Card><CardContent className="py-6 text-sm text-muted-foreground">No compliance data for {unionName}.</CardContent></Card>;
+  // IA-4: filter out internal types (Inspection Reports, Awards, General
+  // Matters) for Union Officials — they don't see these in their compliance tab.
+  const visibleScores = userRole === "OFFICER"
+    ? unionRow.scores.filter((s) => !isInternalDocumentType(s.documentType))
+    : unionRow.scores;
   return (
     <Card>
       <CardContent className="pt-6">
@@ -1347,7 +1363,7 @@ function UnionComplianceTab({ unionId, unionName }: { unionId: string; unionName
               </tr>
             </thead>
             <tbody>
-              {unionRow.scores.map((s) => (
+              {visibleScores.map((s) => (
                 <tr key={s.documentType} className="border-b">
                   <td className="py-2 pr-4 font-medium">{s.documentType}</td>
                   <td className="py-2 pr-4">{getComplianceStatusLabel(s.status)}</td>
