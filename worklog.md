@@ -1524,3 +1524,23 @@ Stage Summary:
 - /demo tour page: 8 journey sections (Start here / Find & file records / Monitor compliance / Get work done / Oversight / Administration / The officer's view / The public portal). No phase/chunk language. Uses IA-1 labels. Credentials shown only when NODE_ENV !== "production" — in production, shows a "contact the Registrar" message. Password assembled from parts so source doesn't contain the literal credential.
 - Public field whitelist + 404 behavior: unchanged (verified by tests).
 - 26 new tests cover: no authed chrome on public pages, /demo production gating, 4 public tabs, status key, journey organization, whitelist + 404 unchanged.
+
+---
+Task ID: IA-3-findability-v2
+Agent: main
+Task: IA-3: Findability using existing document categories (nav rename, category grouping in 5 surfaces, CONTENT.md 13 types + 4 categories)
+
+Work Log:
+- Report: all 13 types have required=true. Officers can upload all 13 (no type restriction). Oversight types DO count in compliance scores. None of this changed.
+- Renamed nav group "Oversight" → "Review & Audit" (keep doc category "Oversight" name). Updated dashboard-nav.test.ts.
+- Updated ROLE_LABELS: REGISTRAR → "Industrial Registrar", OFFICER → "Union Official" (INSPECTOR unchanged). Updated content-definitions.ts + CONTENT.md role headings + label-source-guard test regex.
+- Added description field to DocumentTypeCategory interface + all 4 categories in vocabulary.ts.
+- Union Documents tab: now shows category descriptions + "x of y current" per category. Officer's tab titled "My filings". Documents sorted by next due date (earliest upload first).
+- Compliance matrix: added category super-header row (colSpan per category, with description tooltip).
+- Search filters: document-type dropdown now grouped by category (SelectGroup). Added category chips below filters.
+- Dashboard: added "Documents by Category" expandable card (per-category progress bar + expandable per-type breakdown).
+- CONTENT.md: added entries for all 13 types + 4 categories, each with what/who/how often/Compliant/Expiring/Overdue/Missing. All marked "DRAFT: needs Industrial Registrar review". No legislation citations.
+- content-definitions.ts: added 6 missing type entries + 4 category entries. All marked "DRAFT".
+- Tests: 884/59 pass. tsc 0 errors. Build compiles.
+
+Files changed: nav-structure.ts, vocabulary.ts, content-definitions.ts, unions.tsx, compliance.tsx, search.tsx, dashboard.tsx, dashboard-nav.test.ts, label-source-guard.test.ts, ia3-findability.test.ts, CONTENT.md

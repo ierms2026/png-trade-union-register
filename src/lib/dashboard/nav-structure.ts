@@ -137,9 +137,14 @@ export const NAV_STRUCTURE: NavGroup[] = [
     ],
   },
 
-  // --- 5. Oversight --------------------------------------------------------
+  // --- 5. Review & Audit ----------------------------------------------------
+  // IA-3: renamed from "Oversight" to avoid confusion with the document-type
+  // category "Oversight" (Inspection Reports, Awards, General Matters). The
+  // nav group covers Retention, Review Queue, Contact Updates, Audit Log,
+  // + Search — all review/audit workflows. The document category keeps its
+  // name "Oversight".
   {
-    label: "Oversight",
+    label: "Review & Audit",
     icon: ClipboardList,
     destinations: [
       // IA-1: Retention renamed to "Retention & Disposal". INSPECTOR can see
@@ -186,7 +191,7 @@ export const STANDALONE_NAV_ITEMS: NavDestination[] = [
  * Filter the nav structure to the destinations available to a given role.
  *
  * - Groups with NO available destinations are dropped entirely (e.g. an
- *   OFFICER sees no "Oversight" or "Administration" group).
+ *   OFFICER sees no "Review & Audit" or "Administration" group).
  * - Within a group, only the role-accessible destinations are returned.
  * - The "Retention & Disposal" destination is filtered out when
  *   `retentionEnabled` is false (default).

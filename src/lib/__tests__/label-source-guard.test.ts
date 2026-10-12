@@ -26,7 +26,7 @@ import { join, resolve } from "node:path";
 // WHAT THE GUARD CATCHES:
 //   - Quoted string literals where the ENTIRE string is a known label:
 //       "Pending Review"  ← should use REVIEW_STATUS_CONFIG.PENDING.label
-//       "Registrar"       ← should use ROLE_LABELS.REGISTRAR
+//       "Industrial Registrar" ← should use ROLE_LABELS.REGISTRAR
 //   - JSX text between tags that exactly matches a label:
 //       <span>Approved</span>  ← should use REVIEW_STATUS_CONFIG.APPROVED.label
 //   - Comment lines are stripped before scanning (labels in comments are
@@ -73,9 +73,9 @@ const REVIEW_LABELS = extractLabelsFromFile(vocabularyPath, [
   /label:\s*"((?:Pending Review|Approved|Rejected))"/g,
 ]);
 
-// Role labels: REGISTRAR: "Registrar", etc.
+// Role labels: REGISTRAR: "Industrial Registrar", INSPECTOR: "Inspector", OFFICER: "Union Official".
 const ROLE_LABELS = extractLabelsFromFile(vocabularyPath, [
-  /(?:REGISTRAR|INSPECTOR|OFFICER):\s*"((?:Registrar|Inspector|Officer))"/g,
+  /(?:REGISTRAR|INSPECTOR|OFFICER):\s*"((?:Industrial Registrar|Inspector|Union Official))"/g,
 ]);
 
 // Task status labels: label: "To Do", etc.

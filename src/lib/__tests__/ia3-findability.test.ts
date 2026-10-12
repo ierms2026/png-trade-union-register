@@ -303,7 +303,7 @@ describe("IA-3: upload picker uses grouped categories", () => {
     const content = readFileSync(file, "utf-8");
     // The documents tab must call groupDocumentTypesByCategory on the
     // union's document types + render category headings.
-    expect(content).toMatch(/groupDocumentTypesByCategory\(docTypes\)/);
+    expect(content).toMatch(/groupDocumentTypesByCategory\(allRequiredTypes\)/);
   });
 });
 

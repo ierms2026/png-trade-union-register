@@ -128,7 +128,7 @@ export const CONTENT_DEFINITIONS = {
 
   // --- Roles ---
   "role.registrar": {
-    title: "Registrar",
+    title: "Industrial Registrar",
     body:
       "The system administrator. The Registrar can do everything: register and deregister unions, " +
       "approve or reject documents, configure compliance rules, manage users, place and lift legal holds, and approve disposals.",
@@ -141,7 +141,7 @@ export const CONTENT_DEFINITIONS = {
       "The Inspector is for auditors and reviewers.",
   },
   "role.officer": {
-    title: "Officer",
+    title: "Union Official",
     body:
       "A union-scoped staff user. An Officer is assigned to ONE specific union and can only see data for that union. " +
       "They can file documents for their union and view their union's compliance status. " +
@@ -299,43 +299,125 @@ export const CONTENT_DEFINITIONS = {
       "If the denominator is zero (no required documents), the rate is 0%, not 100%.",
   },
 
+  // --- Document type categories (IA-3) ---
+  "document-category.registration": {
+    title: "Registration",
+    body:
+      "Founding documents that establish the union's legal existence. " +
+      "Permanent — rarely re-filed after initial registration. " +
+      "Includes: Application for Registration, Registration Certificate, Constitution.",
+  },
+  "document-category.annual-filings": {
+    title: "Annual Filings",
+    body:
+      "Documents filed on a yearly cycle. Must be renewed each year to stay compliant. " +
+      "Includes: Financial Return, Financial Membership List, Affiliations, Welfare Fund.",
+  },
+  "document-category.governance": {
+    title: "Governance",
+    body:
+      "Documents about the union's leadership, elections, and internal governance. Renewed every 3 years. " +
+      "Includes: Election of Office Bearers, Secret Ballots, General Secretary Appointments.",
+  },
+  "document-category.oversight": {
+    title: "Oversight",
+    body:
+      "Documents produced by the Industrial Registrar's office during oversight of the union. Renewed annually. " +
+      "Includes: Inspection Reports, Awards, General Matters.",
+  },
+
   // --- Document types (the kinds of records a union must file) ---
+  // IA-3: all 13 types now have entries. DRAFT wording — needs Industrial
+  // Registrar review. Based on seed data + code behavior, not legislation.
+  "document-type.application-for-registration": {
+    title: "Application for Registration",
+    body:
+      "The union's original application to be registered. Filed once (renewal period = 99 years, treated as permanent). " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
   "document-type.registration-certificate": {
     title: "Registration Certificate",
     body:
-      "The official certificate issued by the Registrar when the union was first registered. " +
-      "This is the union's 'birth certificate.'",
+      "The official certificate issued by the Industrial Registrar when the union was first registered. " +
+      "Permanent (renewal period = 99 years). " +
+      "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.constitution": {
     title: "Constitution",
     body:
-      "The union's governing rules. " +
-      "It sets out how the union is run, how office bearers are elected, and how decisions are made.",
+      "The union's governing rules. Sets out how the union is run, how office bearers are elected, and how decisions are made. " +
+      "Permanent (renewal period = 99 years). A new version is filed if the constitution is amended. " +
+      "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.financial-return": {
     title: "Financial Return",
     body:
-      "The union's annual financial statements. " +
-      "Shows the union's income, expenses, assets, and liabilities.",
-  },
-  "document-type.election-of-office-bearers": {
-    title: "Election of Office Bearers",
-    body:
-      "The record of the most recent election of the union's office bearers (president, secretary, treasurer, etc.).",
+      "The union's annual financial statements. Shows income, expenses, assets, and liabilities. " +
+      "Renewed annually (1 year). " +
+      "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.financial-membership-list": {
     title: "Financial Membership List",
-    body: "The current list of financial members of the union.",
-  },
-  "document-type.awards": {
-    title: "Awards",
     body:
-      "Any industrial awards or agreements the union is a party to.",
+      "The current list of financial members of the union. " +
+      "Renewed annually (1 year). " +
+      "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.affiliations": {
     title: "Affiliations",
     body:
-      "Records of the union's affiliations with other bodies (e.g. a national trade union congress).",
+      "Records of the union's affiliations with other bodies (e.g. a national trade union congress). " +
+      "Renewed annually (1 year). " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
+  "document-type.welfare-fund": {
+    title: "Welfare Fund",
+    body:
+      "Records of the union's welfare fund (a fund that provides benefits to members in need). " +
+      "Renewed annually (1 year). " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
+  "document-type.election-of-office-bearers": {
+    title: "Election of Office Bearers",
+    body:
+      "The record of the most recent election of the union's office bearers (president, secretary, treasurer, etc.). " +
+      "Renewed every 3 years. " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
+  "document-type.secret-ballots": {
+    title: "Secret Ballots",
+    body:
+      "Records of secret ballots conducted by the union (e.g. for elections or major decisions). " +
+      "Renewed every 3 years. " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
+  "document-type.general-secretary-appointments": {
+    title: "General Secretary Appointments",
+    body:
+      "Records of the appointment of the union's General Secretary. " +
+      "Renewed every 3 years. " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
+  "document-type.inspection-reports": {
+    title: "Inspection Reports",
+    body:
+      "Reports produced by the Industrial Registrar after inspecting the union's records, finances, or operations. " +
+      "The union does not produce this document. Renewed annually (1 year). " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
+  "document-type.awards": {
+    title: "Awards",
+    body:
+      "Any industrial awards or agreements the union is a party to. " +
+      "Renewed every 3 years. " +
+      "DRAFT: needs Industrial Registrar review.",
+  },
+  "document-type.general-matters": {
+    title: "General Matters",
+    body:
+      "General correspondence or matters between the union and the Industrial Registrar that do not fit into another document type. " +
+      "Renewed annually (1 year). " +
+      "DRAFT: needs Industrial Registrar review.",
   },
 } as const satisfies Record<string, ContentDefinition>;
 

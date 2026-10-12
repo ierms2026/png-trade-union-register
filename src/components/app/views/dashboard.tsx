@@ -1,6 +1,7 @@
 "use client";
 
-import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, ArrowRight, FileDown } from "lucide-react";
+import { useState } from "react";
+import { Building2, FileText, CheckCircle2, AlertTriangle, XCircle, FileQuestion, Activity, ArrowRight, FileDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { WelcomePanel } from "@/components/app/welcome-panel";
 import { DefinitionPopover } from "@/components/app/definition-popover";
+import { groupDocumentTypesByCategory, type DocumentTypeCategory } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -1370,6 +1372,82 @@ const ACTION_LABELS: Record<string, string> = {
   session_revoke: "revoked session",
 };
 
+// =============================================================================
+// IA-3: DocumentsByCategoryRow — expandable category row for the
+// "Documents by Category" dashboard card. Shows the category label, a
+// total on-file count, + a progress bar. Clicking expands to show
+// per-type counts.
+// =============================================================================
+
+function DocumentsByCategoryRow({
+  category,
+  totalOnFile,
+  totalRequired,
+  onFileMap,
+  totalUnions,
+}: {
+  category: DocumentTypeCategory;
+  totalOnFile: number;
+  totalRequired: number;
+  onFileMap: Map<string, number>;
+  totalUnions: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const pct = totalRequired > 0 ? Math.round((totalOnFile / totalRequired) * 100) : 0;
+  return (
+    <div className="rounded-md border">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center gap-3">
+          <ChevronRight
+            className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`}
+            aria-hidden="true"
+          />
+          <div>
+            <p className="text-sm font-medium">{category.label}</p>
+            <p className="text-xs text-muted-foreground">{category.description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium">{totalOnFile} of {totalRequired}</span>
+          <span className="text-xs text-muted-foreground">({pct}%)</span>
+        </div>
+      </button>
+      {/* Progress bar */}
+      <div className="h-1.5 w-full overflow-hidden rounded-b-md bg-muted">
+        <div
+          className="h-full bg-primary transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {/* Expanded: per-type breakdown */}
+      {expanded && (
+        <div className="border-t px-4 py-3">
+          <ul className="space-y-1.5">
+            {category.documentTypes.map((dt) => {
+              const onFile = onFileMap.get(dt) ?? 0;
+              const required = totalUnions;
+              const typePct = required > 0 ? Math.round((onFile / required) * 100) : 0;
+              return (
+                <li key={dt} className="flex items-center justify-between text-xs">
+                  <span className="text-foreground">{dt}</span>
+                  <span className="text-muted-foreground">
+                    {onFile} of {required} on file ({typePct}%)
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DashboardView({ user, onNavigate, onFilterCompliance }: {
   user: { role: "REGISTRAR" | "INSPECTOR" | "OFFICER" };
   onNavigate?: (view: string) => void;
@@ -1733,6 +1811,44 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           );
         })()}
       </div>
+
+      {/* === Row 5b: Documents by Category (IA-3) ===
+          Expandable card showing per-category document counts. Each category
+          row expands to show its individual types. */}
+      {docTypesData && docTypesData.requiredTypes && docTypesData.requiredTypes.length > 0 && (() => {
+        const categories = groupDocumentTypesByCategory(docTypesData.requiredTypes);
+        const onFileMap = new Map(
+          (docTypesData.documentTypes ?? []).map((e: { documentType: string; count: number }) => [e.documentType, e.count]),
+        );
+        return (
+          <div data-testid="documents-by-category">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Documents by Category</CardTitle>
+                <CardDescription>
+                  On-file counts grouped by document-type category. Click a category to expand.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {categories.map((cat) => {
+                  const totalOnFile = cat.documentTypes.reduce((sum, t) => sum + (onFileMap.get(t) ?? 0), 0);
+                  const totalRequired = cat.documentTypes.length * docTypesData.totalUnions;
+                  return (
+                    <DocumentsByCategoryRow
+                      key={cat.label}
+                      category={cat}
+                      totalOnFile={totalOnFile}
+                      totalRequired={totalRequired}
+                      onFileMap={onFileMap}
+                      totalUnions={docTypesData.totalUnions}
+                    />
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* === Row 6: Trend Chart | Recent Activity ===
           6.1 final layout. Both are tall cards; pairing them keeps the row

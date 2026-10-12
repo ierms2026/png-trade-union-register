@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, type FormEvent } from "react";
+import { useState, useEffect, useMemo, Fragment, type FormEvent } from "react";
 import {
   Search, Loader2, FileText, Building2, AlertCircle, XCircle,
   ChevronLeft, ChevronRight, Filter,
@@ -13,7 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -21,7 +23,7 @@ import { useFetch } from "@/components/app/use-fetch";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { Highlight } from "@/components/app/highlight";
-import { REVIEW_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
+import { REVIEW_STATUS_CONFIG, groupDocumentTypesByCategory } from "@/lib/dashboard/vocabulary";
 
 // =============================================================================
 // SearchView — full-text search with filters + pagination.
@@ -305,6 +307,7 @@ export function SearchView() {
 
       {/* Filters */}
       {shouldFetch && (
+        <Fragment>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Filter className="h-4 w-4" />
@@ -326,7 +329,7 @@ export function SearchView() {
               </SelectContent>
             </Select>
           </div>
-          {/* Document type filter */}
+          {/* Document type filter — IA-3: grouped by category */}
           <div className="w-48">
             <Select value={typeFilter} onValueChange={handleTypeChange}>
               <SelectTrigger className="h-9">
@@ -334,10 +337,15 @@ export function SearchView() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All types</SelectItem>
-                {documentTypes.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
+                {groupDocumentTypesByCategory(documentTypes).map((cat) => (
+                  <SelectGroup key={cat.label}>
+                    <SelectLabel>{cat.label}</SelectLabel>
+                    {cat.documentTypes.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
@@ -363,6 +371,35 @@ export function SearchView() {
             </Button>
           )}
         </div>
+
+        {/* IA-3: category chips — quick-filter by document-type category. */}
+        <div className="flex flex-wrap gap-1.5">
+          <span className="text-xs text-muted-foreground">Categories:</span>
+          {groupDocumentTypesByCategory(documentTypes).map((cat) => {
+            const isCategoryActive = cat.documentTypes.includes(typeFilter);
+            return (
+              <button
+                key={cat.label}
+                type="button"
+                onClick={() => {
+                  if (isCategoryActive) {
+                    setTypeFilter("all");
+                  } else if (cat.documentTypes.length > 0) {
+                    setTypeFilter(cat.documentTypes[0]);
+                  }
+                }}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  isCategoryActive
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      </Fragment>
       )}
 
       {/* Results */}

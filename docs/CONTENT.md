@@ -108,25 +108,157 @@ unlike Suspended, there is no "lift" action.
 
 These are the standard document types tracked by the system. Each
 union may be required to file some or all of them, depending on the
-compliance rules configured by the Registrar.
+compliance rules configured by the Industrial Registrar.
 
-- **Registration Certificate** — the official certificate issued by
-  the Registrar when the union was first registered. This is the
-  union's "birth certificate."
-- **Constitution** — the union's governing rules. It sets out how
-  the union is run, how office bearers are elected, and how
-  decisions are made.
-- **Financial Return** — the union's annual financial statements.
-  Shows the union's income, expenses, assets, and liabilities.
-- **Election of Office Bearers** — the record of the most recent
-  election of the union's office bearers (president, secretary,
-  treasurer, etc.).
-- **Financial Membership List** — the current list of financial
-  members of the union.
-- **Awards** — any industrial awards or agreements the union is a
-  party to.
-- **Affiliations** — records of the union's affiliations with other
-  bodies (e.g. a national trade union congress).
+All 13 types below are marked `required: true` in the system's
+compliance rules. A union's compliance rate counts all 13 types —
+if any one is Missing or Overdue, the union's rate drops.
+
+The 13 types are grouped into 4 categories. Each entry below says
+what the type is, who files it, how often it renews, and what
+Compliant / Expiring / Overdue / Missing mean for it.
+
+> **DRAFT: needs Industrial Registrar review.** The wording below is
+> based on the seed data, rules, and code behavior in the repository.
+> It does not cite legislation or legal requirements that are not
+> visible in the code. Please review + correct before publishing.
+
+### Category: Registration
+
+Founding documents that establish the union's legal existence.
+Permanent — rarely re-filed after initial registration.
+
+#### Application for Registration
+- **What it is:** The union's original application to be registered.
+- **Who files it:** The union (before registration). Reviewed by the Industrial Registrar.
+- **How often:** Once (renewal period = 99 years, treated as permanent).
+- **Compliant:** The document is filed + approved. No renewal expected.
+- **Expiring:** Not applicable (renewal period is permanent).
+- **Overdue:** Not applicable (renewal period is permanent).
+- **Missing:** No application is on file — the union may not be properly registered.
+
+#### Registration Certificate
+- **What it is:** The official certificate issued by the Industrial Registrar when the union was first registered.
+- **Who files it:** Issued by the Industrial Registrar. Stored on the union's record.
+- **How often:** Once (renewal period = 99 years, treated as permanent).
+- **Compliant:** The certificate is on file + approved.
+- **Expiring:** Not applicable (permanent).
+- **Overdue:** Not applicable (permanent).
+- **Missing:** No certificate is on file — the union's registration may be incomplete.
+
+#### Constitution
+- **What it is:** The union's governing rules. Sets out how the union is run, how office bearers are elected, and how decisions are made.
+- **Who files it:** The union. Reviewed by the Industrial Registrar.
+- **How often:** Once (renewal period = 99 years, treated as permanent). A new version is filed if the constitution is amended.
+- **Compliant:** The constitution is on file + approved.
+- **Expiring:** Not applicable (permanent).
+- **Overdue:** Not applicable (permanent).
+- **Missing:** No constitution is on file — the union cannot demonstrate it has governing rules.
+
+### Category: Annual Filings
+
+Documents filed on a yearly cycle. Must be renewed each year to stay
+compliant.
+
+#### Financial Return
+- **What it is:** The union's annual financial statements. Shows income, expenses, assets, and liabilities.
+- **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
+- **How often:** Annually (renewal period = 1 year).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, but renewal date is within 90 days.
+- **Overdue:** Filed + approved, but the renewal date has passed (the return is now late).
+- **Missing:** No financial return is on file for this period.
+
+#### Financial Membership List
+- **What it is:** The current list of financial members of the union.
+- **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
+- **How often:** Annually (renewal period = 1 year).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed.
+- **Missing:** No membership list is on file for this period.
+
+#### Affiliations
+- **What it is:** Records of the union's affiliations with other bodies (e.g. a national trade union congress).
+- **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
+- **How often:** Annually (renewal period = 1 year).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed.
+- **Missing:** No affiliations record is on file for this period.
+
+#### Welfare Fund
+- **What it is:** Records of the union's welfare fund (a fund that provides benefits to members in need).
+- **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
+- **How often:** Annually (renewal period = 1 year).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed.
+- **Missing:** No welfare fund record is on file for this period.
+
+### Category: Governance
+
+Documents about the union's leadership, elections, and internal
+governance. Renewed every 3 years.
+
+#### Election of Office Bearers
+- **What it is:** The record of the most recent election of the union's office bearers (president, secretary, treasurer, etc.).
+- **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
+- **How often:** Every 3 years (renewal period = 3 years).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed (elections are overdue).
+- **Missing:** No election record is on file — the union's current leadership may not be properly constituted.
+
+#### Secret Ballots
+- **What it is:** Records of secret ballots conducted by the union (e.g. for elections or major decisions).
+- **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
+- **How often:** Every 3 years (renewal period = 3 years).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed.
+- **Missing:** No secret ballot records are on file for this period.
+
+#### General Secretary Appointments
+- **What it is:** Records of the appointment of the union's General Secretary.
+- **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
+- **How often:** Every 3 years (renewal period = 3 years).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed.
+- **Missing:** No General Secretary appointment record is on file.
+
+### Category: Oversight
+
+Documents produced by the Industrial Registrar's office during
+oversight of the union. Renewed annually.
+
+#### Inspection Reports
+- **What it is:** Reports produced by the Industrial Registrar after inspecting the union's records, finances, or operations.
+- **Who files it:** The Industrial Registrar. The union does not produce this document.
+- **How often:** Annually (renewal period = 1 year).
+- **Compliant:** An inspection report is on file + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed (an inspection is overdue).
+- **Missing:** No inspection report is on file for this period.
+
+#### Awards
+- **What it is:** Any industrial awards or agreements the union is a party to.
+- **Who files it:** May be filed by either the union or the Industrial Registrar. Reviewed by the Industrial Registrar.
+- **How often:** Every 3 years (renewal period = 3 years).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed.
+- **Missing:** No awards record is on file for this period.
+
+#### General Matters
+- **What it is:** General correspondence or matters between the union and the Industrial Registrar that do not fit into another document type.
+- **Who files it:** Either the union or the Industrial Registrar. Reviewed by the Industrial Registrar.
+- **How often:** Annually (renewal period = 1 year).
+- **Compliant:** Filed + approved, renewal date more than 90 days away.
+- **Expiring:** Filed + approved, renewal date within 90 days.
+- **Overdue:** Filed + approved, renewal date has passed.
+- **Missing:** No general matters record is on file for this period.
 
 ---
 
@@ -199,7 +331,7 @@ to an active investigation, court case, or complaint.
 
 ## 8. Roles (who can do what)
 
-### Registrar
+### Industrial Registrar
 The system administrator. The Registrar can do everything: register
 and deregister unions, approve or reject documents, configure
 compliance rules, manage users, place and lift legal holds, and
@@ -213,7 +345,7 @@ make changes** — they cannot approve documents, configure rules,
 manage users, or dispose of records. The Inspector is for
 auditors and reviewers.
 
-### Officer
+### Union Official
 A union-scoped staff user. An Officer is assigned to **one specific
 union** and can only see data for that union. They can file
 documents for their union and view their union's compliance status.

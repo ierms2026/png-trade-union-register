@@ -295,9 +295,12 @@ export const UNION_STATUS_CONFIG: Record<
 export type UserRole = "REGISTRAR" | "INSPECTOR" | "OFFICER";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  REGISTRAR: "Registrar",
+  // IA-3: user-facing labels. Internal enum values unchanged (REGISTRAR,
+  // INSPECTOR, OFFICER). "Industrial Registrar" + "Union Official" are the
+  // formal titles used in user-facing text; "Inspector" stays as-is.
+  REGISTRAR: "Industrial Registrar",
   INSPECTOR: "Inspector",
-  OFFICER: "Officer",
+  OFFICER: "Union Official",
 };
 
 export function getRoleLabel(role: string): string {
@@ -435,12 +438,16 @@ export function buildFeedbackMailto(currentUrl: string, roleLabel: string): stri
 
 export interface DocumentTypeCategory {
   label: string;
+  /** Short plain-language description of what this category covers. */
+  description: string;
   documentTypes: string[];
 }
 
 export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
   {
     label: "Registration",
+    description:
+      "Founding documents that establish the union's legal existence. Permanent — rarely re-filed after initial registration.",
     documentTypes: [
       "Application for Registration",
       "Registration Certificate",
@@ -449,6 +456,8 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
   },
   {
     label: "Annual Filings",
+    description:
+      "Documents filed on a yearly cycle. Must be renewed each year to stay compliant.",
     documentTypes: [
       "Financial Return",
       "Financial Membership List",
@@ -458,6 +467,8 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
   },
   {
     label: "Governance",
+    description:
+      "Documents about the union's leadership, elections, and internal governance. Renewed every 3 years.",
     documentTypes: [
       "Election of Office Bearers",
       "Secret Ballots",
@@ -466,6 +477,8 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
   },
   {
     label: "Oversight",
+    description:
+      "Documents produced by the Industrial Registrar's office during oversight of the union. Renewed annually.",
     documentTypes: [
       "Inspection Reports",
       "Awards",
@@ -489,7 +502,7 @@ export function groupDocumentTypesByCategory(
   for (const cat of DOCUMENT_TYPE_CATEGORIES) {
     const inCategory = cat.documentTypes.filter((t) => typeSet.has(t));
     if (inCategory.length > 0) {
-      grouped.push({ label: cat.label, documentTypes: inCategory });
+      grouped.push({ label: cat.label, description: cat.description, documentTypes: inCategory });
       for (const t of inCategory) seen.add(t);
     }
   }
@@ -497,7 +510,7 @@ export function groupDocumentTypesByCategory(
   // "Other" group for types not in any category
   const others = documentTypes.filter((t) => !seen.has(t));
   if (others.length > 0) {
-    grouped.push({ label: "Other", documentTypes: others });
+    grouped.push({ label: "Other", description: "Document types not in a standard category.", documentTypes: others });
   }
 
   return grouped;

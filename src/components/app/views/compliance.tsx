@@ -1,6 +1,6 @@
 "use client";
 
-import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG, VIEW_TITLES } from "@/lib/dashboard/vocabulary";
+import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG, VIEW_TITLES, groupDocumentTypesByCategory } from "@/lib/dashboard/vocabulary";
 // IA-2: Compare + ConfigureRules are now tabs inside ComplianceView.
 import { CompareView } from "@/components/app/views/compare";
 import { ConfigureRulesView } from "@/components/app/views/configure-rules";
@@ -393,16 +393,34 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full border-collapse text-sm">
             <thead>
+              {/* IA-3: category super-header row — groups columns by category.
+                  Each category header spans the number of types in it. */}
               <tr className="border-b">
-                <th className="sticky left-0 z-10 bg-card px-4 py-3 text-left font-medium min-w-[200px]">
+                <th className="sticky left-0 z-10 bg-card px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground min-w-[200px]" rowSpan={2}>
                   Union
                 </th>
-                {data.documentTypes.map((dt) => (
-                  <th key={dt} className="px-2 py-3 text-center font-medium min-w-[100px]">
-                    <span className="block text-xs leading-tight">{dt}</span>
+                {groupDocumentTypesByCategory(data.documentTypes).map((cat) => (
+                  <th
+                    key={cat.label}
+                    colSpan={cat.documentTypes.length}
+                    className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-l border-border"
+                    title={cat.description}
+                  >
+                    {cat.label}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-center font-medium min-w-[80px]">Score</th>
+                <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground min-w-[80px]" rowSpan={2}>
+                  Score
+                </th>
+              </tr>
+              <tr className="border-b">
+                {groupDocumentTypesByCategory(data.documentTypes).flatMap((cat) =>
+                  cat.documentTypes.map((dt) => (
+                    <th key={dt} className="px-2 py-3 text-center font-medium min-w-[100px]">
+                      <span className="block text-xs leading-tight">{dt}</span>
+                    </th>
+                  )),
+                )}
               </tr>
             </thead>
             <tbody>

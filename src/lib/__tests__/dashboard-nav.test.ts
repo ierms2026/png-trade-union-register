@@ -59,7 +59,7 @@ describe("IA-1: NAV_STRUCTURE group structure", () => {
       "Registry",
       "Compliance",
       "Work",
-      "Oversight",
+      "Review & Audit",
       "Administration",
     ]);
   });
@@ -206,7 +206,7 @@ describe("IA-1: per-role nav visibility", () => {
       "Registry",
       "Compliance",
       "Work",
-      "Oversight",
+      "Review & Audit",
       "Administration",
     ]);
 
@@ -242,7 +242,7 @@ describe("IA-1: per-role nav visibility", () => {
       "Registry",
       "Compliance",
       "Work",
-      "Oversight",
+      "Review & Audit",
     ]);
     // No Administration group
     expect(labels).not.toContain("Administration");
@@ -276,7 +276,7 @@ describe("IA-1: per-role nav visibility", () => {
       "Work",
     ]);
     // No Oversight or Administration
-    expect(labels).not.toContain("Oversight");
+    expect(labels).not.toContain("Review & Audit");
     expect(labels).not.toContain("Administration");
 
     // Officer sees My Union (not Unions), Documents, Compliance, Tasks, Calendar
@@ -307,7 +307,7 @@ describe("IA-1: empty groups are hidden", () => {
     const nav = getNavForRole("OFFICER", true);
     const labels = nav.map((g) => g.label);
     // These groups have zero OFFICER-accessible destinations → filtered out
-    expect(labels).not.toContain("Oversight");
+    expect(labels).not.toContain("Review & Audit");
     expect(labels).not.toContain("Administration");
   });
 
@@ -447,7 +447,7 @@ describe("IA-1: findGroupForRoute", () => {
   it("finds the group for audit (audit → Oversight)", () => {
     const group = findGroupForRoute("audit");
     expect(group).not.toBeNull();
-    expect(group!.label).toBe("Oversight");
+    expect(group!.label).toBe("Review & Audit");
   });
 
   it("returns null for standalone routes (help)", () => {
@@ -506,7 +506,7 @@ describe("IA-1: server routes reject out-of-role access (static check)", () => {
   });
 
   it("OFFICER is not in the roles array for any Oversight destination", () => {
-    const oversightGroup = NAV_STRUCTURE.find((g) => g.label === "Oversight");
+    const oversightGroup = NAV_STRUCTURE.find((g) => g.label === "Review & Audit");
     expect(oversightGroup).toBeDefined();
     for (const dest of oversightGroup!.destinations) {
       expect(dest.roles, `${dest.label} (${dest.route}) must not include OFFICER`).not.toContain("OFFICER");

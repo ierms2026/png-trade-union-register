@@ -124,6 +124,10 @@ export function UnionsView({
   onNavigate?: (view: string, params?: { unionId?: string; unionTab?: string }) => void;
 }) {
   const { data, loading, error, refetch } = useFetch<{ unions: Union[] }>("/api/unions");
+  // IA-3: fetch the full compliance matrix to get the complete list of required
+  // document types per category (for "x of y current" counts in the Documents tab).
+  const { data: complianceData } = useFetch<{ documentTypes: string[] }>("/api/compliance");
+  const allRequiredTypes = complianceData?.documentTypes ?? [];
   const [selectedUnionId, setSelectedUnionId] = useState<string | null>(initialUnionId ?? null);
   // IA-2: tab state for the union hub. History tab is hidden for Officers.
   const isOfficer = user.role === "OFFICER";
@@ -306,41 +310,76 @@ export function UnionsView({
         {hubTab === "documents" && (
           <Card>
             <CardContent className="pt-6">
-              <h4 className="mb-3 text-sm font-medium">Documents ({selectedUnion.documents.length})</h4>
+              {/* IA-3: officer's Documents tab is titled "My filings" (user-facing
+                  label for OFFICER role). Other roles see "Documents". */}
+              <h4 className="mb-3 text-sm font-medium">
+                {isOfficer ? "My filings" : "Documents"} ({selectedUnion.documents.length})
+              </h4>
               {selectedUnion.documents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No documents filed yet.</p>
               ) : (
                 // IA-3: group documents by category (Registration, Annual
-                // Filings, Governance, Oversight). Documents not in any
-                // category fall through to "Other".
+                // Filings, Governance, Oversight). Each section shows the
+                // category description + "x of y current" count (how many
+                // of the required types in this category have a filed
+                // document). Documents within each category are sorted by
+                // next due date (expiry date) for officers.
                 (() => {
-                  const docTypes = selectedUnion.documents.map((d) => d.documentType);
-                  const categories = groupDocumentTypesByCategory(docTypes);
+                  const filedTypes = new Set(selectedUnion.documents.map((d) => d.documentType));
+                  // Group ALL required types by category (not just filed ones)
+                  // so "x of y" shows the full picture.
+                  const categories = groupDocumentTypesByCategory(allRequiredTypes);
                   return (
                     <div className="space-y-6">
-                      {categories.map((cat) => (
-                        <div key={cat.label}>
-                          <h5 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            {cat.label}
-                          </h5>
-                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {selectedUnion.documents
-                              .filter((d) => cat.documentTypes.includes(d.documentType))
-                              .map((doc) => (
-                                <DocumentTile
-                                  key={doc.id}
-                                  doc={doc}
-                                  unionId={selectedUnion.id}
-                                  userRole={user.role}
-                                  onUploadVersion={() => {
-                                    setUploadDocType(doc.documentType);
-                                    setUploadDialogOpen(true);
-                                  }}
-                                />
-                              ))}
+                      {categories.map((cat) => {
+                        const filedInCat = selectedUnion.documents.filter((d) =>
+                          cat.documentTypes.includes(d.documentType),
+                        );
+                        const totalInCat = cat.documentTypes.length;
+                        return (
+                          <div key={cat.label}>
+                            <div className="mb-2">
+                              <div className="flex items-center justify-between">
+                                <h5 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                  {cat.label}
+                                </h5>
+                                <span className="text-xs text-muted-foreground">
+                                  {filedInCat.length} of {totalInCat} current
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-xs text-muted-foreground/80">{cat.description}</p>
+                            </div>
+                            {filedInCat.length === 0 ? (
+                              <p className="text-xs text-muted-foreground/60">No documents filed in this category.</p>
+                            ) : (
+                              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {/* IA-3: sort by next due date (earliest upload first
+                                    as a proxy for oldest filing — the document with the
+                                    oldest version is the most likely to need renewal).
+                                    Documents with no version go last. */}
+                                {[...filedInCat]
+                                  .sort((a, b) => {
+                                    const aDate = a.latestVersion?.uploadedAt ?? "";
+                                    const bDate = b.latestVersion?.uploadedAt ?? "";
+                                    return aDate.localeCompare(bDate);
+                                  })
+                                  .map((doc) => (
+                                    <DocumentTile
+                                      key={doc.id}
+                                      doc={doc}
+                                      unionId={selectedUnion.id}
+                                      userRole={user.role}
+                                      onUploadVersion={() => {
+                                        setUploadDocType(doc.documentType);
+                                        setUploadDialogOpen(true);
+                                      }}
+                                    />
+                                  ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()
