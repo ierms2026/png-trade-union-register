@@ -25,13 +25,20 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   // --- Production secret checks ---
-  // Fail fast at boot if required secrets are missing or use known demo values.
+  // OP-01: Fail fast at boot if required secrets are missing or use known demo
+  // values. The known demo values are read from the repo's seed scripts (see
+  // prisma/seed-demo.ts:45 and scripts/reset-demo-passwords.ts) but are NEVER
+  // printed — only the check runs.
   if (process.env.NODE_ENV === "production") {
     const requiredSecrets = [
       { name: "SESSION_SECRET", value: process.env.SESSION_SECRET },
       { name: "CRON_SECRET", value: process.env.CRON_SECRET },
       { name: "DATABASE_URL", value: process.env.DATABASE_URL },
     ];
+    // Known demo/dev values that must never appear in production. These are
+    // the string LITERALS from the codebase's dev fallbacks + test setup.
+    // The actual seed password (prisma/seed-demo.ts:45) is also checked via
+    // ALLOW_DEMO_SEED gate below — its literal value is not repeated here.
     const knownDemoValues = [
       "dev-only-insecure-fallback-do-not-use-in-prod",
       "test-secret-for-vitest-only-do-not-use-in-prod",
@@ -43,6 +50,18 @@ export async function register() {
       if (knownDemoValues.includes(value)) {
         throw new Error(`[instrumentation] ${name} is set to a known demo value. Generate a real secret with: openssl rand -hex 32`);
       }
+    }
+    // OP-01: refuse to boot if the demo seed password is reachable. The seed
+    // script (prisma/seed-demo.ts) refuses to run in production unless
+    // ALLOW_DEMO_SEED=true is set. We check the same gate here — if someone
+    // has set ALLOW_DEMO_SEED=true in production, the demo accounts (with
+    // their known password) would be created, which is a security risk.
+    if (process.env.ALLOW_DEMO_SEED === "true") {
+      throw new Error(
+        "[instrumentation] ALLOW_DEMO_SEED=true is set in production. " +
+          "This would allow demo accounts (with a known password) to be created. " +
+          "Remove ALLOW_DEMO_SEED before deploying to production.",
+      );
     }
   }
 

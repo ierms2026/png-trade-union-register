@@ -78,14 +78,13 @@ describe("Step 4: credential hardening", () => {
       const isDemoPage = file.includes("/demo/") || content.includes("Demo Tour");
 
       if (isDemoPage) {
-        // IA-4: the demo page must check NODE_ENV === "production" + hide
-        // credentials in that branch. The credential display must be inside
-        // a conditional that's false in production.
+        // OP-01: the demo page must check BOTH NODE_ENV === "production"
+        // AND DEMO_MODE env var. Credentials are shown only when
+        // !isProduction && demoModeEnabled.
         expect(content).toContain('NODE_ENV');
         expect(content).toContain('"production"');
-        // The credentials block must be inside a conditional — look for the
-        // isProduction variable + a conditional render.
-        expect(content).toMatch(/isProduction/);
+        expect(content).toContain('DEMO_MODE');
+        expect(content).toMatch(/showCredentials/);
         // The demo password must NOT appear as a literal "Test!" string in
         // the source — it must be assembled from parts (so the source
         // itself doesn't contain the credential).

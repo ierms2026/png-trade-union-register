@@ -154,7 +154,13 @@ const JOURNEY: JourneySection[] = [
 
 export default function DemoPage() {
   const [expanded, setExpanded] = useState<string | null>("start-here");
+  // OP-01: credentials are shown ONLY when all three conditions are met:
+  //   1. NODE_ENV !== "production"
+  //   2. DEMO_MODE is set (to any truthy value)
+  // In production OR when DEMO_MODE is unset, no credentials are shown.
   const isProduction = process.env.NODE_ENV === "production";
+  const demoModeEnabled = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1";
+  const showCredentials = !isProduction && demoModeEnabled;
 
   return (
     <div className="min-h-screen bg-background">
@@ -187,8 +193,8 @@ export default function DemoPage() {
           </CardContent>
         </Card>
 
-        {/* Demo credentials — only shown when NOT in production */}
-        {!isProduction ? (
+        {/* OP-01: Demo credentials — only shown when NOT in production AND DEMO_MODE is set */}
+        {showCredentials ? (
           <Card className="border-primary/30 bg-primary/5">
             <CardHeader>
               <CardTitle className="text-lg">Demo accounts</CardTitle>
@@ -224,7 +230,9 @@ export default function DemoPage() {
           <Card className="border-muted bg-muted/30">
             <CardContent className="p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Demo accounts are not available in production. Contact the Office of The Industrial Registrar for access.
+                {isProduction
+                  ? "Demo accounts are not available in production. Contact the Office of The Industrial Registrar for access."
+                  : "Demo accounts are not shown. Set DEMO_MODE=true in your environment to enable them for testing."}
               </p>
             </CardContent>
           </Card>

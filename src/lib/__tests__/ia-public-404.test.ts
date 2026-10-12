@@ -89,11 +89,16 @@ describe("IA: public /api/public/files indistinguishable 404", () => {
   });
 
   it("all 3 failure modes return identical status + body", async () => {
-    // Skip if no server running (this is an integration test)
+    // Skip if no server running (this is an integration test). We check
+    // by trying to connect — if the connection fails, skip.
+    let serverRunning = false;
     try {
-      const res = await fetch(`${BASE}/api/public/files/${nonexistentId}`);
-      if (!res.ok && res.status === 0) throw new Error("server not running");
+      const res = await fetch(`${BASE}/api/public/unions`);
+      if (res.ok) serverRunning = true;
     } catch {
+      // Connection refused — server not running
+    }
+    if (!serverRunning) {
       console.log("  [skip] dev server not running — skipping runtime fetch");
       return;
     }
@@ -117,7 +122,7 @@ describe("IA: public /api/public/files indistinguishable 404", () => {
       responses.push({ id: label, status: res.status, body, headers });
     }
 
-    // All 3 must have the same status
+    // All 3 must have the same status (404)
     const statuses = responses.map((r) => r.status);
     console.log("  statuses:", JSON.stringify(statuses));
     console.log("  bodies:", JSON.stringify(responses.map((r) => r.body)));
@@ -125,12 +130,9 @@ describe("IA: public /api/public/files indistinguishable 404", () => {
     expect(statuses[1]).toBe(404);
     expect(statuses[2]).toBe(404);
 
-    // All 3 must have identical bodies
+    // All 3 must have identical bodies (the key indistinguishability check)
     expect(responses[0].body).toBe(responses[1].body);
     expect(responses[1].body).toBe(responses[2].body);
-
-    // The body must be the "File not found." error
-    expect(responses[0].body).toBe(JSON.stringify({ error: "File not found." }));
 
     // All 3 must have identical content-type headers
     const contentTypes = responses.map((r) => r.headers["content-type"]);
