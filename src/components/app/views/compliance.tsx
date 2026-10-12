@@ -61,10 +61,12 @@ interface ComplianceMatrixResponse {
 type StatusFilter = "ALL" | "COMPLIANT" | "EXPIRING" | "OVERDUE" | "AWAITING_REVIEW" | "MISSING" | "NOT_APPLICABLE";
 
 // Visual tokens only — labels come from COMPLIANCE_STATUS_CONFIG (single source).
+// STEP 6 (polish): WCAG-AA-compliant tailwind color pairs. Matches
+// COMPLIANCE_STATUS_CONFIG.cell in vocabulary.ts.
 const STATUS_VISUAL: Record<string, { cell: string; dot: string; icon: typeof CheckCircle2 }> = {
-  COMPLIANT: { cell: "bg-chart-3/15 text-chart-3 border-chart-3/30", dot: "bg-chart-3", icon: CheckCircle2 },
-  EXPIRING: { cell: "bg-accent/15 text-accent-foreground border-accent/30", dot: "bg-accent", icon: AlertTriangle },
-  OVERDUE: { cell: "bg-destructive/10 text-destructive border-destructive/30", dot: "bg-destructive", icon: XCircle },
+  COMPLIANT: { cell: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900", dot: "bg-chart-3", icon: CheckCircle2 },
+  EXPIRING: { cell: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900", dot: "bg-chart-4", icon: AlertTriangle },
+  OVERDUE: { cell: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900", dot: "bg-destructive", icon: XCircle },
   AWAITING_REVIEW: { cell: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900", dot: "bg-blue-500", icon: Clock },
   MISSING: { cell: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground/40", icon: FileQuestion },
   NOT_APPLICABLE: { cell: "bg-muted/50 text-muted-foreground border-border", dot: "bg-muted-foreground/20", icon: Ban },

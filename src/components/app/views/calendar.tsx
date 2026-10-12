@@ -40,9 +40,12 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 
 const EVENT_COLORS: Record<string, string> = {
-  task: "bg-primary/10 text-primary border-primary/30",
-  document: "bg-chart-4/15 text-chart-4 border-chart-4/30",
-  compliance: "bg-accent/15 text-accent-foreground border-accent/30",
+  // STEP 6 (polish): WCAG-AA-compliant tailwind color pairs (was chart
+  // tokens + accent tokens — failed contrast). These are tiny 10px pills
+  // so AA (4.5:1) is the right target.
+  task: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900",
+  document: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
+  compliance: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
 };
 
 const EVENT_DOT_COLORS: Record<string, string> = {

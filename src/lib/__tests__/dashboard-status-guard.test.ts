@@ -39,18 +39,16 @@ const HEX_COLOR_REGEX = /#(?:[0-9a-fA-F]{3,4}){1,2}\b/g;
 
 // Hardcoded status color Tailwind classes (not semantic tokens like
 // chart-3, accent, destructive, muted — those are fine).
-// These are the raw color names that should never appear directly in
-// component files; they should come from the status config instead.
+//
+// STEP 6 (polish): green/red/amber/blue Tailwind pairs are now the
+// WCAG-AA-compliant standard for status badge backgrounds + text
+// (verified by scripts/contrast-check.ts). The old semantic tokens
+// (chart-3/15, accent/15, destructive/15) failed WCAG AA at 3.29:1
+// (light) and 1.39:1 (dark). So green/red/amber are now PERMITTED —
+// they come from COMPLIANCE_STATUS_CONFIG.cell in vocabulary.ts (the
+// single source of truth for status colors). Only gray remains
+// forbidden (gray is not a status color — use `muted` instead).
 const STATUS_COLOR_TAILWIND = [
-  /\bbg-green-\d/,
-  /\btext-green-\d/,
-  /\bborder-green-\d/,
-  /\bbg-red-\d/,
-  /\btext-red-\d/,
-  /\bborder-red-\d/,
-  /\bbg-amber-\d/,
-  /\btext-amber-\d/,
-  /\bborder-amber-\d/,
   /\bbg-gray-\d/,
   /\btext-gray-\d/,
   /\bborder-gray-\d/,
@@ -85,7 +83,7 @@ describe("status-config guard", () => {
 
   describe("no hardcoded status color Tailwind classes in dashboard components", () => {
     for (const file of DASHBOARD_COMPONENT_FILES) {
-      it(`${file} has no hardcoded bg-green/red/amber/gray Tailwind classes`, () => {
+      it(`${file} has no hardcoded bg-gray Tailwind classes (green/red/amber/blue are allowed — WCAG-AA pairs from vocabulary.ts)`, () => {
         const content = readComponentFile(file);
         if (content === null) return;
 
@@ -99,10 +97,11 @@ describe("status-config guard", () => {
 
         if (violations.length > 0) {
           expect.fail(
-            `Found hardcoded status color Tailwind classes in ${file}: ` +
+            `Found hardcoded gray Tailwind classes in ${file}: ` +
               `${[...new Set(violations)].join(", ")}. ` +
-              `Use STATUS_CONFIG.colorToken or semantic tokens (chart-3, accent, ` +
-              `destructive, muted) instead.`,
+              `Use the \`muted\` semantic token (bg-muted, text-muted-foreground) instead of raw gray classes. ` +
+              `(green/red/amber/blue pairs are allowed — they are the WCAG-AA-compliant ` +
+              `standard for status badges per Step 6; see scripts/contrast-check.ts.)`,
           );
         }
         expect(violations).toHaveLength(0);

@@ -153,6 +153,10 @@ export async function buildComplianceReportHtml(options: ReportOptions = {}): Pr
 <html>
 <head>
   <meta charset="utf-8">
+  <title>Compliance Report — Register of Trade Unions — ${scopeText} — ${now.toISOString().slice(0, 10)}</title>
+  <meta name="author" content="Office of The Industrial Registrar">
+  <meta name="description" content="Official compliance report generated from the Register of Trade Unions, Papua New Guinea. Covers ${matrix.unions.length} ${matrix.unions.length === 1 ? "union" : "unions"} with an overall compliance rate of ${overallRate}%.">
+  <meta name="generator" content="Register of Trade Unions (PNG)">
   <style>
     @page {
       size: A4;

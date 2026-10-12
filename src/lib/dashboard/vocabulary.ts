@@ -62,7 +62,12 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
     label: "Compliant",
     shortLabel: "Compliant",
     icon: CheckCircle2,
-    cell: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+    // STEP 6 (polish): use tailwind color stops (not chart tokens) so the
+    // bg+text pair is guaranteed WCAG-AA contrast in both light + dark.
+    // Chart tokens at /15 opacity over card gave 3.29:1 in light mode
+    // (chart-3 on chart-3/15 — same hue, insufficient luminance diff).
+    // green-800 on green-100 = 6.49:1 (verified by contrast-check.ts).
+    cell: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
     dot: "bg-chart-3",
     definition: "Document filed, approved by Registrar, with renewal date (counted from approval date) more than 90 days away.",
   },
@@ -70,7 +75,10 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
     label: "Expiring",
     shortLabel: "Expiring",
     icon: AlertTriangle,
-    cell: "bg-chart-4/15 text-chart-4 border-chart-4/30",
+    // STEP 6: amber pair (was chart-4 tokens — failed in dark mode at
+    // 1.39:1 because accent-foreground is dark navy on a barely-tinted
+    // dark card). amber-800 on amber-100 = 6.37:1.
+    cell: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
     dot: "bg-chart-4",
     definition: "Document filed and approved, but renewal date (counted from approval date) is within 90 days.",
   },
@@ -78,7 +86,9 @@ export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = 
     label: "Overdue",
     shortLabel: "Overdue",
     icon: XCircle,
-    cell: "bg-destructive/15 text-destructive border-destructive/30",
+    // STEP 6: red pair (was destructive tokens — failed in light mode at
+    // 4.01:1). red-800 on red-100 = 6.80:1.
+    cell: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
     dot: "bg-destructive",
     definition: "Document filed and approved, but renewal date (counted from approval date) has passed.",
   },
@@ -245,7 +255,10 @@ export const UNION_STATUS_CONFIG: Record<
     label: "Active",
     icon: CheckCircle2,
     variant: "default",
-    className: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+    // STEP 6 (polish): WCAG-AA-compliant tailwind color pair (was chart-3
+    // tokens — failed at 3.29:1 in light mode). green-800 on green-100
+    // = 6.49:1. Matches StatusBadge STATUS_CONFIG.
+    className: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
     definition:
       "The union is currently registered and operating. It has met the requirements of the Industrial Organizations Act and its registration is in good standing.",
     plainLanguage:
@@ -255,7 +268,9 @@ export const UNION_STATUS_CONFIG: Record<
     label: "Suspended",
     icon: Clock,
     variant: "secondary",
-    className: "bg-accent/15 text-accent-foreground border-accent/30",
+    // STEP 6: amber pair (was accent tokens — failed at 1.39:1 in dark
+    // mode). amber-800 on amber-100 = 6.37:1. Matches StatusBadge.
+    className: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
     definition:
       "The union's registration has been temporarily suspended by the Registrar. A suspended union cannot operate as a registered trade union, but the suspension may be lifted once the issues are resolved.",
     plainLanguage:

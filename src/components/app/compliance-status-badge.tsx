@@ -25,9 +25,12 @@ import { DefinitionPopover } from "@/components/app/definition-popover";
 // =============================================================================
 
 const COMPLIANCE_VISUAL: Record<ComplianceStatus, { icon: LucideIcon; className: string }> = {
-  COMPLIANT: { icon: CheckCircle2, className: "bg-chart-3/15 text-chart-3 border-chart-3/30" },
-  EXPIRING: { icon: AlertTriangle, className: "bg-accent/15 text-accent-foreground border-accent/30" },
-  OVERDUE: { icon: XCircle, className: "bg-destructive/10 text-destructive border-destructive/30" },
+  // STEP 6 (polish): use tailwind color stops (not chart tokens) so the
+  // bg+text pair is guaranteed WCAG-AA contrast in both light + dark.
+  // Matches the `cell` field in COMPLIANCE_STATUS_CONFIG (vocabulary.ts).
+  COMPLIANT: { icon: CheckCircle2, className: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900" },
+  EXPIRING: { icon: AlertTriangle, className: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900" },
+  OVERDUE: { icon: XCircle, className: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900" },
   AWAITING_REVIEW: { icon: Clock, className: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900" },
   MISSING: { icon: FileQuestion, className: "bg-muted text-muted-foreground border-border" },
   NOT_APPLICABLE: { icon: Ban, className: "bg-muted/50 text-muted-foreground border-border" },

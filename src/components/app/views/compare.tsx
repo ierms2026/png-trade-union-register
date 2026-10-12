@@ -64,9 +64,11 @@ const STATUS_LETTER: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  COMPLIANT: "bg-chart-3/15 text-chart-3 border-chart-3/30",
-  EXPIRING: "bg-accent/15 text-accent-foreground border-accent/30",
-  OVERDUE: "bg-destructive/10 text-destructive border-destructive/30",
+  // STEP 6 (polish): WCAG-AA-compliant tailwind color pairs. Matches
+  // COMPLIANCE_STATUS_CONFIG.cell in vocabulary.ts.
+  COMPLIANT: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
+  EXPIRING: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
+  OVERDUE: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
   AWAITING_REVIEW: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900",
   MISSING: "bg-muted text-muted-foreground border-border",
   NOT_APPLICABLE: "bg-muted/50 text-muted-foreground border-border",

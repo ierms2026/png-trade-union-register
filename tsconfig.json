@@ -42,6 +42,9 @@
     "download",
     "skills",
     "examples",
-    "scripts/test-pdf-parse.ts"
+    "scripts/test-pdf-parse.ts",
+    "scripts/capture-layout-screenshots.ts",
+    "scripts/capture-step5-screenshots.ts",
+    "scripts/contrast-check.ts"
   ]
 }

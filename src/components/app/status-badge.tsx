@@ -29,8 +29,12 @@ interface StatusBadgeConfig {
 }
 
 const STATUS_CONFIG: Record<string, StatusBadgeConfig> = {
-  ACTIVE: { icon: CheckCircle2, variant: "default", className: "bg-chart-3/15 text-chart-3 border-chart-3/30" },
-  SUSPENDED: { icon: Pause, variant: "secondary", className: "bg-accent/15 text-accent-foreground border-accent/30" },
+  // STEP 6 (polish): use tailwind color stops (not chart tokens) so the
+  // bg+text pair is guaranteed WCAG-AA contrast in both light + dark.
+  // Chart tokens at /15 opacity gave 3.29:1 (light ACTIVE) + 1.39:1
+  // (dark SUSPENDED) — both failed. Tailwind pairs are pre-balanced.
+  ACTIVE: { icon: CheckCircle2, variant: "default", className: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900" },
+  SUSPENDED: { icon: Pause, variant: "secondary", className: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900" },
   DEREGISTERED: { icon: XCircle, variant: "secondary", className: "bg-muted text-muted-foreground border-border" },
 };
 

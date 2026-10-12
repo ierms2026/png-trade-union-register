@@ -1147,3 +1147,67 @@ Stage Summary:
 - Empty states: every list view explains what appears there + what to do next. Calendar view now has a "No events this month" notice. Unions list has role-aware messaging + a Register Union action for the Registrar.
 - Test guardrails (12 tests): structural integrity of CONTENT_DEFINITIONS, every termKey literal in the UI exists in CONTENT_DEFINITIONS, the static help-key maps in the badge components reference only valid keys, and CONTENT.md mirrors the runtime definitions (drift alarm).
 - 4 Playwright screenshots captured to download/step5-screenshots/ as visual proof.
+
+---
+Task ID: B8-polish
+Agent: main
+Task: Step 6: Polish (404/error pages, sitemap, tsconfig exclude, WCAG AA contrast, PDF metadata, package name)
+
+Work Log:
+- R1 verified: HEAD at 82a4221 (Step 5: onboarding). Tree clean.
+- Step 1 (404/error pages):
+  * src/app/not-found.tsx — friendly 404. Card with FileQuestion icon, "We couldn't find that page" heading, 3 next steps (Go home / Search the registry / contact Registrar note). No jargon ("404", "Not Found").
+  * src/app/error.tsx — route-segment error boundary (client component). AlertTriangle icon, "Something went wrong" heading, Try again (reset) + Go home buttons. Shows error.digest reference. useEffect logs to console.
+  * src/app/global-error.tsx — root-layout error boundary. Renders own <html>/<body> with INLINE STYLES + system fonts (can't use Tailwind/fonts — the layout that loads them is what crashed). Hard reload on "Try again" (React reset won't help when layout crashed). Same friendly wording.
+- Step 2 (sitemap):
+  * src/app/sitemap.ts — MetadataRoute.Sitemap. Public routes only: `/` (the public portal) + one entry per registered union (`/unions/[registrationNo]`). EXCLUDES /reports/compliance (requires auth), /api/* (JSON), /?view=X (same route, SPA query). Queries DB for ACTIVE+SUSPENDED unions (excludes DEREGISTERED — historical, not for search indexing). Uses NEXT_PUBLIC_APP_URL with localhost fallback. try/catch around DB query — sitemap is best-effort, shouldn't break the build.
+- Step 3 (tsconfig exclude):
+  * Added scripts/capture-layout-screenshots.ts, scripts/capture-step5-screenshots.ts, scripts/contrast-check.ts to tsconfig exclude. These are dev-only scripts that import `playwright` (globally installed, not in package.json). Excluding them means tsc is clean in a fresh checkout without requiring `npm install playwright`. Matches the existing scripts/test-pdf-parse.ts precedent. Verified tsc --noEmit exits 0.
+- Step 4 (WCAG AA contrast):
+  * Created scripts/contrast-check.ts — computes WCAG contrast ratios for all 24 status badge color combinations (12 statuses × 2 modes). OKLCH → sRGB → relative luminance → contrast ratio. Source-over alpha compositing for /X opacity backgrounds over card.
+  * FIRST RUN found 5 failures: light Union ACTIVE (3.29:1), light Compliance COMPLIANT (3.29:1), light Compliance OVERDUE (4.01:1), dark Union SUSPENDED (1.39:1), dark Compliance EXPIRING (1.39:1). Root cause: chart-token / accent-token colors at /15 opacity over card produced backgrounds too close in luminance to the text color.
+  * Fix: replaced chart-token + accent-token + destructive-token badge classes with WCAG-AA-compliant Tailwind color pairs (matching the existing AWAITING_REVIEW pattern that already passed). Applied consistently across 6 files: vocabulary.ts COMPLIANCE_STATUS_CONFIG.cell (COMPLIANT/EXPIRING/OVERDUE), vocabulary.ts UNION_STATUS_CONFIG.className (ACTIVE/SUSPENDED), status-badge.tsx STATUS_CONFIG, compliance-status-badge.tsx COMPLIANCE_VISUAL, compare.tsx STATUS_COLORS, compliance.tsx STATUS_VISUAL. Also fixed calendar.tsx EVENT_COLORS (document pills were using the failing chart-4 pattern).
+  * SECOND RUN: all 24 combinations pass. Light mode ratios: 5.21:1–7.15:1. Dark mode ratios: 5.06:1–11.72:1. All ≥ 4.5:1 (WCAG AA for normal text).
+  * Updated dashboard-status-guard.test.ts: removed green/red/amber from the forbidden STATUS_COLOR_TAILWIND list (they're now the WCAG-compliant standard). Kept gray forbidden (gray isn't a status color — use muted). Updated the test description + error message to explain the new convention.
+- Step 5 (PDF metadata):
+  * src/lib/compliance/report-html.ts: added <title>, <meta name="author">, <meta name="description">, <meta name="generator"> to the HTML <head>. WeasyPrint reads these and writes them to the PDF /Title, /Author, /Subject, /Creator metadata fields.
+    - Title: "Compliance Report — Register of Trade Unions — <scope> — <date>"
+    - Author: "Office of The Industrial Registrar" (the ORG, not the user's email — no personal info leakage)
+    - Description: includes union count + overall rate (for search engine snippets)
+    - Generator: "Register of Trade Unions (PNG)" (the system name, not "WeasyPrint X.Y")
+  * The preparedBy email (user.email) appears ONLY in the visible cover page content (audit trail — who generated this report), NOT in the <head> (so it doesn't leak to PDF metadata).
+  * Created src/lib/__tests__/report-html-pdf-metadata.test.ts — 5 tests: <title> exists with report name + scope + date; <meta author> is the org; <meta generator> is the system name; preparedBy email does NOT appear in <head>; preparedBy email DOES appear in visible <body> (audit trail).
+- Step 6 (package name):
+  * package.json: "name" changed from "nextjs_tailwind_shadcn_ts" to "png-trade-union-register". Reflects the actual project (PNG Register of Trade Unions).
+
+Verification:
+- Targeted tests: contrast-check.ts (24/24 pass), report-html-pdf-metadata.test.ts (5/5 pass), report-html-awaiting-review.test.ts (3/3 pass), dashboard-status-guard.test.ts (passes with updated allowlist), content-definitions.test.ts (12/12 pass), t52-compliance-status-badge.test.ts (7/7 pass), t20-label-source-contract.test.ts (5/5 pass), label-source-guard.test.ts (5/5 pass).
+- tsc --noEmit: 0 errors (clean in this checkout; will be clean in a fresh checkout too because the playwright scripts are excluded).
+- Full suite: 801 tests / 55 files pass (was 796/54 before Step 6; +5 tests +1 file from PDF metadata test).
+- Build: compiles successfully. Pre-existing Edge Runtime warning about node:util in instrumentation.ts (unrelated to Step 6).
+
+Files changed (Step 6):
+- NEW src/app/not-found.tsx (friendly 404)
+- NEW src/app/error.tsx (route-segment error boundary)
+- NEW src/app/global-error.tsx (root-layout error boundary, inline styles)
+- NEW src/app/sitemap.ts (public routes only)
+- NEW scripts/contrast-check.ts (WCAG AA contrast verifier, 24 combinations)
+- NEW src/lib/__tests__/report-html-pdf-metadata.test.ts (5 tests)
+- MOD src/lib/dashboard/vocabulary.ts (COMPLIANCE_STATUS_CONFIG.cell + UNION_STATUS_CONFIG.className → WCAG-AA Tailwind pairs)
+- MOD src/components/app/status-badge.tsx (STATUS_CONFIG → WCAG-AA Tailwind pairs)
+- MOD src/components/app/compliance-status-badge.tsx (COMPLIANCE_VISUAL → WCAG-AA Tailwind pairs)
+- MOD src/components/app/views/compliance.tsx (STATUS_VISUAL → WCAG-AA Tailwind pairs)
+- MOD src/components/app/views/compare.tsx (STATUS_COLORS → WCAG-AA Tailwind pairs)
+- MOD src/components/app/views/calendar.tsx (EVENT_COLORS → WCAG-AA Tailwind pairs)
+- MOD src/lib/compliance/report-html.ts (<title> + <meta author/generator/description> in HTML head)
+- MOD src/lib/__tests__/dashboard-status-guard.test.ts (allow green/red/amber; keep gray forbidden)
+- MOD tsconfig.json (exclude playwright scripts from tsc)
+- MOD package.json (name → png-trade-union-register)
+
+Stage Summary:
+- 404/error/global-error pages: friendly wording, clear way back, no jargon. Global error uses inline styles (can't rely on Tailwind when layout crashed).
+- sitemap.ts: public routes only (home + per-union detail pages for ACTIVE+SUSPENDED unions). Excludes auth-required /reports/compliance + all /api/* routes.
+- tsconfig: playwright scripts excluded → tsc clean in fresh checkout.
+- WCAG AA: all 24 status badge color combinations pass (≥4.5:1). Was 5 failures (3.29:1, 4.01:1, 1.39:1). Fixed by switching from chart/accent/destructive tokens at /15 opacity to pre-balanced Tailwind color pairs (green/amber/red/blue 100-stop bg + 800-stop text in light, 950/30 bg + 300-stop text in dark). Guard test updated to allow the new convention.
+- PDF metadata: <title> set, <meta author> = org (not user email), <meta generator> = system name. No email leakage to PDF /Author field. 5-test guard.
+- Package name: png-trade-union-register.
