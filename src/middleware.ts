@@ -7,13 +7,17 @@ import { NextRequest, NextResponse } from "next/server";
 // with 403, EXCEPT:
 //   - POST /api/auth/login (needed to sign in)
 //   - POST /api/auth/logout (needed to sign out)
-//   - POST /api/auth/forgot-password (needed for password reset flow)
-//   - POST /api/auth/set-password (needed for password reset flow)
 //
-// This lets stakeholders click around + read everything in demo mode without
-// accidentally mutating data. The check runs at the middleware level (before
-// the route handler), so it's enforced even if a route handler forgets to
-// check.
+// Password reset (forgot-password, set-password) is BLOCKED in read-only mode
+// — stakeholders testing the demo don't need to reset passwords, and allowing
+// it could be used to take over an account.
+//
+// Cron routes: the middleware blocks cron POST requests when DEMO_READ_ONLY
+// is true. Cron jobs should NOT run in demo mode — they're scheduled
+// background tasks that mutate data (snapshots, sweeps, digests). If cron
+// needs to run during a demo, set DEMO_READ_ONLY=false temporarily, or
+// exclude cron routes from the matcher (see config below — currently cron
+// IS blocked, which is the safe default).
 //
 // The middleware is a no-op when DEMO_READ_ONLY is not set or not "true".
 // =============================================================================
@@ -22,8 +26,6 @@ import { NextRequest, NextResponse } from "next/server";
 const ALLOWED_POST_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
-  "/api/auth/forgot-password",
-  "/api/auth/set-password",
 ];
 
 export function middleware(req: NextRequest) {

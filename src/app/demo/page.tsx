@@ -26,12 +26,11 @@ import { ROLE_LABELS } from "@/lib/dashboard/vocabulary";
 // guard's pattern.
 // =============================================================================
 
-// The demo password is stored as a parts-joined constant so the source file
-// does not contain the literal credential string (which would trip the
-// credential-leak guard in step4-credentials.test.ts). The parts are joined
-// at render time.
-const DEMO_PASSWORD_PARTS = ["Test", "!2345"];
-const DEMO_PASSWORD = DEMO_PASSWORD_PARTS.join("");
+// OP-01: the demo password is read from the DEMO_PASSWORD env var, which is
+// set ONLY in dev (by .env or the dev environment). It is NEVER hardcoded in
+// source. If the env var is not set, no password is shown — the user is told
+// to contact the Industrial Registrar.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "";
 
 interface DemoAccount {
   email: string;
@@ -215,8 +214,16 @@ export default function DemoPage() {
                 </div>
               ))}
               <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm">
-                <span className="font-medium">Password:</span>{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{DEMO_PASSWORD}</code>
+                {DEMO_PASSWORD ? (
+                  <>
+                    <span className="font-medium">Password:</span>{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{DEMO_PASSWORD}</code>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Password: set the DEMO_PASSWORD env var to display it here.
+                  </span>
+                )}
                 <p className="mt-1 text-xs text-muted-foreground">
                   These accounts are for testing only. They are not created in production.
                 </p>

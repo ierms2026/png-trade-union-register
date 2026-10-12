@@ -17,7 +17,7 @@ import bcrypt from "bcryptjs";
 
 const BASE = "http://localhost:3000";
 const TEST_EMAIL = `officer-null-union-test@example.com`;
-const TEST_PASSWORD = "Test!2345";
+const TEST_PASSWORD = process.env.DEMO_PASSWORD ?? "";
 
 async function main() {
   // --- 1. Create a temporary Officer with no assigned union ---

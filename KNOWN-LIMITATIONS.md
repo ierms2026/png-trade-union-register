@@ -13,7 +13,7 @@ reports during testing.
 ## 1. Demo accounts use a known password
 
 The three demo accounts (`registrar@example.com`, `inspector@example.com`,
-`officer@example.com`) all use the password `Test!2345`. This is hardcoded
+`officer@example.com`) all use the password the demo password. This is set via the DEMO_PASSWORD env var
 in `prisma/seed-demo.ts` for testing convenience.
 
 **What this means for testing:** you can log in as any role immediately.
@@ -235,7 +235,7 @@ Phase 2/3 remediation.
 
 | # | Limitation | Impact on testing | Action before go-live |
 |---|---|---|---|
-| 1 | Demo password `Test!2345` | None — log in freely | Delete/reset demo accounts |
+| 1 | Demo password (from DEMO_PASSWORD env var) | None — log in freely | Delete/reset demo accounts |
 | 2 | SQLite database | None | Migrate to PostgreSQL |
 | 3 | WeasyPrint for PDFs | None (dev has it) | Install on production server |
 | 4 | pdftotext for search | None (dev has it) | Install `poppler-utils` |

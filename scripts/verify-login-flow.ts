@@ -64,9 +64,9 @@ async function simulateLogin(email: string, password: string) {
 
 async function main() {
   const accounts = [
-    { email: "registrar@example.com", password: "Test!2345" },
-    { email: "inspector@example.com", password: "Test!2345" },
-    { email: "officer@example.com", password: "Test!2345" },
+    { email: "registrar@example.com", password: process.env.DEMO_PASSWORD ?? "" },
+    { email: "inspector@example.com", password: process.env.DEMO_PASSWORD ?? "" },
+    { email: "officer@example.com", password: process.env.DEMO_PASSWORD ?? "" },
   ];
   for (const a of accounts) {
     await simulateLogin(a.email, a.password);

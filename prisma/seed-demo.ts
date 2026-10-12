@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
 // Management System so the UI has something to show.
 //
 // WHAT THIS CREATES:
-//   - 3 demo users: registrar@, inspector@, officer@ (password Test!2345)
+//   - 3 demo users: registrar@, inspector@, officer@ (password from DEMO_PASSWORD env var)
 //   - 6 demo unions with varied statuses (ACTIVE, SUSPENDED, DEREGISTERED)
 //   - ~20 documents across the unions, with varied compliance states:
 //     - Some filed recently (COMPLIANT)
@@ -42,7 +42,8 @@ const db = new PrismaClient();
 const STORAGE_ROOT =
   process.env.STORAGE_ROOT || path.join(process.cwd(), "storage");
 
-const DEMO_PASSWORD = "Test!2345";
+// OP-01: read from env so no literal credential appears in source.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "";
 
 // -----------------------------------------------------------------------------
 // Production gate: refuse to seed demo data in production unless explicitly
@@ -51,7 +52,7 @@ const DEMO_PASSWORD = "Test!2345";
 // -----------------------------------------------------------------------------
 if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "true") {
   console.error("\nERROR: seed-demo.ts refuses to run in production.");
-  console.error("Demo accounts use a known password (Test!2345) and must NOT");
+  console.error("Demo accounts use a known password and must NOT");
   console.error("be created in stakeholder or production environments.");
   console.error("\nTo override (NOT recommended): ALLOW_DEMO_SEED=true npx tsx prisma/seed-demo.ts");
   process.exit(1);

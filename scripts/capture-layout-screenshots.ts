@@ -7,7 +7,7 @@
 // USAGE: npx tsx scripts/capture-layout-screenshots.ts
 //
 // PREREQ: dev server running on http://localhost:3000.
-// AUTH: logs in as registrar@example.com / Test!2345 (the demo credential
+// AUTH: logs in as registrar@example.com (password from DEMO_PASSWORD env var)
 //       from scripts/reset-demo-passwords.ts).
 //
 // OUTPUT:
@@ -24,7 +24,7 @@ const BASE_URL = "http://localhost:3000";
 const OUTPUT_DIR = resolve(__dirname, "../docs/layout-screenshots");
 
 const EMAIL = "registrar@example.com";
-const PASSWORD = "Test!2345";
+const PASSWORD = process.env.DEMO_PASSWORD ?? "";
 
 const WIDTHS = [
   { width: 1440, name: "dashboard-1440" }, // Desktop wide

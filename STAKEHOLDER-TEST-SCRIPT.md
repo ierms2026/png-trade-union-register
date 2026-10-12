@@ -6,7 +6,7 @@ the tasks in order — each builds on the one before.
 
 **Time needed:** 20–30 minutes per role.
 
-**Demo accounts** (password for all: `Test!2345`):
+**Demo accounts** (ask the Industrial Registrar for the demo password):
 - Industrial Registrar: `registrar@example.com`
 - Inspector: `inspector@example.com`
 - Union Official: `officer@example.com` (assigned to Papua Maritime Workers Union)
@@ -31,7 +31,7 @@ overdue unions by category, previewing a rule change, approving a
 disposal, creating a Union Official account, and reading a union's
 audit trail.
 
-**Log in as `registrar@example.com` / `Test!2345`.**
+**Log in as `registrar@example.com` (ask for the demo password).**
 
 ### Task 1.1 — Find overdue unions by category
 
@@ -150,7 +150,7 @@ The Inspector is an oversight role — can view everything, but cannot
 make changes. This walkthrough confirms the Inspector can see all the
 data but has NO action buttons (no Approve, no Edit, no Delete).
 
-**Log in as `inspector@example.com` / `Test!2345`.**
+**Log in as `inspector@example.com` (ask for the demo password).**
 
 ### Task 2.1 — Compare 3 unions on Annual Filings
 
@@ -251,7 +251,7 @@ The Union Official is a union-scoped user — assigned to ONE union
 Official can only see their own union's data and CANNOT access other
 unions.
 
-**Log in as `officer@example.com` / `Test!2345`.**
+**Log in as `officer@example.com` (ask for the demo password).**
 This account is assigned to **Papua Maritime Workers Union**.
 
 ### Task 3.1 — Find "My filings" and what's due first

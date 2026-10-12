@@ -50,10 +50,16 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
   return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count };
 }
 
-const NOT_FOUND_RESPONSE = NextResponse.json(
-  { error: "File not found." },
-  { status: 404 },
-);
+// OP-01: return a NEW response each time (not a shared constant). A shared
+// NextResponse object can only have its body read once — concurrent 404s would
+// get an unusable body on the second read. This factory ensures every call
+// gets a fresh response with the same status + body.
+function notFoundResponse() {
+  return NextResponse.json(
+    { error: "File not found." },
+    { status: 404 },
+  );
+}
 
 export async function GET(
   req: NextRequest,
@@ -94,14 +100,14 @@ export async function GET(
     },
   });
 
-  if (!version) return NOT_FOUND_RESPONSE;
+  if (!version) return notFoundResponse();
 
   // --- 2. Visibility check (indistinguishable 404 if not public) ------
   if (!version.document.isPublic) {
-    return NOT_FOUND_RESPONSE;
+    return notFoundResponse();
   }
   if (version.document.disposedAt) {
-    return NOT_FOUND_RESPONSE;
+    return notFoundResponse();
   }
 
   // --- 3. Read the file from disk ----------------------------------------
@@ -112,7 +118,7 @@ export async function GET(
   } catch {
     // File missing on disk — indistinguishable 404 (don't reveal it
     // existed in the DB).
-    return NOT_FOUND_RESPONSE;
+    return notFoundResponse();
   }
 
   // --- 4. Serve the file -------------------------------------------------

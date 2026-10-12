@@ -10,11 +10,18 @@ if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "tr
   process.exit(1);
 }
 
-const DEMO_PASSWORD = "Test!2345";
+// OP-01: read from env so no literal credential appears in source.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "";
+
+if (!DEMO_PASSWORD) {
+  console.error("\nERROR: DEMO_PASSWORD env var is not set.");
+  console.error("Set it before running this script: DEMO_PASSWORD=<value> npx tsx scripts/reset-demo-passwords.ts");
+  process.exit(1);
+}
 
 async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
-  console.log(`Hashing password "${DEMO_PASSWORD}" (bcrypt rounds=12)...`);
+  console.log("Hashing demo password (bcrypt rounds=12)...");
 
   const targets = [
     "registrar@example.com",
@@ -49,7 +56,7 @@ async function main() {
   if (inspector) {
     const ok = await bcrypt.compare(DEMO_PASSWORD, inspector.passwordHash);
     console.log(
-      `\nVerification: bcrypt.compare("Test!2345", hash) → ${ok ? "PASS" : "FAIL"}`,
+      `\nVerification: bcrypt.compare(DEMO_PASSWORD, hash) → ${ok ? "PASS" : "FAIL"}`,
     );
   }
 }
