@@ -24,6 +24,28 @@ export async function register() {
   // Only run in the Node.js runtime (not edge).
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  // --- Production secret checks ---
+  // Fail fast at boot if required secrets are missing or use known demo values.
+  if (process.env.NODE_ENV === "production") {
+    const requiredSecrets = [
+      { name: "SESSION_SECRET", value: process.env.SESSION_SECRET },
+      { name: "CRON_SECRET", value: process.env.CRON_SECRET },
+      { name: "DATABASE_URL", value: process.env.DATABASE_URL },
+    ];
+    const knownDemoValues = [
+      "dev-only-insecure-fallback-do-not-use-in-prod",
+      "test-secret-for-vitest-only-do-not-use-in-prod",
+    ];
+    for (const { name, value } of requiredSecrets) {
+      if (!value) {
+        throw new Error(`[instrumentation] ${name} is required in production. Generate with: openssl rand -hex 32`);
+      }
+      if (knownDemoValues.includes(value)) {
+        throw new Error(`[instrumentation] ${name} is set to a known demo value. Generate a real secret with: openssl rand -hex 32`);
+      }
+    }
+  }
+
   // Dynamic imports — see comment in file header.
   const fs = await import("node:fs/promises");
   const path = await import("node:path");

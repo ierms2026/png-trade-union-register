@@ -1,8 +1,14 @@
 // Reset demo passwords inline — bypasses the seed entirely.
 // Run: npx tsx scripts/reset-demo-passwords.ts
+// PRODUCTION GATE: refuses to run in production.
 
 import bcrypt from "bcryptjs";
 import { db } from "../src/lib/prisma";
+
+if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "true") {
+  console.error("\nERROR: reset-demo-passwords.ts refuses to run in production.");
+  process.exit(1);
+}
 
 const DEMO_PASSWORD = "Test!2345";
 

@@ -1,0 +1,108 @@
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+// =============================================================================
+// Step 4: Credential hardening tests.
+//
+// 1. seed-demo.ts refuses to run in production (production gate exists)
+// 2. reset-demo-passwords.ts refuses to run in production
+// 3. instrumentation.ts has production secret checks
+// 4. No /demo tour page with credentials
+// 5. session.ts throws in production if SESSION_SECRET is unset
+// =============================================================================
+
+describe("Step 4: credential hardening", () => {
+  it("seed-demo.ts has a production gate", () => {
+    const src = readFileSync(resolve(__dirname, "../../../prisma/seed-demo.ts"), "utf8");
+    expect(src).toContain("NODE_ENV");
+    expect(src).toContain("production");
+    expect(src).toContain("ALLOW_DEMO_SEED");
+    expect(src).toMatch(/process\.exit\(1\)/);
+  });
+
+  it("reset-demo-passwords.ts has a production gate", () => {
+    const src = readFileSync(resolve(__dirname, "../../../scripts/reset-demo-passwords.ts"), "utf8");
+    expect(src).toContain("NODE_ENV");
+    expect(src).toContain("production");
+    expect(src).toContain("ALLOW_DEMO_SEED");
+    expect(src).toMatch(/process\.exit\(1\)/);
+  });
+
+  it("instrumentation.ts checks SESSION_SECRET in production", () => {
+    const src = readFileSync(resolve(__dirname, "../../../instrumentation.ts"), "utf8");
+    expect(src).toContain("SESSION_SECRET");
+    expect(src).toContain("required in production");
+    expect(src).toContain("CRON_SECRET");
+    expect(src).toContain("known demo value");
+  });
+
+  it("session.ts throws in production if SESSION_SECRET is unset", () => {
+    const src = readFileSync(resolve(__dirname, "../../../src/lib/auth/session.ts"), "utf8");
+    expect(src).toContain("SESSION_SECRET");
+    expect(src).toContain("is required in production");
+    expect(src).toContain("throw new Error");
+  });
+
+  it("create-stakeholder-account.ts exists and generates random passwords", () => {
+    const src = readFileSync(resolve(__dirname, "../../../scripts/create-stakeholder-account.ts"), "utf8");
+    expect(src).toMatch(/generatePassword/);
+    expect(src).toMatch(/crypto\.randomBytes/);
+    expect(src).toMatch(/passwordResetToken/); // forces password change
+  });
+
+  it("no /demo tour page exists with hardcoded credentials", () => {
+    // Search for any page that contains both "demo" and "Test!" or a password
+    const appDir = resolve(__dirname, "../../../src/app");
+    const { readdirSync, statSync } = require("node:fs");
+    const { join } = require("node:path");
+
+    function findFiles(dir: string, ext: string): string[] {
+      const results: string[] = [];
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) results.push(...findFiles(full, ext));
+        else if (entry.endsWith(ext)) results.push(full);
+      }
+      return results;
+    }
+
+    const tsxFiles = findFiles(appDir, ".tsx");
+    for (const file of tsxFiles) {
+      const content = readFileSync(file, "utf8");
+      // Check for demo pages that expose credentials
+      if (content.toLowerCase().includes("demo") && content.includes("Test!")) {
+        throw new Error(`Found demo page with hardcoded password: ${file}`);
+      }
+      if (content.toLowerCase().includes("demo") && content.match(/password.*["'].*["']/i)) {
+        throw new Error(`Found demo page with hardcoded password: ${file}`);
+      }
+    }
+  });
+
+  it("cron routes have no dev fallback for CRON_SECRET", () => {
+    const cronDir = resolve(__dirname, "../../../src/app/api/cron");
+    const { readdirSync, statSync } = require("node:fs");
+    const { join } = require("node:path");
+
+    function findFiles(dir: string): string[] {
+      const results: string[] = [];
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) results.push(...findFiles(full));
+        else if (entry.endsWith(".ts")) results.push(full);
+      }
+      return results;
+    }
+
+    const cronFiles = findFiles(cronDir);
+    for (const file of cronFiles) {
+      const content = readFileSync(file, "utf8");
+      // Must read CRON_SECRET from env
+      expect(content).toMatch(/process\.env\.CRON_SECRET/);
+      // Must NOT have a dev fallback string
+      expect(content).not.toMatch(/dev-cron-secret/i);
+      expect(content).not.toMatch(/dev.*secret.*fallback/i);
+    }
+  });
+});
