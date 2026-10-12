@@ -138,7 +138,7 @@ export function PublicPortal({ onStaffLogin }: Props) {
                 <Card className="cursor-pointer transition-colors hover:bg-muted/50 border-l-2 border-solid border-l-transparent hover:border-l-accent">
                   <CardContent className="flex items-center justify-between p-4">
                     <div><p className="font-medium">{u.unionName}</p><p className="text-sm text-muted-foreground">Reg. No: {u.registrationNo}</p></div>
-                    <StatusBadge status={u.status} />
+                    <StatusBadge status={u.status} withHelp />
                   </CardContent>
                 </Card>
               </Link>

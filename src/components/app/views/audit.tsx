@@ -304,7 +304,10 @@ export function AuditView() {
         <EmptyState
           icon={ScrollText}
           title="No audit entries found"
-          description="Try adjusting your filters, or clear them to see all entries."
+          description={
+            "The audit log records every meaningful action taken in the system (who did what, when, and what changed). " +
+            "Try adjusting your filters, or clear them to see all entries."
+          }
         />
       ) : null}
     </div>

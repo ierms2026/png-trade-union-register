@@ -127,7 +127,16 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
       <EmptyState
         icon={Building2}
         title="No unions registered"
-        description="Once unions are registered, they will appear here."
+        description={
+          user.role === "REGISTRAR"
+            ? "The register is empty. Click 'Register Union' to add the first trade union."
+            : "The register is empty. Once the Registrar adds a union, it will appear here."
+        }
+        action={
+          user.role === "REGISTRAR"
+            ? { label: "Register Union", onClick: () => setRegisterDialogOpen(true) }
+            : undefined
+        }
       />
     );
   }
@@ -342,7 +351,7 @@ export function UnionsView({ user, initialUnionId }: { user: { role: string; ass
                 </div>
                 <span className="hidden truncate text-sm text-muted-foreground sm:inline">{u.registrationNo}</span>
                 <span className="hidden text-center text-sm text-muted-foreground sm:inline">{u.documents.length}</span>
-                <span className="hidden text-center sm:flex sm:justify-center"><StatusBadge status={u.status} /></span>
+                <span className="hidden text-center sm:flex sm:justify-center"><StatusBadge status={u.status} withHelp /></span>
                 <ChevronRight className="hidden h-4 w-4 justify-self-end text-muted-foreground sm:block" />
               </div>
             ))}

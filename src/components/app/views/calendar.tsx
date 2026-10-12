@@ -102,6 +102,12 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string) => vo
     return map;
   }, [data]);
 
+  // Whether the currently-loaded month has zero events. Used to show an
+  // inline "no events this month" notice above the grid (the grid still
+  // renders, so the user can see the month shape — but the notice tells
+  // them there's nothing on the schedule and what to do next).
+  const hasNoEventsThisMonth = !loading && !error && (data?.events?.length ?? 0) === 0;
+
   function prevMonth() {
     setCurrentDate(new Date(year, month - 1, 1));
   }
@@ -171,6 +177,17 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string) => vo
       ) : error ? (
         <ErrorState description={error} onRetry={refetch} />
       ) : (
+        <>
+        {hasNoEventsThisMonth && (
+          <div
+            data-testid="calendar-empty-notice"
+            className="rounded-md border border-dashed border-muted bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+          >
+            <span className="font-medium text-foreground">No events this month.</span>{" "}
+            Document renewals, task due dates, and compliance milestones will appear here as they are scheduled.
+            Try a different tab (Documents / Tasks / Compliance) or use the prev/next buttons to look at other months.
+          </div>
+        )}
         <Card>
           <CardContent className="p-4">
             {/* Weekday header */}
@@ -231,6 +248,7 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string) => vo
             </div>
           </CardContent>
         </Card>
+        </>
       )}
 
       {/* Legend */}

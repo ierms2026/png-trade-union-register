@@ -11,6 +11,7 @@ import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { DefinitionPopover } from "@/components/app/definition-popover";
 
 // =============================================================================
 // Retention view — pending disposal list with Approve (REGISTRAR) + Snooze.
@@ -96,7 +97,10 @@ export function RetentionView({ user }: { user: User }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight">Retention Queue</h1>
+        <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight">
+          Retention Queue
+          <span className="ml-2 align-middle"><DefinitionPopover termKey="retention.queue" size="sm" align="start" /></span>
+        </h1>
         <p className="text-sm text-muted-foreground">
           Documents whose retention period has elapsed. Review and approve for disposal, or snooze.
         </p>

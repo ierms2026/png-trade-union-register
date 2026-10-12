@@ -1,6 +1,7 @@
 import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, Clock, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { COMPLIANCE_STATUS_CONFIG, type ComplianceStatus } from "@/lib/dashboard/vocabulary";
+import { DefinitionPopover } from "@/components/app/definition-popover";
 
 // =============================================================================
 // ComplianceStatusBadge — renders a COMPLIANCE status badge (not a union
@@ -15,6 +16,12 @@ import { COMPLIANCE_STATUS_CONFIG, type ComplianceStatus } from "@/lib/dashboard
 //
 // StatusBadge (for union statuses) is unchanged — it still handles
 // ACTIVE/SUSPENDED/DEREGISTERED for the union list, union detail, etc.
+//
+// STEP 5 (onboarding): the badge now optionally renders a "?" popover
+// next to the label, showing the plain-language definition from
+// CONTENT_DEFINITIONS (the runtime mirror of docs/CONTENT.md). Pass
+// `withHelp` to enable it. The popover is OFF by default to avoid
+// visual clutter in dense tables (e.g. the compliance matrix).
 // =============================================================================
 
 const COMPLIANCE_VISUAL: Record<ComplianceStatus, { icon: LucideIcon; className: string }> = {
@@ -26,7 +33,27 @@ const COMPLIANCE_VISUAL: Record<ComplianceStatus, { icon: LucideIcon; className:
   NOT_APPLICABLE: { icon: Ban, className: "bg-muted/50 text-muted-foreground border-border" },
 };
 
-export function ComplianceStatusBadge({ status }: { status: ComplianceStatus }) {
+// Maps a ComplianceStatus to its CONTENT_DEFINITIONS key. Kept here (not
+// in vocabulary.ts) because the keys are an onboarding concern, not a
+// status-config concern. The test in content-definitions.test.ts asserts
+// these keys all exist.
+const COMPLIANCE_STATUS_HELP_KEY: Record<ComplianceStatus, string> = {
+  COMPLIANT: "compliance-status.compliant",
+  EXPIRING: "compliance-status.expiring",
+  OVERDUE: "compliance-status.overdue",
+  AWAITING_REVIEW: "compliance-status.awaiting-review",
+  MISSING: "compliance-status.missing",
+  NOT_APPLICABLE: "compliance-status.not-applicable",
+};
+
+interface ComplianceStatusBadgeProps {
+  status: ComplianceStatus;
+  /** When true, renders a "?" DefinitionPopover next to the label.
+   *  Defaults to false (keeps dense tables uncluttered). */
+  withHelp?: boolean;
+}
+
+export function ComplianceStatusBadge({ status, withHelp = false }: ComplianceStatusBadgeProps) {
   const visual = COMPLIANCE_VISUAL[status] ?? COMPLIANCE_VISUAL.MISSING;
   const Icon = visual.icon;
   const label = COMPLIANCE_STATUS_CONFIG[status]?.label ?? status;
@@ -35,6 +62,13 @@ export function ComplianceStatusBadge({ status }: { status: ComplianceStatus }) 
     <Badge variant="outline" className={`gap-1 ${visual.className}`}>
       <Icon className="h-3 w-3" />
       {label}
+      {withHelp && (
+        <DefinitionPopover
+          termKey={COMPLIANCE_STATUS_HELP_KEY[status]}
+          size="xs"
+          align="start"
+        />
+      )}
     </Badge>
   );
 }

@@ -33,6 +33,8 @@ import {
 import { type EventSeverity } from "@/lib/dashboard/activity-config";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
+import { WelcomePanel } from "@/components/app/welcome-panel";
+import { DefinitionPopover } from "@/components/app/definition-popover";
 
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
@@ -227,7 +229,10 @@ function RateKpiCard({ numerator, denominator, percentage, sparklineValues }: Ra
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardDescription className="text-xs">Compliance Rate</CardDescription>
+          <div className="flex items-center gap-1">
+            <CardDescription className="text-xs">Compliance Rate</CardDescription>
+            <DefinitionPopover termKey="compliance-rate" size="xs" align="start" />
+          </div>
           {/* No icon-color badge — the rate is a derived metric, not a status.
               Keeping the header structurally identical to StatCard for visual
               rhythm; the right-side slot is intentionally empty. */}
@@ -1475,6 +1480,11 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           Overview of the union registry and compliance status.
         </p>
       </div>
+
+      {/* === Row 0: Welcome Panel (first login per role, dismissible) ===
+          Shows 3-4 lines on what this role can do here. Dismissed state
+          is stored in localStorage per role — see welcome-panel.tsx. */}
+      <WelcomePanel role={user.role} />
 
       {/* === Row 1: Quick Actions (full width) === */}
       {/* Quick Actions — derived from NAV_STRUCTURE via getQuickActions.

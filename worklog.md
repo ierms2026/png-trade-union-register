@@ -1084,3 +1084,66 @@ Stage Summary:
 - Officer scoping verified: all routes filter by assignedUnionId server-side. No cross-union data exposure.
 - REPRESENTATIVE not accepted anywhere — only D7-history comments remain.
 - Route-coverage test unchanged (no routes added/removed).
+
+---
+Task ID: B7-onboarding-non-technical-testers
+Agent: main
+Task: Step 5: Onboarding for non-technical testers (CONTENT.md + popovers + welcome panel + empty states + test)
+
+Work Log:
+- R1 verified: HEAD at b007ba2 (Step 4: credentials). Tree clean before changes.
+- Step 1: created docs/CONTENT.md — plain-language glossary covering every domain term shown in the UI: 6 compliance statuses, 3 review statuses, 3 union statuses (with explicit "Suspended vs Deregistered — the short version" callout), 7 document types (Registration Certificate, Constitution, Financial Return, Election of Office Bearers, Financial Membership List, Awards, Affiliations), retention + disposal (retentionYrs, Retention Queue, Disposition Request, cooldown, certificate, 4 disposition statuses), legal hold (place + lift), 3 roles (Registrar, Inspector, Officer), 4 task statuses, 3 contact-update statuses, 3 webhook-delivery statuses, audit log severity (INFO/WARNING/CRITICAL), and the compliance-rate formula. Reading level: plain language a union officer can follow.
+- Step 2: created src/lib/dashboard/content-definitions.ts — typed runtime mirror of CONTENT.md. 39 entries, each with {title, body}. ContentDefinitionKey type derived from the object keys. getContentDefinition() + isContentDefinitionKey() helpers. The `as const satisfies Record<string, ContentDefinition>` pattern gives compile-time key safety.
+- Step 3: created src/components/app/definition-popover.tsx — small "?" HelpCircle button using Radix Popover. termKey prop → looks up definition. A11y: real <button>, aria-label from the definition title, Escape closes + returns focus (Radix default). Graceful degradation: if key missing, renders nothing + console.warns in dev. onClick stopPropagation so it works inside clickable rows/cards.
+- Step 4: created src/components/app/welcome-panel.tsx — role-based welcome card (REGISTRAR/INSPECTOR/OFFICER). 3-4 lines per role on what they can do here + where to start + pointer to Help & Guide. Dismiss button stores `welcome-panel.dismissed.<ROLE>` in localStorage per role. SSR-safe: reads localStorage in useEffect, renders consistently on first paint, hides on client if previously dismissed.
+- Step 5: wired WelcomePanel into DashboardView, immediately after the "Dashboard" h1 + subtitle. Passes user.role.
+- Step 6: DefinitionPopover integration:
+  * compliance-status-badge.tsx: added optional `withHelp` prop. When true, renders a DefinitionPopover next to the label. Maps each ComplianceStatus to its CONTENT_DEFINITIONS key via COMPLIANCE_STATUS_HELP_KEY map. Default off (dense tables).
+  * status-badge.tsx (union status): same pattern. UNION_STATUS_HELP_KEY map. Default off.
+  * dashboard.tsx RateKpiCard: added DefinitionPopover (termKey="compliance-rate") next to the "Compliance Rate" label — always on (only one rate, prominent location).
+  * retention.tsx: added DefinitionPopover (termKey="retention.queue") next to the "Retention Queue" h1.
+  * public-portal.tsx: enabled withHelp on StatusBadge in the public union list (non-technical audience — help is most valuable here).
+  * unions.tsx: enabled withHelp on StatusBadge in the unions list (one badge per row — not dense).
+- Step 7 (empty states):
+  * calendar.tsx: added inline "No events this month" notice above the grid when data.events.length === 0. The grid still renders (so the user sees the month shape). Notice explains what would appear + suggests other tabs / prev-next navigation.
+  * unions.tsx: improved the "No unions registered" empty state — REGISTRAR sees "Click 'Register Union' to add the first trade union." + a Register Union action button; INSPECTOR/OFFICER sees "Once the Registrar adds a union, it will appear here." (role-aware messaging).
+  * audit.tsx: enriched the "No audit entries found" description to explain what audit entries are (every meaningful action, who/what/when) before suggesting the filter adjustment.
+  * All other list views (api-keys, compare, compliance, configure-rules, contact-requests, documents, legislation, reviews, search, security, tasks, users, webhooks) already had EmptyState with title + description + (where relevant) action — no changes needed.
+- Step 8: created src/lib/__tests__/content-definitions.test.ts — 12 tests in 4 describe blocks:
+  * Structural integrity (5 tests): every entry has non-empty title + body; CONTENT_DEFINITION_KEYS is sorted + matches Object.keys; getContentDefinition + isContentDefinitionKey helpers work.
+  * UI usage scan (3 tests): walks src/ collecting .ts/.tsx files (skipping node_modules/.next/.git/__tests__/content-definitions.ts itself). Scans each line for `termKey="..."` literals (excludes comment lines). Asserts (a) at least one termKey is used, (b) every static termKey literal exists in CONTENT_DEFINITIONS, (c) [SOFT] orphan keys log a warning but don't fail.
+  * Static map validation (2 tests): reads COMPLIANCE_STATUS_HELP_KEY from compliance-status-badge.tsx + UNION_STATUS_HELP_KEY from status-badge.tsx, asserts every referenced key exists in CONTENT_DEFINITIONS.
+  * CONTENT.md drift alarm (2 tests): asserts docs/CONTENT.md exists + is non-empty, and that every CONTENT_DEFINITIONS title appears somewhere in CONTENT.md (catches "added a key to content-definitions.ts but forgot to add the doc section").
+- Step 9: scripts/capture-step5-screenshots.ts — Playwright script that logs in as registrar@example.com, navigates to Dashboard (waits for [data-testid="welcome-panel"]), Unions list (clicks first help button), Retention view (clicks first help button), and Calendar (advances months until [data-testid="calendar-empty-notice"] appears). Captures 4 screenshots to download/step5-screenshots/. All 4 captured successfully (110KB / 114KB / 132KB / 81KB — proper full-page screenshots).
+
+Verification:
+- Targeted test (content-definitions.test.ts): 12/12 pass.
+- Targeted tests (t52-compliance-status-badge, t20-label-source-contract, label-source-guard): 17/17 pass — Step 5 changes don't break the existing label-source contracts.
+- tsc --noEmit: 0 errors.
+- Full suite: 796 tests / 54 files pass (was 784/53 before Step 5; +12 tests +1 file). [Note: the suite has grown beyond the 701/48 baseline noted in earlier worklog entries due to intermediate work between B6 and B7 — the +12 delta from Step 5 itself is accurate.]
+- Build: compiles successfully. Pre-existing Edge Runtime warning about `node:util` in instrumentation.ts (unrelated to Step 5) + pre-existing SESSION_SECRET-required-in-production gate (passes when SESSION_SECRET is set, e.g. `SESSION_SECRET=$(openssl rand -hex 32) npx next build`).
+- Playwright screenshots: 4/4 captured.
+
+Files changed (Step 5):
+- NEW docs/CONTENT.md (plain-language glossary)
+- NEW src/lib/dashboard/content-definitions.ts (runtime mirror, 39 keys)
+- NEW src/components/app/definition-popover.tsx ("?" help popover)
+- NEW src/components/app/welcome-panel.tsx (role-based first-login welcome)
+- NEW src/lib/__tests__/content-definitions.test.ts (12 tests)
+- NEW scripts/capture-step5-screenshots.ts (Playwright screenshot script)
+- MOD src/components/app/compliance-status-badge.tsx (withHelp prop + help-key map)
+- MOD src/components/app/status-badge.tsx (withHelp prop + help-key map)
+- MOD src/components/app/views/dashboard.tsx (WelcomePanel + RateKpiCard DefinitionPopover)
+- MOD src/components/app/views/retention.tsx (heading DefinitionPopover)
+- MOD src/components/app/views/calendar.tsx (empty-state notice for no-events month)
+- MOD src/components/app/views/unions.tsx (withHelp on StatusBadge + improved empty state)
+- MOD src/components/app/views/audit.tsx (richer empty-state description)
+- MOD src/components/app/public-portal.tsx (withHelp on StatusBadge for non-technical audience)
+
+Stage Summary:
+- CONTENT.md + content-definitions.ts form a single source of truth for plain-language definitions. Every domain term shown in the UI has a definition a union officer can follow.
+- DefinitionPopover wires those definitions into the UI — next to the Compliance Rate KPI (always on), next to the Retention Queue heading (always on), and opt-in via `withHelp` on ComplianceStatusBadge + StatusBadge (on for public portal + unions list, off for dense tables).
+- WelcomePanel shows 3-4 lines per role on first dashboard visit, dismissible per-role via localStorage.
+- Empty states: every list view explains what appears there + what to do next. Calendar view now has a "No events this month" notice. Unions list has role-aware messaging + a Register Union action for the Registrar.
+- Test guardrails (12 tests): structural integrity of CONTENT_DEFINITIONS, every termKey literal in the UI exists in CONTENT_DEFINITIONS, the static help-key maps in the badge components reference only valid keys, and CONTENT.md mirrors the runtime definitions (drift alarm).
+- 4 Playwright screenshots captured to download/step5-screenshots/ as visual proof.
