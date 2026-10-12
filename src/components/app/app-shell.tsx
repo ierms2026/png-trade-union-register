@@ -308,7 +308,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
               title="Search (Cmd+K)"
             >
               <Search className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">Search documents...</span>
+              <span className="hidden lg:inline">Search...</span>
               <kbd className="ml-1 hidden rounded border bg-muted px-1 py-0.5 text-[10px] font-sans lg:inline">⌘K</kbd>
             </Button>
             <Button

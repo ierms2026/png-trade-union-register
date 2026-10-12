@@ -416,6 +416,94 @@ export function buildFeedbackMailto(currentUrl: string, roleLabel: string): stri
 }
 
 // =============================================================================
+// Document type categories — IA-3.
+//
+// The 13 canonical document types (from prisma/seed.ts) grouped into 4
+// categories for the upload picker + union Documents tab. This is the
+// single source of truth for the grouping — both UI surfaces read from
+// here so they stay in sync.
+//
+// Categories:
+//   Registration  — the founding documents (permanent, rarely re-filed)
+//   Annual Filings — documents filed on a yearly cycle
+//   Governance    — documents about the union's leadership + elections
+//   Oversight     — documents produced by the Registrar's office
+//
+// If a document type from the DB is NOT in any category (e.g. a custom
+// type added later), it falls through to an "Other" group at the bottom.
+// =============================================================================
+
+export interface DocumentTypeCategory {
+  label: string;
+  documentTypes: string[];
+}
+
+export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
+  {
+    label: "Registration",
+    documentTypes: [
+      "Application for Registration",
+      "Registration Certificate",
+      "Constitution",
+    ],
+  },
+  {
+    label: "Annual Filings",
+    documentTypes: [
+      "Financial Return",
+      "Financial Membership List",
+      "Affiliations",
+      "Welfare Fund",
+    ],
+  },
+  {
+    label: "Governance",
+    documentTypes: [
+      "Election of Office Bearers",
+      "Secret Ballots",
+      "General Secretary Appointments",
+    ],
+  },
+  {
+    label: "Oversight",
+    documentTypes: [
+      "Inspection Reports",
+      "Awards",
+      "General Matters",
+    ],
+  },
+];
+
+/**
+ * Group a flat list of document type strings into categories.
+ * Types not in any category go into an "Other" group at the bottom.
+ * Categories with zero matching types are omitted.
+ */
+export function groupDocumentTypesByCategory(
+  documentTypes: string[],
+): DocumentTypeCategory[] {
+  const typeSet = new Set(documentTypes);
+  const grouped: DocumentTypeCategory[] = [];
+  const seen = new Set<string>();
+
+  for (const cat of DOCUMENT_TYPE_CATEGORIES) {
+    const inCategory = cat.documentTypes.filter((t) => typeSet.has(t));
+    if (inCategory.length > 0) {
+      grouped.push({ label: cat.label, documentTypes: inCategory });
+      for (const t of inCategory) seen.add(t);
+    }
+  }
+
+  // "Other" group for types not in any category
+  const others = documentTypes.filter((t) => !seen.has(t));
+  if (others.length > 0) {
+    grouped.push({ label: "Other", documentTypes: others });
+  }
+
+  return grouped;
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 

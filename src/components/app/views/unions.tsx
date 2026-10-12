@@ -1,5 +1,5 @@
 "use client";
-import { getUnionStatusLabel, getComplianceStatusLabel } from "@/lib/dashboard/vocabulary";
+import { getUnionStatusLabel, getComplianceStatusLabel, groupDocumentTypesByCategory } from "@/lib/dashboard/vocabulary";
 import type { ComplianceMatrixResponse } from "@/lib/compliance/matrix";
 import Link from "next/link";
 
@@ -33,7 +33,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -308,20 +310,40 @@ export function UnionsView({
               {selectedUnion.documents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No documents filed yet.</p>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {selectedUnion.documents.map((doc) => (
-                    <DocumentTile
-                      key={doc.id}
-                      doc={doc}
-                      unionId={selectedUnion.id}
-                      userRole={user.role}
-                      onUploadVersion={() => {
-                        setUploadDocType(doc.documentType);
-                        setUploadDialogOpen(true);
-                      }}
-                    />
-                  ))}
-                </div>
+                // IA-3: group documents by category (Registration, Annual
+                // Filings, Governance, Oversight). Documents not in any
+                // category fall through to "Other".
+                (() => {
+                  const docTypes = selectedUnion.documents.map((d) => d.documentType);
+                  const categories = groupDocumentTypesByCategory(docTypes);
+                  return (
+                    <div className="space-y-6">
+                      {categories.map((cat) => (
+                        <div key={cat.label}>
+                          <h5 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            {cat.label}
+                          </h5>
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {selectedUnion.documents
+                              .filter((d) => cat.documentTypes.includes(d.documentType))
+                              .map((doc) => (
+                                <DocumentTile
+                                  key={doc.id}
+                                  doc={doc}
+                                  unionId={selectedUnion.id}
+                                  userRole={user.role}
+                                  onUploadVersion={() => {
+                                    setUploadDocType(doc.documentType);
+                                    setUploadDialogOpen(true);
+                                  }}
+                                />
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()
               )}
             </CardContent>
           </Card>
@@ -1004,8 +1026,15 @@ function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded }: Up
                 <SelectValue placeholder="Select a document type" />
               </SelectTrigger>
               <SelectContent>
-                {documentTypes.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                {/* IA-3: group document types into categories (Registration,
+                    Annual Filings, Governance, Oversight) for easier scanning. */}
+                {groupDocumentTypesByCategory(documentTypes).map((cat) => (
+                  <SelectGroup key={cat.label}>
+                    <SelectLabel>{cat.label}</SelectLabel>
+                    {cat.documentTypes.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

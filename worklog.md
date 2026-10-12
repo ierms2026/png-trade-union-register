@@ -1437,3 +1437,43 @@ Stage Summary:
 - Deep-linking: dashboard cards, calendar events, and notifications all deep-link to the right union tab (?view=unions&union=ID&unionTab=X). Fixed a pre-existing bug where dashboard links used the public-portal route with the DB id.
 - Audit API: supports ?unionId= filter for the History tab.
 - 27 new tests cover: officers don't see History/other unions, Compare uses same endpoint, redirects work, Union Hub tab structure, deep-linking.
+
+---
+Task ID: IA-3-findability
+Agent: main
+Task: IA-3: Breadcrumbs + global search + document type categories
+
+Work Log:
+- Step 1 (breadcrumbs): verified breadcrumbs already exist on every authenticated page. AppShell (the sole shell for authenticated users) renders the breadcrumb bar unconditionally between the sidebar and main content. buildBreadcrumbs uses role-filtered nav (getNavForRole) + findDestination to derive group + destination labels. Special-cases account-security (uses VIEW_TITLES) + document-detail. No changes needed — already meets the IA-3 requirement.
+- Step 2 (global search scoping): the /api/search route already uses getUnionScope for server-side scoping. Officers get scope.kind="union" → forced to their own union. An officer with null union gets scope.kind="none" → 403. The GlobalSearch palette fetches /api/unions + /api/tasks + /api/users, all of which scope server-side. The palette's fetch handlers check r.ok before parsing JSON, so a 403 (null-union officer) is handled gracefully (no results shown, no crash). No changes needed to the scoping logic — it was already correct.
+- Step 3 (search across title + type): extended /api/search to search across document content (textContent), file name (fileName), AND document type (documentType) using a Prisma OR clause. Previously it only searched textContent. Now a query like "constitution" matches both the document type "Constitution" AND any document whose extracted text mentions "constitution". Added synthetic snippets for documentType + fileName matches (when textContent has no match, the snippet shows "[Document type: X]" or "[File: X]" with the match position highlighted).
+- Step 4 (header search button): verified the header already has a visible search button (desktop outline button with "Search..." text + ⌘K kbd hint, visible on sm+; mobile icon-only button, visible below sm). Updated the placeholder text from "Search documents..." to "Search..." since the palette searches everything (unions, tasks, users, navigation, document content) — not just documents.
+- Step 5 (document type categories): created DOCUMENT_TYPE_CATEGORIES in vocabulary.ts — 4 categories (Registration, Annual Filings, Governance, Oversight) covering all 13 canonical document types from prisma/seed.ts. Added groupDocumentTypesByCategory() helper that groups a flat list of types into categories, omits empty categories, + puts unrecognized types in an "Other" group.
+- Step 6 (upload picker grouping): updated UploadDialog in unions.tsx to use SelectGroup + SelectLabel for category headings. The picker now shows 4 groups (Registration, Annual Filings, Governance, Oversight) instead of a flat alphabetical list of 13 types. Easier to scan.
+- Step 7 (union Documents tab grouping): updated the Documents tab in the Union Hub to group documents by category. Each category has an uppercase heading (e.g. "Registration") followed by a grid of DocumentTile cards for that category's documents. Documents not in any category fall through to "Other".
+- Step 8 (tests): created src/lib/__tests__/ia3-findability.test.ts — 34 tests in 7 describe blocks:
+  * Breadcrumbs on every authenticated page (4 tests): AppShell renders breadcrumb bar unconditionally; buildBreadcrumbs uses VIEW_TITLES + getNavForRole + findDestination; page.tsx wraps every authed view in AppShell.
+  * Global search client-side scoping (5 tests): palette fetches /api/unions + /api/tasks + /api/search + /api/users; header has visible search button with ⌘K hint.
+  * Search API server-side scoping (9 tests): getUnionScope returns "none" for officer with null/empty/whitespace union; returns "union" for officer with valid union; returns "all" for registrar + inspector; search route uses getUnionScope + returns 403 for "none"; search route forces officer scoping; /api/unions uses getUnionScope.
+  * Search API searches title + type + content (2 tests): WHERE clause uses OR across textContent + fileName + documentType; synthetic snippets for documentType + fileName matches.
+  * Document type categories (8 tests): 4 categories defined; 13 types covered with no duplicates; each category has the expected types; groupDocumentTypesByCategory groups + omits empty + handles unknown types + handles empty input + preserves all input types.
+  * Upload picker uses grouped categories (3 tests): unions.tsx imports groupDocumentTypesByCategory; UploadDialog uses SelectGroup + SelectLabel; Documents tab groups by category.
+  * Null-union officer gets nothing (2 tests): officer with null union gets scope.kind="none" → search returns 403; GlobalSearch palette handles 403 gracefully (r.ok check).
+
+Verification:
+- tsc --noEmit: 0 errors.
+- Full suite: 858 tests / 58 files pass (was 824/57; +34 tests +1 file).
+- Build: compiles successfully.
+
+Files changed (IA-3):
+- MOD src/app/api/search/route.ts (OR clause: textContent + fileName + documentType; synthetic snippets for type/file matches)
+- MOD src/components/app/app-shell.tsx (header search button text: "Search documents..." → "Search...")
+- MOD src/components/app/views/unions.tsx (UploadDialog uses SelectGroup + SelectLabel; Documents tab groups by category; imports groupDocumentTypesByCategory + SelectGroup + SelectLabel)
+- MOD src/lib/dashboard/vocabulary.ts (DOCUMENT_TYPE_CATEGORIES + groupDocumentTypesByCategory helper)
+- NEW src/lib/__tests__/ia3-findability.test.ts (34 tests)
+
+Stage Summary:
+- Breadcrumbs: already on every authenticated page (verified, no changes needed).
+- Global search: Cmd+K + header button (already existed). Server-side scoping via getUnionScope already correct. Extended /api/search to search document title (fileName) + type (documentType) in addition to content (textContent) — with synthetic snippets for non-content matches.
+- Document type categories: 4 groups (Registration, Annual Filings, Governance, Oversight) covering all 13 types. Applied to both the upload picker (SelectGroup) + the union Documents tab (category headings above document grids).
+- 34 new tests cover: breadcrumbs, search scoping (including null-union officer → 403), search across title/type/content, document type categories + grouping, upload picker grouping.

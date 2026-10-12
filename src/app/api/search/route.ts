@@ -160,8 +160,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // IA-3: search across document content (textContent), document type
+  // (documentType), and file name (fileName). The OR clause matches any of
+  // the three; the document-level where (scoping + filters) is ANDed on top.
   const whereClause: Record<string, unknown> = {
-    textContent: { contains: whitespaceFlexibleQuery },
+    OR: [
+      { textContent: { contains: whitespaceFlexibleQuery } },
+      { fileName: { contains: whitespaceFlexibleQuery } },
+      { document: { ...documentWhere, documentType: { contains: whitespaceFlexibleQuery } } },
+    ],
     document: documentWhere,
   };
 
@@ -198,11 +205,31 @@ export async function GET(req: NextRequest) {
   });
 
   // --- Build result array with snippets ----------------------------------
+  // IA-3: when the match is on documentType or fileName (not textContent),
+  // the extractSnippet won't find it in the text content. In that case we
+  // show a synthetic snippet indicating where the match was.
   const results = versions.map((v) => {
     const { snippet, matchStart, matchLength } = extractSnippet(
       v.textContent || "",
       trimmedQuery,
     );
+    // If the textContent had no match, check if the match was on documentType
+    // or fileName — show a synthetic snippet for those.
+    let finalSnippet = snippet;
+    let finalMatchStart = matchStart;
+    let finalMatchLength = matchLength;
+    if (matchLength === 0) {
+      const lowerQuery = trimmedQuery.toLowerCase();
+      if (v.document.documentType.toLowerCase().includes(lowerQuery)) {
+        finalSnippet = `[Document type: ${v.document.documentType}]`;
+        finalMatchStart = 16; // position of the type name in the snippet
+        finalMatchLength = v.document.documentType.length;
+      } else if (v.fileName.toLowerCase().includes(lowerQuery)) {
+        finalSnippet = `[File: ${v.fileName}]`;
+        finalMatchStart = 7;
+        finalMatchLength = v.fileName.length;
+      }
+    }
     return {
       documentId: v.document.id,
       documentType: v.document.documentType,
@@ -213,9 +240,9 @@ export async function GET(req: NextRequest) {
       versionId: v.id,
       versionNumber: v.versionNumber,
       fileName: v.fileName,
-      snippet,
-      matchStart,
-      matchLength,
+      snippet: finalSnippet,
+      matchStart: finalMatchStart,
+      matchLength: finalMatchLength,
       uploadedAt: v.uploadedAt.toISOString(),
     };
   });
