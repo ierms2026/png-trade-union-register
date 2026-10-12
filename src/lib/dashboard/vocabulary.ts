@@ -373,6 +373,45 @@ export const RESOURCES_EMPTY_TITLE = "No resources";
 export const RESOURCES_EMPTY_ACTION = "Add Resource";
 
 // =============================================================================
+// Feedback email — the address that the "Give feedback" link in the app
+// shell sends to. This is the single place to change it.
+//
+// STEP 7 (feedback path): the value below is a PLACEHOLDER. Replace it
+// with the actual stakeholder-feedback address (e.g. the Registrar's
+// inbox or a shared support alias) before go-live. The test in
+// feedback-link.test.ts asserts the constant is non-empty + looks like
+// an email, so a missing @ will fail the build.
+// =============================================================================
+
+export const FEEDBACK_EMAIL = "registrar@example.com";
+
+/**
+ * Build a mailto: URL for the "Give feedback" link, pre-filled with the
+ * current page URL and the user's role. The body is a short prompt so
+ * the user knows what to type.
+ *
+ * @param currentUrl The current page URL (window.location.href from the caller).
+ * @param roleLabel The user's role label (e.g. "Registrar", "Officer").
+ * @returns A mailto: URL string.
+ */
+export function buildFeedbackMailto(currentUrl: string, roleLabel: string): string {
+  const subject = `Feedback on the Register of Trade Unions`;
+  const body =
+    `I'd like to give feedback on the Register of Trade Unions.\n\n` +
+    `Page: ${currentUrl}\n` +
+    `My role: ${roleLabel}\n\n` +
+    `What I was trying to do:\n\n` +
+    `What I expected:\n\n` +
+    `What actually happened:\n\n` +
+    `(Delete anything above that isn't relevant. The more specific you are, ` +
+    `the easier it is to act on.)`;
+  // encodeURI handles the common cases. Line breaks (%0A) need explicit
+  // handling because encodeURI does NOT encode them.
+  const encoded = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return encoded;
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 

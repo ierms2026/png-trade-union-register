@@ -1211,3 +1211,66 @@ Stage Summary:
 - WCAG AA: all 24 status badge color combinations pass (≥4.5:1). Was 5 failures (3.29:1, 4.01:1, 1.39:1). Fixed by switching from chart/accent/destructive tokens at /15 opacity to pre-balanced Tailwind color pairs (green/amber/red/blue 100-stop bg + 800-stop text in light, 950/30 bg + 300-stop text in dark). Guard test updated to allow the new convention.
 - PDF metadata: <title> set, <meta author> = org (not user email), <meta generator> = system name. No email leakage to PDF /Author field. 5-test guard.
 - Package name: png-trade-union-register.
+
+---
+Task ID: B9-feedback-path
+Agent: main
+Task: Step 7: Make stakeholder testing productive (BACKLOG.md + Give feedback link + STAKEHOLDER-TEST-SCRIPT.md + KNOWN-LIMITATIONS.md)
+
+Work Log:
+- R1 verified: HEAD at b91ef27 (Step 6: polish). Tree clean.
+- Step 1 (BACKLOG.md): created with 3 sections (Bugs / Questions / Feature requests). Each section has a template line showing the exact format to use (e.g. `- [OPEN] [BUG] <title> — <what you did> → <what you expected> → <what actually happened>. Page: <URL>. Role: <...>. Reported by: <name>, <date>.`). Each section also has a filled-in example. Status convention: [OPEN] → [IN PROGRESS] (with owner) → [DONE] (with date). Includes a "How to give feedback without editing this file" section pointing to the in-app Give feedback link.
+- Step 2 (Give feedback link):
+  * src/lib/dashboard/vocabulary.ts: added FEEDBACK_EMAIL constant (placeholder = "registrar@example.com" — clearly marked as needing replacement before go-live). Added buildFeedbackMailto(currentUrl, roleLabel) helper that constructs a mailto: URL with subject + body pre-filled with the page URL, role, and a short prompt ("What I was trying to do / What I expected / What actually happened").
+  * src/components/app/app-shell.tsx: imported MessageSquare icon + buildFeedbackMailto. Added handleFeedback() function that reads window.location.href at click time (so it always reflects the current page) + builds the mailto URL + navigates to it. Added a "Give feedback" DropdownMenuItem in the user account menu (between "Account Security" and "Sign Out").
+  * src/lib/__tests__/feedback-link.test.ts: 17 tests in 4 describe blocks:
+    - FEEDBACK_EMAIL non-empty + looks like an email (has @).
+    - FEEDBACK_EMAIL placeholder warning (soft — logs if still the placeholder, doesn't fail).
+    - buildFeedbackMailto: produces mailto: URL with email, subject, page URL in body, role in body. Works for all 3 staff roles.
+    - App shell wiring: app-shell.tsx contains "Give feedback" + handleFeedback, imports buildFeedbackMailto.
+    - BACKLOG.md: exists, has Bugs/Questions/Feature requests sections, each has a template line ([BUG]/[Q]/[FR]).
+- Step 3 (STAKEHOLDER-TEST-SCRIPT.md): created with 4 sections, one per role:
+  * Registrar (8 tasks): dashboard welcome panel, review queue (approve a document), register a new union, configure compliance rules, view compliance matrix, generate PDF report, check audit log, give feedback.
+  * Inspector (8 tasks): dashboard, compliance matrix, **confirm NO Approve button on Retention Queue** (critical — Inspector is view-only), audit log, compare two unions, inspect a union, confirm no access to Users/Security/Rules, give feedback.
+  * Officer (8 tasks): dashboard (scoped to their union), My Union view, **confirm CANNOT see other unions** (critical — try ?view=unions, ?view=compliance, /unions/IO-02 — all should be blocked or scoped), upload a document, view compliance matrix (single row), check tasks, search (scoped), give feedback.
+  * Public (8 tasks): land on public portal, search for a union, view union detail page, download a public document, confirm private documents NOT visible, confirm status badge has help popover, try to access staff dashboard (should be redirected), view a deregistered union.
+  Each task has "Do:" (the action) + "What you should see:" (the expected result). Drawn from the demo tour scenarios in help-guide.tsx + the demo seed data (Papua Maritime Workers Union = officer's assigned union, IO-01 through IO-06 = the 6 demo unions).
+  Includes demo account credentials (Test!2345) + instructions to file issues via Give feedback link or BACKLOG.md.
+- Step 4 (KNOWN-LIMITATIONS.md): created with 16 limitations gathered from the codebase + decisions-and-defaults.md:
+  1. Demo password Test!2345 (must delete before go-live)
+  2. SQLite database (migrate to PostgreSQL for production)
+  3. WeasyPrint required for PDF generation (Python dep)
+  4. pdftotext required for full-text search (poppler-utils)
+  5. Retention Queue feature-flagged off by default (NEXT_PUBLIC_RETENTION_ENABLED)
+  6. 2FA optional per user (no system-wide enforcement)
+  7. Email needs SMTP config
+  8. SMS/WhatsApp need Twilio + opt-in
+  9. Cron jobs require manual scheduling + CRON_SECRET
+  10. 50 MB file upload limit
+  11. Public rate limiting partial (D14 deferred)
+  12. Compliance rate formula provisional (D1 — Awaiting Review in denominator)
+  13. Officer with no assigned union sees nothing (D17 fail-closed)
+  14. Public compliance rate endpoint exists but not displayed (D2 open)
+  15. Representative role removed (D7)
+  16. Known usability gaps (14 confirmed — don't re-report; see usability-gap-register.md)
+  Each limitation has "What this means for testing" + "What this means for production." Includes a summary table at the bottom.
+
+Verification:
+- Targeted test (feedback-link.test.ts): 17/17 pass.
+- tsc --noEmit: 0 errors.
+- Full suite: 818 tests / 56 files pass (was 801/55 before Step 7; +17 tests +1 file).
+- Build: compiles successfully.
+
+Files changed (Step 7):
+- NEW BACKLOG.md (3 sections + templates + examples)
+- NEW STAKEHOLDER-TEST-SCRIPT.md (4 roles × 8 tasks each)
+- NEW KNOWN-LIMITATIONS.md (16 limitations + summary table)
+- NEW src/lib/__tests__/feedback-link.test.ts (17 tests)
+- MOD src/lib/dashboard/vocabulary.ts (FEEDBACK_EMAIL constant + buildFeedbackMailto helper)
+- MOD src/components/app/app-shell.tsx (Give feedback menu item + handleFeedback handler + MessageSquare icon import)
+
+Stage Summary:
+- Stakeholders have a clear place to file feedback (BACKLOG.md) + an easy in-app way to do it (Give feedback link → mailto with page URL + role pre-filled).
+- Stakeholders have a guided test script (STAKEHOLDER-TEST-SCRIPT.md) with 4 role-based walkthroughs, each with 8 concrete tasks + "what you should see." Critical scoping tests are called out: Officer can't see other unions, Inspector can't Approve on retention, Public can search + download.
+- Stakeholders know the 16 limitations up front (KNOWN-LIMITATIONS.md) — prevents "I thought this was broken" reports for known issues.
+- FEEDBACK_EMAIL is a placeholder — replace before go-live (test warns, doesn't fail).

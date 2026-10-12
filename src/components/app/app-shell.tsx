@@ -4,7 +4,7 @@ import { Fragment, useState, useEffect, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
   ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck, Home, FileCheck,
-  ChevronDown, Search,
+  ChevronDown, Search, MessageSquare,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -26,7 +26,7 @@ import { NotificationsSkeleton } from "@/components/app/skeletons";
 import { ScrollToTop } from "@/components/app/scroll-to-top";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { GlobalSearch } from "@/components/app/global-search";
-import { parseStaffLinkUrl, getRoleLabel, getNotificationTypeLabel } from "@/lib/dashboard/vocabulary";
+import { parseStaffLinkUrl, getRoleLabel, getNotificationTypeLabel, buildFeedbackMailto } from "@/lib/dashboard/vocabulary";
 import {
   getNavForRole,
   findDestination,
@@ -305,6 +305,18 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
     window.location.href = "/";
   }
 
+  // STEP 7 (feedback path): "Give feedback" opens the user's email client
+  // with the current page URL + their role pre-filled. The mailto: URL is
+  // built at click time (not render time) so it always reflects the page
+  // the user is actually on when they click. The email address itself
+  // lives in FEEDBACK_EMAIL (vocabulary.ts) — one place to change it.
+  function handleFeedback() {
+    const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+    const roleLabel = getRoleLabel(user.role);
+    const mailto = buildFeedbackMailto(currentUrl, roleLabel);
+    window.location.href = mailto;
+  }
+
   // Group notifications by date category for scannability.
   // Returns an ordered array of { label, items } groups.
   function groupNotifications(notifs: Notification[]): Array<{ label: string; items: Notification[] }> {
@@ -423,6 +435,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
                 <DropdownMenuLabel><div className="flex flex-col"><span className="text-sm font-medium">{user.email}</span><span className="text-xs text-muted-foreground">{getRoleLabel(user.role)}{user.twoFactorEnabled && " · 2FA on"}</span></div></DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onNavigate("account-security")}><Shield className="mr-2 h-4 w-4" />Account Security</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleFeedback}><MessageSquare className="mr-2 h-4 w-4" />Give feedback</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive"><LogOut className="mr-2 h-4 w-4" />Sign Out</DropdownMenuItem>
               </DropdownMenuContent>
