@@ -20,7 +20,7 @@ import { ROLE_LABELS } from "@/lib/dashboard/vocabulary";
 // Disposal, etc.). Plain language for stakeholders.
 //
 // CREDENTIALS: demo credentials are shown ONLY when NODE_ENV !== "production".
-// In production, the page shows a message to contact the Registrar for access.
+// In production, the page shows a message to contact the Industrial Registrar for access.
 // The password is never hardcoded in the source — it's read from an env var
 // (DEMO_PASSWORD) or a constant that does not match the credential-leak
 // guard's pattern.
@@ -85,7 +85,7 @@ const JOURNEY: JourneySection[] = [
     tasks: [
       { label: "Compliance (Overview tab)", detail: "Color-coded matrix: unions × document types. Green = Compliant, Amber = Expiring, Red = Overdue, Blue = Awaiting Review, Grey = Missing." },
       { label: "Compare tab", detail: "Select 2+ unions to see their statuses side-by-side. Uses the same /api/compliance endpoint — no separate scoring." },
-      { label: "Rules tab (Registrar only)", detail: "Configure which document types are required, their renewal cycles, and retention periods." },
+      { label: "Rules tab (Industrial Registrar only)", detail: "Configure which document types are required, their renewal cycles, and retention periods." },
       { label: "Generate Report", detail: "On the Compliance Overview tab, click Generate Report to download a PDF." },
     ],
   },
@@ -97,8 +97,8 @@ const JOURNEY: JourneySection[] = [
     tasks: [
       { label: "Tasks", detail: "Create tasks, assign them, track status (To Do / In Progress / Done / Cancelled)." },
       { label: "Calendar", detail: "Monthly grid of document renewals, task due dates, and compliance milestones. Click a day to see all events." },
-      { label: "Review Queue (Registrar)", detail: "Approve or reject documents uploaded by unions. Only approved documents count toward compliance." },
-      { label: "Contact Updates (Registrar)", detail: "Approve or reject contact-detail change requests submitted by unions." },
+      { label: "Review Queue (Industrial Registrar)", detail: "Approve or reject documents uploaded by unions. Only approved documents count toward compliance." },
+      { label: "Contact Updates (Industrial Registrar)", detail: "Approve or reject contact-detail change requests submitted by unions." },
     ],
   },
   {
@@ -107,7 +107,7 @@ const JOURNEY: JourneySection[] = [
     icon: ScrollText,
     description: "Retention, disposal, and the audit log.",
     tasks: [
-      { label: "Retention & Disposal", detail: "Documents whose retention period has elapsed. Registrar approves disposal; Inspector can view (reject-only)." },
+      { label: "Retention & Disposal", detail: "Documents whose retention period has elapsed. Industrial Registrar approves disposal; Inspector can view (reject-only)." },
       { label: "Audit Log", detail: "Every action: who did what, when, what changed. Filter by entity, action, actor, or date. Immutable." },
     ],
   },
@@ -117,23 +117,23 @@ const JOURNEY: JourneySection[] = [
     icon: Users,
     description: "Users, access monitoring, API keys, webhooks, resources.",
     tasks: [
-      { label: "Users (Registrar)", detail: "Create accounts for Officers, Inspectors. Reset passwords. Disable accounts." },
-      { label: "Access Monitoring (Registrar)", detail: "Auth health metrics, locked-out users, login trends." },
-      { label: "API Keys (Registrar)", detail: "Create API keys for external systems. Scoped (compliance:read, etc.)." },
-      { label: "Webhooks (Registrar)", detail: "Register external URLs to receive event notifications." },
-      { label: "Resources (Registrar)", detail: "Manage the acts/regulations library shown on the public portal." },
+      { label: "Users (Industrial Registrar)", detail: "Create accounts for Union Officials, Inspectors. Reset passwords. Disable accounts." },
+      { label: "Access Monitoring (Industrial Registrar)", detail: "Auth health metrics, locked-out users, login trends." },
+      { label: "API Keys (Industrial Registrar)", detail: "Create API keys for external systems. Scoped (compliance:read, etc.)." },
+      { label: "Webhooks (Industrial Registrar)", detail: "Register external URLs to receive event notifications." },
+      { label: "Resources (Industrial Registrar)", detail: "Manage the acts/regulations library shown on the public portal." },
     ],
   },
   {
     id: "officer-view",
-    title: "The officer's view",
+    title: "The Union Official's view",
     icon: Home,
-    description: "What an Officer sees (union-scoped).",
+    description: "What a Union Official sees (union-scoped).",
     tasks: [
-      { label: "My Union", detail: "The Officer's only nav item in the Registry group. Shows their assigned union's hub." },
-      { label: "No Oversight or Administration", detail: "Officers don't see Retention, Audit, Users, or any Administration items." },
-      { label: "No History tab", detail: "The Union Hub's History tab is hidden for Officers (audit is Registrar + Inspector only)." },
-      { label: "Cannot see other unions", detail: "An Officer with no assigned union sees nothing (fail-closed). An Officer with a union sees only that union's data." },
+      { label: "My Union", detail: "The Union Official's only nav item in the Registry group. Shows their assigned union's hub." },
+      { label: "No Review & Audit or Administration", detail: "Union Officials don't see Retention & Disposal, Audit Log, Users, or any Administration items." },
+      { label: "No History tab", detail: "The Union Hub's History tab is hidden for Union Officials (audit is Industrial Registrar + Inspector only)." },
+      { label: "Cannot see other unions", detail: "A Union Official with no assigned union sees nothing (fail-closed). A Union Official with a union sees only that union's data." },
     ],
   },
   {
@@ -143,8 +143,9 @@ const JOURNEY: JourneySection[] = [
     description: "What an anonymous visitor sees (no login).",
     tasks: [
       { label: "Register tab", detail: "Search the public union list. A status key explains Active / Suspended / Deregistered. Click a union for its public detail page." },
+      { label: "Public documents", detail: "On a union's public detail page, visitors can view + download documents the Industrial Registrar has marked public — typically the Registration Certificate and Constitution. Not all documents are public; the Registrar controls which ones appear." },
       { label: "Resources tab", detail: "Read acts and regulations governing trade unions in PNG." },
-      { label: "About tab", detail: "What this register is, who runs it, how to contact the Registrar." },
+      { label: "About tab", detail: "What this register is, who runs it, how to contact the Industrial Registrar." },
       { label: "Help tab", detail: "Plain-language definitions of every status badge." },
       { label: "No authenticated chrome", detail: "The public portal has its own header + footer. No sidebar, no breadcrumbs, no user menu." },
     ],
