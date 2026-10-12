@@ -354,7 +354,6 @@ export async function POST(
           unionName: existingUnion.unionName,
           versionNumber,
           versionId: result.newVersion.id,
-          uploadedBy: user.email,
           source: "api_v1",
         },
       });
@@ -372,7 +371,6 @@ export async function POST(
           id: result.newVersion.id,
           versionNumber: result.newVersion.versionNumber,
           fileName: result.newVersion.fileName,
-          filePath: result.newVersion.filePath,
           fileSize: result.newVersion.fileSize,
           checksum: result.newVersion.checksum,
           fileExtension: result.newVersion.fileExtension,

@@ -7,6 +7,7 @@ import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix"
 import { collectSweepIssues, type SweepIssue } from "@/lib/compliance/sweep-issues";
 import { dispatchEvent } from "@/lib/webhooks/dispatcher";
 import { staffLinkUrl } from "@/lib/dashboard/vocabulary";
+import { buildComplianceStatusChangePayload } from "@/lib/webhooks/payload-builders";
 
 // =============================================================================
 // POST /api/cron/compliance-sweep
@@ -283,14 +284,7 @@ export async function POST(req: NextRequest) {
       for (const change of statusChanges) {
         const result = await dispatchEvent({
           eventType: WebhookEventType.COMPLIANCE_STATUS_CHANGE,
-          payload: {
-            unionId: change.unionId,
-            unionName: change.unionName,
-            previousScore: change.previousScore,
-            currentScore: change.currentScore,
-            issuesCount: issues.filter((i) => i.unionId === change.unionId).length,
-            sweptAt: now.toISOString(),
-          },
+          payload: buildComplianceStatusChangePayload(change, issues, now.toISOString()),
         });
         webhookEventsDispatched += result.dispatched;
       }

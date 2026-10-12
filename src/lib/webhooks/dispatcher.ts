@@ -1,4 +1,11 @@
 import { createHmac } from "node:crypto";
+import { assertPublicDestination } from "@/lib/webhooks/destination-guard";
+
+function toKebabCase(s: string): string { return s.toLowerCase().replace(/_/g, "-"); }
+function extractEventTypeFromPayload(payloadJson: string): string {
+  try { const parsed = JSON.parse(payloadJson) as { type?: string }; return parsed.type ?? "unknown"; }
+  catch { return "unknown"; }
+}
 import { db } from "@/lib/prisma";
 import { WebhookEventType, WebhookDeliveryStatus } from "@prisma/client";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -124,7 +131,7 @@ export async function dispatchEvent(event: WebhookEvent): Promise<DispatchResult
 
     // Attempt immediate delivery (best-effort — failure schedules a retry)
     try {
-      const result = await attemptDelivery(delivery.id, endpoint, payloadJson);
+      const result = await attemptDelivery(delivery.id, endpoint, payloadJson, event.eventType);
       if (result.delivered) {
         deliveredImmediately++;
       } else {
@@ -164,6 +171,7 @@ export async function attemptDelivery(
   deliveryId: string,
   endpoint: { id: string; url: string; secret: string },
   payloadJson: string,
+  eventType?: string,
 ): Promise<AttemptResult> {
   // Rate-limit check: 60 deliveries/min per endpoint (blocks a runaway
   // retry loop from hammering a slow endpoint).
@@ -191,6 +199,12 @@ export async function attemptDelivery(
   const timestamp = new Date().toISOString();
   const signature = signPayload(payloadJson, endpoint.secret, timestamp);
 
+  const destCheck = await assertPublicDestination(endpoint.url);
+  if (!destCheck.ok) {
+    await scheduleRetry(deliveryId, null, `Destination blocked: ${destCheck.reason}`);
+    return { delivered: false, error: `Destination blocked: ${destCheck.reason}` };
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
 
@@ -200,13 +214,14 @@ export async function attemptDelivery(
       headers: {
         "Content-Type": "application/json",
         "X-URM-Signature": signature,
-        "X-URM-Event": "compliance-status-change", // set by caller via eventType; simplified here
+        "X-URM-Event": toKebabCase(eventType ?? extractEventTypeFromPayload(payloadJson)),
         "X-URM-Delivery": deliveryId,
         "X-URM-Timestamp": timestamp,
         "User-Agent": "URM-Webhook/1.0",
       },
       body: payloadJson,
       signal: controller.signal,
+      redirect: "manual",
     });
 
     clearTimeout(timeout);
@@ -229,9 +244,11 @@ export async function attemptDelivery(
       });
       return { delivered: true, statusCode };
     } else {
-      // Non-2xx — schedule a retry
-      await scheduleRetry(deliveryId, statusCode, `HTTP ${statusCode}`);
-      return { delivered: false, statusCode, error: `HTTP ${statusCode}` };
+      const errorMsg = statusCode >= 300 && statusCode < 400
+        ? `HTTP ${statusCode} (redirects not supported — receiver must respond 2xx)`
+        : `HTTP ${statusCode}`;
+      await scheduleRetry(deliveryId, statusCode, errorMsg);
+      return { delivered: false, statusCode, error: errorMsg };
     }
   } catch (err) {
     clearTimeout(timeout);
@@ -343,7 +360,7 @@ export async function processPendingDeliveries(): Promise<number> {
     }
 
     try {
-      await attemptDelivery(delivery.id, delivery.endpoint, delivery.payload);
+      await attemptDelivery(delivery.id, delivery.endpoint, delivery.payload, delivery.eventType);
       processed++;
     } catch (err) {
       console.error(`[webhooks] Retry failed for ${delivery.id}:`, err);

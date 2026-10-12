@@ -3,6 +3,7 @@ import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
 import { generateWebhookSecret } from "@/lib/webhooks/dispatcher";
+import { assertPublicDestination } from "@/lib/webhooks/destination-guard";
 
 // =============================================================================
 // GET  /api/webhooks        — list all webhook endpoints (REGISTRAR only)
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  // Validate URL
+  // Validate URL (basic format check)
   if (typeof body.url !== "string" || body.url.trim().length === 0) {
     return NextResponse.json(
       { error: "Field 'url' is required and must be a non-empty string." },
@@ -96,14 +97,12 @@ export async function POST(req: NextRequest) {
     );
   }
   const url = body.url.trim();
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      throw new Error("Must be http or https");
-    }
-  } catch {
+
+  // C31 (D18): SSRF guard
+  const destCheck = await assertPublicDestination(url);
+  if (!destCheck.ok) {
     return NextResponse.json(
-      { error: "Field 'url' must be a valid HTTP(S) URL." },
+      { error: `Webhook destination rejected: ${destCheck.reason}` },
       { status: 400 },
     );
   }
