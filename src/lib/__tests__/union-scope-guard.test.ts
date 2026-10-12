@@ -4,6 +4,10 @@ import { join, resolve } from "node:path";
 
 const projectRoot = resolve(__dirname, "../../..");
 const apiRoot = resolve(projectRoot, "src", "app", "api");
+// STEP 8 (pre-demo gate): also scan server-rendered pages (not just API
+// routes). The reports/compliance page had a fail-open truthiness gate
+// that the API-only scan missed.
+const reportsRoot = resolve(projectRoot, "src", "app", "reports");
 
 const ALLOWLIST: Array<[string, string]> = [
   ["tasks/route.ts", "Uses a ternary that falls through to { assigneeId: user.id } for an unassigned Officer — they see only tasks assigned to them, not all tasks. Fail-closed enough for the tasks domain."],
@@ -11,11 +15,13 @@ const ALLOWLIST: Array<[string, string]> = [
 
 function collectRouteFiles(dir: string): string[] {
   const files: string[] = [];
-  for (const entry of readdirSync(dir)) {
+  let entries: string[];
+  try { entries = readdirSync(dir); } catch { return files; }
+  for (const entry of entries) {
     const fullPath = join(dir, entry);
     const stat = statSync(fullPath);
     if (stat.isDirectory()) files.push(...collectRouteFiles(fullPath));
-    else if (entry.endsWith(".ts") && !entry.includes(".test.")) files.push(fullPath);
+    else if ((entry.endsWith(".ts") || entry.endsWith(".tsx")) && !entry.includes(".test.")) files.push(fullPath);
   }
   return files;
 }
@@ -48,5 +54,33 @@ describe("union-scope guard — no fail-open patterns in src/app/api", () => {
   });
   it("allowlisted files exist", () => {
     for (const [relPath] of ALLOWLIST) { expect(statSync(join(apiRoot, relPath)).isFile()).toBe(true); }
+  });
+});
+
+// STEP 8 (pre-demo gate): separate describe block for server-rendered pages.
+// The reports/compliance page is NOT an API route but it renders scoped data
+// — it must use getUnionScope, not a hand-rolled truthiness gate.
+describe("union-scope guard — no fail-open patterns in src/app/reports", () => {
+  const pageFiles = collectRouteFiles(reportsRoot);
+  it("found page files to scan", () => { expect(pageFiles.length).toBeGreaterThan(0); });
+  it("no fail-open OFFICER&&assignedUnionId truthiness gates in report pages", () => {
+    const offenders: string[] = [];
+    for (const filePath of pageFiles) {
+      const relPath = filePath.replace(reportsRoot + "/", "");
+      const source = readFileSync(filePath, "utf8");
+      const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      const match = FAILOPEN_PATTERN.exec(stripped);
+      if (match) {
+        const lines = source.split("\n");
+        let lineNum = 0;
+        for (let i = 0; i < lines.length; i++) {
+          if (FAILOPEN_PATTERN.test(lines[i].replace(/\/\/.*$/, ""))) { lineNum = i + 1; break; }
+        }
+        offenders.push(`  ${relPath}:${lineNum}: ${match[0].trim()}`);
+      }
+    }
+    if (offenders.length > 0) {
+      throw new Error(`Guard: ${offenders.length} fail-open pattern(s) found in report pages.\nUse getUnionScope(user) instead.\n` + offenders.join("\n"));
+    }
   });
 });

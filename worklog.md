@@ -1274,3 +1274,46 @@ Stage Summary:
 - Stakeholders have a guided test script (STAKEHOLDER-TEST-SCRIPT.md) with 4 role-based walkthroughs, each with 8 concrete tasks + "what you should see." Critical scoping tests are called out: Officer can't see other unions, Inspector can't Approve on retention, Public can search + download.
 - Stakeholders know the 16 limitations up front (KNOWN-LIMITATIONS.md) — prevents "I thought this was broken" reports for known issues.
 - FEEDBACK_EMAIL is a placeholder — replace before go-live (test warns, doesn't fail).
+
+---
+Task ID: B10-pre-demo-gate
+Agent: main
+Task: Step 8: Pre-demo gate (full suite + tsc + fail-open grep + officer null-union test + demo password check + build)
+
+Work Log:
+- Item 1 (full suite + tsc): tsc --noEmit exit 0. Vitest: 818/56 pass (initial). After fixes below: 820/56 pass.
+- Item 2 (grep for "OFFICER && assignedUnionId"): initial scan found 1 FAIL-OPEN in production code:
+  * src/app/reports/compliance/page.tsx:54 — `if (authUser.role === "OFFICER" && authUser.assignedUnionId)` — truthiness gate that let an unassigned Officer see ALL unions' compliance data on the report page. The guard test (union-scope-guard.test.ts) only scanned src/app/api/, so it missed this server-rendered page.
+  FIX: replaced with getUnionScope() — fails closed (notFound) for scope.kind === "none".
+  Also extended the guard test to scan src/app/reports/ (new describe block). Guard now passes 5/5.
+  After fix: 0 fail-open patterns in production code (only safe `!==` form remains in 3 API routes + a comment in the fixed file).
+- Item 3 (officer with null union): created scripts/step8-officer-null-union-test.ts. Creates a temporary Officer with assignedUnionId=null, logs in, hits 9 scoped endpoints + /reports/compliance. Initial run found a SECOND fail-open:
+  * /api/dashboard/document-types returned 200 with ALL unions' document-type counts (5,5,4,2,2...) — because buildDocumentTypesWhere()'s fallback for scope.kind === "none" returns the SAME as "all" (unscoped), and the route handler didn't check the scope first.
+  FIX: added getDocumentTypesScope() check in the route handler — returns 403 for scope.kind === "none" before calling buildDocumentTypesWhere.
+  After fix: ALL 9 endpoints pass:
+    - 6 return 403 ("Forbidden: your account is not assigned to a union"): dashboard/stats, dashboard/activity, compliance, calendar, retention (404 via notFound), dashboard/document-types
+    - 2 return 200 with empty data: tasks (allowlisted — returns user's own tasks, not union data), dashboard/trend (no snapshot data for null-union officer)
+    - /reports/compliance returns 404 (notFound — fail-closed)
+  Overall: PASS — Officer with null union sees NO data.
+- Item 4 (demo password in production build): grep -rl "Test!2345" .next/server/ → exit 1 (no match). grep -rl "DEMO_PASSWORD" .next/server/ → exit 1 (no match). The compiled server chunks contain NO demo password. The .next/standalone/ directory contains source files copied verbatim (seed-demo.ts, reset-demo-passwords.ts, .md docs) but these are NOT executed in production — both seed scripts have NODE_ENV=production gates (verified: `if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "true") { console.error("ERROR: ... refuses to run in production"); process.exit(1); }`).
+- Item 5 (npm run build): ✓ Compiled successfully in 25.2s. No errors. Static + dynamic routes generated. /sitemap.xml prerendered as static.
+
+Verification:
+- tsc --noEmit: 0 errors.
+- Full suite: 820 tests / 56 files pass (was 818/56; +2 from the new reports-scan describe block in union-scope-guard.test.ts).
+- Build: compiles successfully.
+- Officer null-union test: 9/9 endpoints pass (no data leaked).
+- Demo password: not in compiled build output.
+
+Files changed (Step 8):
+- MOD src/app/reports/compliance/page.tsx (replaced fail-open truthiness gate with getUnionScope + notFound)
+- MOD src/app/api/dashboard/document-types/route.ts (added getDocumentTypesScope check — 403 for null-union officers)
+- MOD src/lib/__tests__/union-scope-guard.test.ts (added src/app/reports scan — new describe block, +2 tests)
+- NEW scripts/step8-officer-null-union-test.ts (runtime verification — creates null-union officer, hits 9 endpoints)
+
+Stage Summary:
+- 2 fail-open patterns found and fixed during the pre-demo gate:
+  1. reports/compliance/page.tsx — server-rendered page leaked all unions' compliance data to an unassigned Officer.
+  2. api/dashboard/document-types/route.ts — API endpoint leaked all unions' document-type counts to an unassigned Officer.
+- Guard test extended to scan src/app/reports/ (was api-only) — prevents this class of regression.
+- All 5 gate items PASS.

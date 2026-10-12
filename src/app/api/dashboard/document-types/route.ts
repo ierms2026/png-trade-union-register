@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
-import { buildDocumentTypesWhere } from "@/lib/dashboard/document-types-where";
+import { buildDocumentTypesWhere, getDocumentTypesScope } from "@/lib/dashboard/document-types-where";
 
 // =============================================================================
 // GET /api/dashboard/document-types
@@ -27,6 +27,22 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // STEP 8 (pre-demo gate): fail-closed check BEFORE calling
+  // buildDocumentTypesWhere. The where-builder's fallback for
+  // scope.kind === "none" returns the SAME as "all" (unscoped) — relying
+  // on the caller to check first. Without this check, an Officer with no
+  // assigned union would see ALL unions' document-type counts.
+  const scope = getDocumentTypesScope({
+    role: user.role,
+    assignedUnionId: user.assignedUnionId,
+  });
+  if (scope.kind === "none") {
+    return NextResponse.json(
+      { error: "Forbidden: your account is not assigned to a union." },
+      { status: 403 },
+    );
   }
 
   const { docWhere, unionWhere } = buildDocumentTypesWhere({

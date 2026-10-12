@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { db } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth/auth-guard";
+import { getUnionScope } from "@/lib/auth/union-scope";
 import { fetchMatrixData, buildComplianceMatrix } from "@/lib/compliance/matrix";
 import { getExpiryForecast, getNeedsAttention, tallyStatuses, computeRateFromCounts, type ComplianceCell, type UnionSummary } from "@/lib/dashboard/metrics";
 import { getComplianceTrend } from "@/lib/dashboard/snapshot";
@@ -50,9 +51,18 @@ export default async function ComplianceReportPage({ searchParams }: PageProps) 
 
   // --- 1. Fetch the compliance matrix ---
   const data = await fetchMatrixData();
-  // Officer scoping: filter to their union only
-  if (authUser.role === "OFFICER" && authUser.assignedUnionId) {
-    data.unions = data.unions.filter((u) => u.id === authUser.assignedUnionId);
+  // Officer scoping via the canonical helper (D17 fail-closed). An Officer
+  // with no assigned union sees NO data (notFound), never everything.
+  // STEP 8 (pre-demo gate): was `if (role === "OFFICER" && assignedUnionId)`
+  // — a fail-open truthiness gate that let an unassigned Officer see ALL
+  // unions. Now uses getUnionScope which returns { kind: "none" } for that
+  // case, triggering notFound().
+  const scope = getUnionScope({ role: authUser.role, assignedUnionId: authUser.assignedUnionId });
+  if (scope.kind === "none") {
+    notFound();
+  }
+  if (scope.kind === "union") {
+    data.unions = data.unions.filter((u) => u.id === scope.unionId);
   }
   const matrix = buildComplianceMatrix(data);
   const now = new Date();
