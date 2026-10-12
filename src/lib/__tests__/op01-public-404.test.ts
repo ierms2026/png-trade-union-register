@@ -136,4 +136,27 @@ describe("OP-01: public /api/public/files indistinguishable 404 (direct handler 
     const r = await callRouteHandler(nonexistentId);
     expect(r.body).toBe(JSON.stringify({ error: "File not found." }));
   });
+
+  it("calling each case 3 times returns identical responses (no body-consumption bug)", async () => {
+    // OP-01: verify the notFoundResponse() factory creates a FRESH response
+    // each time. A shared module-level NextResponse would have its body
+    // consumed on the first read, leaving empty bodies for subsequent reads.
+    for (const id of [nonPublicVersionId, disposedVersionId, nonexistentId]) {
+      const results = await Promise.all([
+        callRouteHandler(id),
+        callRouteHandler(id),
+        callRouteHandler(id),
+      ]);
+      // All 3 calls must return the same status
+      expect(results[0].status).toBe(404);
+      expect(results[1].status).toBe(404);
+      expect(results[2].status).toBe(404);
+      // All 3 calls must return the same non-empty body
+      expect(results[0].body).toBe(results[1].body);
+      expect(results[1].body).toBe(results[2].body);
+      expect(results[0].body.length).toBeGreaterThan(0);
+      // Body must be the JSON error
+      expect(results[0].body).toBe(JSON.stringify({ error: "File not found." }));
+    }
+  });
 });

@@ -18,6 +18,7 @@ import bcrypt from "bcryptjs";
 const BASE = "http://localhost:3000";
 const TEST_EMAIL = `officer-null-union-test@example.com`;
 const TEST_PASSWORD = process.env.DEMO_PASSWORD ?? "";
+if (!TEST_PASSWORD || TEST_PASSWORD.length < 12) { console.error("ERROR: DEMO_PASSWORD unset, empty, or under 12 chars."); process.exit(1); }
 
 async function main() {
   // --- 1. Create a temporary Officer with no assigned union ---

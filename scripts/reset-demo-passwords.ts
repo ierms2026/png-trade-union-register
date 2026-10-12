@@ -13,9 +13,9 @@ if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "tr
 // OP-01: read from env so no literal credential appears in source.
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "";
 
-if (!DEMO_PASSWORD) {
-  console.error("\nERROR: DEMO_PASSWORD env var is not set.");
-  console.error("Set it before running this script: DEMO_PASSWORD=<value> npx tsx scripts/reset-demo-passwords.ts");
+if (!DEMO_PASSWORD || DEMO_PASSWORD.length < 12) {
+  console.error("\nERROR: DEMO_PASSWORD env var is unset, empty, or under 12 characters.");
+  console.error("Set it before running: DEMO_PASSWORD=<value> npx tsx scripts/reset-demo-passwords.ts");
   process.exit(1);
 }
 

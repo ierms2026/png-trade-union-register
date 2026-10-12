@@ -46,15 +46,19 @@ const STORAGE_ROOT =
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "";
 
 // -----------------------------------------------------------------------------
-// Production gate: refuse to seed demo data in production unless explicitly
-// allowed. Demo accounts use a known password — they must NOT reach
-// stakeholder or production environments.
+// Validation: refuse to run if DEMO_PASSWORD is unset, empty, or too short.
+// Also refuse in production (unless ALLOW_DEMO_SEED=true).
 // -----------------------------------------------------------------------------
 if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "true") {
   console.error("\nERROR: seed-demo.ts refuses to run in production.");
   console.error("Demo accounts use a known password and must NOT");
   console.error("be created in stakeholder or production environments.");
   console.error("\nTo override (NOT recommended): ALLOW_DEMO_SEED=true npx tsx prisma/seed-demo.ts");
+  process.exit(1);
+}
+if (!DEMO_PASSWORD || DEMO_PASSWORD.length < 12) {
+  console.error("\nERROR: DEMO_PASSWORD env var is unset, empty, or under 12 characters.");
+  console.error("Set it before running: DEMO_PASSWORD=<value> npx tsx prisma/seed-demo.ts");
   process.exit(1);
 }
 

@@ -63,10 +63,15 @@ async function simulateLogin(email: string, password: string) {
 }
 
 async function main() {
+  const DEMO_PW = process.env.DEMO_PASSWORD ?? "";
+  if (!DEMO_PW || DEMO_PW.length < 12) {
+    console.error("ERROR: DEMO_PASSWORD unset, empty, or under 12 chars.");
+    process.exit(1);
+  }
   const accounts = [
-    { email: "registrar@example.com", password: process.env.DEMO_PASSWORD ?? "" },
-    { email: "inspector@example.com", password: process.env.DEMO_PASSWORD ?? "" },
-    { email: "officer@example.com", password: process.env.DEMO_PASSWORD ?? "" },
+    { email: "registrar@example.com", password: DEMO_PW },
+    { email: "inspector@example.com", password: DEMO_PW },
+    { email: "officer@example.com", password: DEMO_PW },
   ];
   for (const a of accounts) {
     await simulateLogin(a.email, a.password);

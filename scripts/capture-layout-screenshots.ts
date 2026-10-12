@@ -25,6 +25,7 @@ const OUTPUT_DIR = resolve(__dirname, "../docs/layout-screenshots");
 
 const EMAIL = "registrar@example.com";
 const PASSWORD = process.env.DEMO_PASSWORD ?? "";
+if (!PASSWORD || PASSWORD.length < 12) { console.error("ERROR: DEMO_PASSWORD unset, empty, or under 12 chars."); process.exit(1); }
 
 const WIDTHS = [
   { width: 1440, name: "dashboard-1440" }, // Desktop wide

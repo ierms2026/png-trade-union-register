@@ -29,6 +29,7 @@ const OUTPUT_DIR = resolve(__dirname, "../download/step5-screenshots");
 
 const EMAIL = "registrar@example.com";
 const PASSWORD = process.env.DEMO_PASSWORD ?? "";
+if (!PASSWORD || PASSWORD.length < 12) { console.error("ERROR: DEMO_PASSWORD unset, empty, or under 12 chars."); process.exit(1); }
 
 async function login(page: import("playwright").Page) {
   // Hit the API directly — faster + more reliable than scraping the form.
