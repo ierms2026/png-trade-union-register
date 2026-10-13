@@ -13,12 +13,15 @@ import { resolve } from "node:path";
 // =============================================================================
 
 describe("Step 4: credential hardening", () => {
-  it("seed-demo.ts has a production gate", () => {
+  it("seed-demo.ts uses requireDemoPassword() (which has the production gate)", () => {
     const src = readFileSync(resolve(__dirname, "../../../prisma/seed-demo.ts"), "utf8");
-    expect(src).toContain("NODE_ENV");
-    expect(src).toContain("production");
-    expect(src).toContain("ALLOW_DEMO_SEED");
-    expect(src).toMatch(/process\.exit\(1\)/);
+    expect(src).toContain("requireDemoPassword");
+    // The production gate is in require-demo-password.ts
+    const gateSrc = readFileSync(resolve(__dirname, "../../../src/lib/security/require-demo-password.ts"), "utf8");
+    expect(gateSrc).toContain("NODE_ENV");
+    expect(gateSrc).toContain("production");
+    expect(gateSrc).toContain("ALLOW_DEMO_SEED");
+    expect(gateSrc).toMatch(/process\.exit\(1\)/);
   });
 
   it("reset-demo-passwords.ts has a production gate", () => {
@@ -37,11 +40,13 @@ describe("Step 4: credential hardening", () => {
     expect(src).toContain("known demo value");
   });
 
-  it("session.ts throws in production if SESSION_SECRET is unset", () => {
+  it("session.ts throws in ALL environments if SESSION_SECRET is unset (no fallback)", () => {
     const src = readFileSync(resolve(__dirname, "../../../src/lib/auth/session.ts"), "utf8");
     expect(src).toContain("SESSION_SECRET");
-    expect(src).toContain("is required in production");
     expect(src).toContain("throw new Error");
+    // OP-01: no dev fallback — throw in all environments
+    expect(src).not.toContain("dev-only-insecure-fallback");
+    expect(src).not.toContain("??");
   });
 
   it("create-stakeholder-account.ts exists and generates random passwords", () => {

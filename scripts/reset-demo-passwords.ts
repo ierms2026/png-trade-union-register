@@ -10,14 +10,9 @@ if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "tr
   process.exit(1);
 }
 
-// OP-01: read from env so no literal credential appears in source.
-const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "";
-
-if (!DEMO_PASSWORD || DEMO_PASSWORD.length < 12) {
-  console.error("\nERROR: DEMO_PASSWORD env var is unset, empty, or under 12 characters.");
-  console.error("Set it before running: DEMO_PASSWORD=<value> npx tsx scripts/reset-demo-passwords.ts");
-  process.exit(1);
-}
+// OP-01: shared validation via requireDemoPassword().
+import { requireDemoPassword } from "../src/lib/security/require-demo-password";
+const DEMO_PASSWORD = requireDemoPassword();
 
 async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);

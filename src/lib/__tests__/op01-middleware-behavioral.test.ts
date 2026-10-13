@@ -92,6 +92,11 @@ describe("OP-01: DEMO_READ_ONLY middleware — behavioral tests", () => {
       expect(res.status).toBe(200);
     });
 
+    it("allows POST to /api/auth/login/2fa (2FA verification step)", async () => {
+      const res = await callMiddleware("POST", "/api/auth/login/2fa");
+      expect(res.status).toBe(200);
+    });
+
     // --- Blocked POST paths ---
     it("blocks POST to /api/unions with 403", async () => {
       const res = await callMiddleware("POST", "/api/unions");

@@ -76,33 +76,34 @@ describe("OP-01.2: instrumentation.ts production secret checks", () => {
 // 7. PasswordHash verification check (script)
 // =============================================================================
 
-describe("OP-01.7: script to check if any user's hash matches the demo password", () => {
-  it("scripts/check-demo-password.ts exists", () => {
-    const path = resolve(SRC_ROOT, "scripts/check-demo-password.ts");
+describe("OP-01.7: demo password leak check module + script", () => {
+  it("src/lib/security/demo-password-check.ts exists + exports checkDemoPasswordLeak", () => {
+    const path = resolve(SRC_ROOT, "src/lib/security/demo-password-check.ts");
     const src = readFileSync(path, "utf-8");
-    expect(src.length).toBeGreaterThan(0);
-  });
-
-  it("the script reads DEMO_PASSWORD from env (not a literal)", () => {
-    const path = resolve(SRC_ROOT, "scripts/check-demo-password.ts");
-    const src = readFileSync(path, "utf-8");
-    expect(src).toContain("process.env.DEMO_PASSWORD");
-    expect(src).not.toContain("Test!");
-  });
-
-  it("the script uses bcrypt.compare (never prints the password)", () => {
-    const path = resolve(SRC_ROOT, "scripts/check-demo-password.ts");
-    const src = readFileSync(path, "utf-8");
+    expect(src).toContain("export async function checkDemoPasswordLeak");
     expect(src).toContain("bcrypt.compare");
-    // Must NOT print the password value
-    expect(src).not.toMatch(/console\.(log|error).*password.*\$\{/i);
   });
 
-  it("the script exits with code 2 if DEMO_PASSWORD is not set", () => {
+  it("scripts/check-demo-password.ts is a thin wrapper importing the module", () => {
     const path = resolve(SRC_ROOT, "scripts/check-demo-password.ts");
     const src = readFileSync(path, "utf-8");
-    expect(src).toMatch(/process\.exit\(2\)/);
-    expect(src).toMatch(/DEMO_PASSWORD.*not set/i);
+    expect(src).toContain("demo-password-check");
+    expect(src).toContain("process.env.DEMO_PASSWORD");
+    // Must NOT contain bcrypt directly (it's in the module)
+    expect(src).not.toContain("bcrypt.compare");
+  });
+
+  it("the module never prints the password", () => {
+    const path = resolve(SRC_ROOT, "src/lib/security/demo-password-check.ts");
+    const src = readFileSync(path, "utf-8");
+    expect(src).not.toMatch(/console\.(log|error).*password/i);
+  });
+
+  it("the script exits with code 2 when DEMO_PASSWORD is empty", () => {
+    const path = resolve(SRC_ROOT, "scripts/check-demo-password.ts");
+    const src = readFileSync(path, "utf-8");
+    expect(src).toMatch(/exit\(2\)/);
+    expect(src).toMatch(/unset|empty/i);
   });
 });
 

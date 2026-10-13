@@ -23,8 +23,12 @@ import { NextRequest, NextResponse } from "next/server";
 // =============================================================================
 
 // Paths that are always allowed even in read-only mode.
+// OP-01: login + logout + the 2FA verification step (POST /api/auth/login/2fa)
+// are needed to complete a 2FA-protected login. Without it, a user with 2FA
+// enabled could not sign in during a read-only demo.
 const ALLOWED_POST_PATHS = [
   "/api/auth/login",
+  "/api/auth/login/2fa",
   "/api/auth/logout",
 ];
 

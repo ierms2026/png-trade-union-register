@@ -62,12 +62,10 @@ async function simulateLogin(email: string, password: string) {
   }
 }
 
+import { requireDemoPassword } from "../src/lib/security/require-demo-password";
+
 async function main() {
-  const DEMO_PW = process.env.DEMO_PASSWORD ?? "";
-  if (!DEMO_PW || DEMO_PW.length < 12) {
-    console.error("ERROR: DEMO_PASSWORD unset, empty, or under 12 chars.");
-    process.exit(1);
-  }
+  const DEMO_PW = requireDemoPassword();
   const accounts = [
     { email: "registrar@example.com", password: DEMO_PW },
     { email: "inspector@example.com", password: DEMO_PW },
