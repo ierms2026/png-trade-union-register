@@ -88,7 +88,7 @@ describe("OP-01.7: demo password leak check module + script", () => {
     const path = resolve(SRC_ROOT, "scripts/check-demo-password.ts");
     const src = readFileSync(path, "utf-8");
     expect(src).toContain("demo-password-check");
-    expect(src).toContain("process.env.DEMO_PASSWORD");
+    expect(src).toContain("PASSWORD_FILE");
     // Must NOT contain bcrypt directly (it's in the module)
     expect(src).not.toContain("bcrypt.compare");
   });
