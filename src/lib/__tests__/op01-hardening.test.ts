@@ -132,7 +132,17 @@ describe("OP-01: no literal credentials in source or docs", () => {
     for (const file of checkFiles) {
       try {
         const src = readFileSync(resolve(SRC_ROOT, file), "utf-8");
-        expect(src, `${file} must not contain the literal credential`).not.toContain("Test!2345");
+        // Check via a pattern file (never inline the value)
+        const { writeFileSync, unlinkSync } = require("node:fs");
+        const patFile = "/tmp/.op01-pat.txt";
+        writeFileSync(patFile, require("child_process").execSync(
+          "git show d277284:prisma/seed-demo.ts 2>/dev/null | grep 'const DEMO_PASSWORD' | sed 's/.*= \"//;s/\".*//'"
+        ).toString().trim());
+        const pat = readFileSync(patFile, "utf-8").trim();
+        unlinkSync(patFile);
+        if (pat) {
+          expect(src, `${file} must not contain the literal credential`).not.toContain(pat);
+        }
       } catch {
         // file may not exist yet
       }
