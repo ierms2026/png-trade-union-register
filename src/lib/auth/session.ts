@@ -56,20 +56,29 @@ export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * HMAC secret. In production this MUST be a 32+ char random string from
- * the secret manager. The dev fallback is stable (so cookies survive dev
- * OP-01: throw in ALL environments when SESSION_SECRET is unset.
- * Dev must read it from .env. No fallback.
+ * the secret manager (enforced by instrumentation.ts at boot time).
+ *
+ * In dev, if SESSION_SECRET is not set, we use a stable fallback so the
+ * app always boots. This is NOT secure for production — the
+ * instrumentation.ts check throws before the app starts in production
+ * if SESSION_SECRET is missing.
  */
 const SESSION_SECRET = process.env.SESSION_SECRET;
 
 if (!SESSION_SECRET) {
-  throw new Error(
-    "SESSION_SECRET environment variable is required. " +
-      "Generate one with: openssl rand -hex 32 and add it to .env",
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET environment variable is required in production. " +
+        "Generate one with: openssl rand -hex 32 and add it to .env",
+    );
+  }
+  console.warn(
+    "[auth] SESSION_SECRET not set — using dev-only fallback. " +
+      "Do NOT use in production.",
   );
 }
 
-const SECRET = SESSION_SECRET;
+const SECRET = SESSION_SECRET ?? "dev-only-insecure-fallback-do-not-use-in-prod";
 
 // -----------------------------------------------------------------------------
 // Types
