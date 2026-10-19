@@ -1,0 +1,252 @@
+/home/z/my-project/src/components/app/views/unions.tsx:129:  // IA-3: fetch the full compliance matrix to get the complete list of required
+/home/z/my-project/src/components/app/views/unions.tsx:329:                // of the required types in this category have a filed
+/home/z/my-project/src/components/app/views/unions.tsx:334:                  // Group ALL required types by category (not just filed ones)
+/home/z/my-project/src/components/app/views/unions.tsx:1030:      toast.error("Document type is required.");
+/home/z/my-project/src/components/app/views/unions.tsx:1034:      toast.error("Title is required.");
+/home/z/my-project/src/components/app/views/unions.tsx:1074:            <Select value={documentType} onValueChange={setDocumentType} required>
+/home/z/my-project/src/components/app/views/unions.tsx:1145:// empty initial values + the registration number field is required.
+/home/z/my-project/src/components/app/views/unions.tsx:1170:      toast.error("Union Name and Registration Number are required.");
+/home/z/my-project/src/components/app/views/unions.tsx:1225:              required
+/home/z/my-project/src/components/app/views/unions.tsx:1237:                required
+/home/z/my-project/src/components/app/views/api-keys.tsx:199:      toast.error("Name is required.");
+/home/z/my-project/src/components/app/views/api-keys.tsx:207:      toast.error("Expiry date is required.");
+/home/z/my-project/src/components/app/views/help-guide.tsx:81:        description: "Set which document types are required, how often they renew, and how long they're retained.",
+/home/z/my-project/src/components/app/views/tasks.tsx:322:      toast.error("Title is required.");
+/home/z/my-project/src/components/app/views/webhooks.tsx:366:                required
+/home/z/my-project/src/components/app/views/webhooks.tsx:377:                required
+/home/z/my-project/src/components/app/views/dashboard.tsx:196://   - "N of D required (P%)" text — reads from stats.compliance.rate
+/home/z/my-project/src/components/app/views/dashboard.tsx:259:                    aria-label={`${numerator} of ${denominator} required documents compliant. ${percentage} percent.`}
+/home/z/my-project/src/components/app/views/dashboard.tsx:265:                      {numerator} of {denominator} required
+/home/z/my-project/src/components/app/views/dashboard.tsx:271:                    Percentage of required documents currently compliant. Required = registered unions × required document types.
+/home/z/my-project/src/components/app/views/dashboard.tsx:385://   - Denominator changes across the window (required types or unions
+/home/z/my-project/src/components/app/views/dashboard.tsx:750:          {denominator} required documents across {totalUnions} unions.
+/home/z/my-project/src/components/app/views/dashboard.tsx:839:// RequiredVsOnFileMeters — one meter row per required document type showing
+/home/z/my-project/src/components/app/views/dashboard.tsx:840:// on-file vs required. Replaces the lollipop chart (chunk 2.2).
+/home/z/my-project/src/components/app/views/dashboard.tsx:842:// Each row: type label + meter track (fill = onFile/required) + text
+/home/z/my-project/src/components/app/views/dashboard.tsx:862:  // Guard: required = 0 for a configured type → omit row + log loudly
+/home/z/my-project/src/components/app/views/dashboard.tsx:864:    if (e.required === 0) {
+/home/z/my-project/src/components/app/views/dashboard.tsx:866:        `[RequiredVsOnFileMeters] Type "${e.documentType}" has required=0. Omitting row.`,
+/home/z/my-project/src/components/app/views/dashboard.tsx:870:    if (e.onFile > e.required) {
+/home/z/my-project/src/components/app/views/dashboard.tsx:872:        `[RequiredVsOnFileMeters] Type "${e.documentType}" has onFile (${e.onFile}) > required (${e.required}). Data inconsistency — rendering without clamping.`,
+/home/z/my-project/src/components/app/views/dashboard.tsx:883:          On file vs required across {requiredTypes.length} document types.
+/home/z/my-project/src/components/app/views/dashboard.tsx:889:            const fillPct = entry.required > 0 ? (entry.onFile / entry.required) * 100 : 0;
+/home/z/my-project/src/components/app/views/dashboard.tsx:893:                aria-label={`${entry.documentType}: ${entry.onFile} of ${entry.required} on file${entry.missing > 0 ? `, ${entry.missing} missing` : ""}`}
+/home/z/my-project/src/components/app/views/dashboard.tsx:901:                    {entry.onFile} of {entry.required} on file
+/home/z/my-project/src/components/app/views/dashboard.tsx:974:            Nothing needs attention — all required documents are compliant or not yet due.
+/home/z/my-project/src/components/app/views/dashboard.tsx:1433:              const required = totalUnions;
+/home/z/my-project/src/components/app/views/dashboard.tsx:1434:              const typePct = required > 0 ? Math.round((onFile / required) * 100) : 0;
+/home/z/my-project/src/components/app/views/dashboard.tsx:1439:                    {onFile} of {required} on file ({typePct}%)
+/home/z/my-project/src/components/app/views/dashboard.tsx:1805:        <div data-testid="required-vs-on-file" className="lg:col-span-3">
+/home/z/my-project/src/components/app/views/legislation.tsx:50:    if (!formData.title.trim() || !formData.summary.trim()) { toast.error("Title and Summary are required."); return; }
+/home/z/my-project/src/components/app/views/compliance.tsx:468:                                  This document type is not required for this union.
+/home/z/my-project/src/app/demo/page.tsx:87:      { label: "Rules tab (Industrial Registrar only)", detail: "Configure which document types are required, their renewal cycles, and retention periods." },
+/home/z/my-project/src/components/app/views/configure-rules.tsx:28:// Each rule shows: documentType, required toggle, renewalYears, retentionYrs.
+/home/z/my-project/src/components/app/views/configure-rules.tsx:37:  required: boolean;
+/home/z/my-project/src/components/app/views/configure-rules.tsx:54:  changes: { required?: boolean; renewalYears?: number; retentionYrs?: number };
+/home/z/my-project/src/components/app/views/configure-rules.tsx:81:        description="Compliance rules define which document types are required and their renewal cycles."
+/home/z/my-project/src/components/app/views/configure-rules.tsx:110:                    <Badge variant={rule.required ? "default" : "secondary"}>
+/home/z/my-project/src/components/app/views/configure-rules.tsx:111:                      {rule.required ? "Required" : "Optional"}
+/home/z/my-project/src/components/app/views/configure-rules.tsx:156:  const [required, setRequired] = useState(rule.required);
+/home/z/my-project/src/components/app/views/configure-rules.tsx:164:    const changes: { required?: boolean; renewalYears?: number; retentionYrs?: number } = {};
+/home/z/my-project/src/components/app/views/configure-rules.tsx:165:    if (required !== rule.required) changes.required = required;
+/home/z/my-project/src/components/app/views/configure-rules.tsx:243:              <Label htmlFor="required-switch">Required</Label>
+/home/z/my-project/src/components/app/views/configure-rules.tsx:249:              id="required-switch"
+/home/z/my-project/src/components/app/views/configure-rules.tsx:250:              checked={required}
+/home/z/my-project/src/components/app/use-fetch.ts:80:          setError("Authentication required.");
+/home/z/my-project/src/components/app/set-password-form.tsx:105:                required
+/home/z/my-project/src/components/app/set-password-form.tsx:119:                required
+/home/z/my-project/src/components/app/confirm-dialog.tsx:62:  /** Dialog title (required by ARIA alertdialog). */
+/home/z/my-project/src/app/api/documents/route.ts:42:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/legal-holds/[documentId]/place/route.ts:33:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/legal-holds/[documentId]/place/route.ts:49:      { error: "A reason is required (e.g., 'Court order 2026/123', 'Active audit ref AUD-456')." },
+/home/z/my-project/src/app/api/documents/[id]/route.ts:37:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/legal-holds/[documentId]/lift/route.ts:32:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/security/unlock/route.ts:54:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/security/unlock/route.ts:78:      { error: "Field 'userId' is required and must be a non-empty string." },
+/home/z/my-project/src/app/api/security/overview/route.ts:57:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/calendar/route.ts:38:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/route.ts:63:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/route.ts:97:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/route.ts:119:  // email — required, must be a non-empty string, format check is light
+/home/z/my-project/src/app/api/users/route.ts:129:      { error: "Field 'email' is required and must be a valid email address." },
+/home/z/my-project/src/app/api/users/route.ts:134:  // role — required, must be one of the enum values
+/home/z/my-project/src/app/api/users/route.ts:140:      { error: "Field 'role' is required and must be one of: REGISTRAR, INSPECTOR, OFFICER." },
+/home/z/my-project/src/app/api/users/route.ts:145:  // assignedUnionId — required for OFFICER, must be null for others.
+/home/z/my-project/src/app/api/users/route.ts:154:        { error: `Field 'assignedUnionId' is required when role is ${body.role}.` },
+/home/z/my-project/src/app/api/cron/compliance-sweep/route.ts:41://   - OFFICER (assigned to the union): action required
+/home/z/my-project/src/app/api/users/[id]/route.ts:70:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/[id]/route.ts:115:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/[id]/route.ts:292:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/[id]/reset-password/route.ts:64:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/[id]/reset-2fa/route.ts:42:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/users/[id]/reset-2fa/route.ts:132:      severity: Severity.WARNING, // 2FA reset is sensitive (re-enrollment required)
+/home/z/my-project/src/app/api/dispositions/[documentId]/cancel/route.ts:32:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/dispositions/[documentId]/cancel/route.ts:48:      { error: "A cancellation reason is required for the audit trail." },
+/home/z/my-project/src/app/api/tasks/route.ts:37:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/tasks/route.ts:101:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/tasks/route.ts:124:  // title — required
+/home/z/my-project/src/app/api/tasks/route.ts:127:      { error: "Field 'title' is required." },
+/home/z/my-project/src/app/api/dispositions/[documentId]/execute/route.ts:51:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/dispositions/route.ts:33:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/tasks/assignees/route.ts:26:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/api-keys/route.ts:102:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/api-keys/route.ts:139:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/api-keys/route.ts:161:  // name — required, non-empty string
+/home/z/my-project/src/app/api/api-keys/route.ts:164:      { error: "Field 'name' is required and must be a non-empty string." },
+/home/z/my-project/src/app/api/api-keys/route.ts:169:  // scopes — required, must be a non-empty array of valid scope strings
+/home/z/my-project/src/app/api/api-keys/route.ts:173:      { error: "Field 'scopes' is required and must be a non-empty array." },
+/home/z/my-project/src/app/api/api-keys/route.ts:190:  // expiresAt — required, must be a future ISO date, max 365 days from now
+/home/z/my-project/src/app/api/api-keys/route.ts:193:      { error: "Field 'expiresAt' is required and must be an ISO date string." },
+/home/z/my-project/src/app/api/tasks/[id]/route.ts:58:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/tasks/[id]/route.ts:275:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/api-keys/[id]/route.ts:82:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/webhooks/route.ts:95:      { error: "Field 'url' is required and must be a non-empty string." },
+/home/z/my-project/src/app/api/webhooks/route.ts:113:      { error: "Field 'name' is required and must be a non-empty string." },
+/home/z/my-project/src/app/api/auth/me/preferences/route.ts:31:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/auth/me/preferences/route.ts:90:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/unions/route.ts:20://   - unionName: required, non-empty
+/home/z/my-project/src/app/api/unions/route.ts:21://   - registrationNo: required, unique (409 on duplicate)
+/home/z/my-project/src/app/api/unions/route.ts:40:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/unions/route.ts:122:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/unions/route.ts:144:  // --- Validate required fields ---
+/home/z/my-project/src/app/api/unions/route.ts:147:      { error: "Field 'unionName' is required." },
+/home/z/my-project/src/app/api/unions/route.ts:153:      { error: "Field 'registrationNo' is required." },
+/home/z/my-project/src/app/api/auth/sessions/[jti]/route.ts:45:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/unions/[unionId]/route.ts:98:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/auth/sessions/route.ts:45:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/auth/set-password/route.ts:75:      { error: "Token and password are required." },
+/home/z/my-project/src/app/api/auth/2fa/verify/route.ts:24://     without also having the user's session cookie (auth required).
+/home/z/my-project/src/app/api/auth/2fa/verify/route.ts:47:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/auth/2fa/verify/route.ts:64:      { error: "Secret is required." },
+/home/z/my-project/src/app/api/auth/2fa/verify/route.ts:70:      { error: "Code is required." },
+/home/z/my-project/src/app/api/unions/[unionId]/documents/[documentId]/visibility/route.ts:35:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/auth/2fa/setup/route.ts:46:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/auth/2fa/disable/route.ts:36:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/auth/2fa/disable/route.ts:53:      { error: "Password is required to disable 2FA." },
+/home/z/my-project/src/app/api/auth/2fa/disable/route.ts:69:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/auth/login/route.ts:92:      { error: "Email is required." },
+/home/z/my-project/src/app/api/auth/login/route.ts:101:      { error: "Password is required." },
+/home/z/my-project/src/app/api/auth/login/2fa/route.ts:71:      { error: "Challenge token is required." },
+/home/z/my-project/src/app/api/auth/login/2fa/route.ts:77:      { error: "OTP code is required." },
+/home/z/my-project/src/app/api/auth/forgot-password/route.ts:43://      action, even though no auth was required). Requests for unknown emails
+/home/z/my-project/src/app/api/auth/forgot-password/route.ts:124:      { error: "Email is required." },
+/home/z/my-project/src/app/api/compliance/route.ts:38:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/unions/[unionId]/documents/[documentId]/restore/route.ts:80:      { error: "versionId is required." },
+/home/z/my-project/src/app/api/unions/[unionId]/documents/route.ts:97:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/compliance/rules/route.ts:21:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:49:  /** The hypothetical new values for the rule. Only `required`,
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:54:    required?: boolean;
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:92: * (marking a previously-required rule as not-required), so we want it
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:111:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:138:      { error: "Field 'ruleId' is required and must be a string." },
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:144:      { error: "Field 'changes' is required and must be an object." },
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:150:  const { required, renewalYears, retentionYrs } = body.changes;
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:152:    required !== undefined &&
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:153:    typeof required !== "boolean"
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:156:      { error: "Field 'changes.required' must be a boolean." },
+/home/z/my-project/src/app/api/compliance/rules/preview/route.ts:204:    ...(required !== undefined && { required }),
+/home/z/my-project/src/app/api/reviews/[documentId]/approve/route.ts:23:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:24:// Accepts only `required`, `renewalYears`, `retentionYrs` fields. Unknown
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:26://   - required: boolean
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:40:  required?: boolean;
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:54:    "required" in b || "renewalYears" in b || "retentionYrs" in b;
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:56:    return "Request body must include at least one of: required, renewalYears, retentionYrs.";
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:60:  if ("required" in b && typeof b.required !== "boolean") {
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:61:    return "Field 'required' must be a boolean.";
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:92:      { error: "Authentication required." },
+/home/z/my-project/src/app/api/compliance/rules/[id]/route.ts:128:  if ("required" in b) updateData.required = b.required as boolean;
+/home/z/my-project/src/app/api/reviews/[documentId]/reject/route.ts:10:// Rejects a pending document with a required reason. Race-safe.
+/home/z/my-project/src/app/api/reviews/[documentId]/reject/route.ts:23:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/reviews/[documentId]/reject/route.ts:39:      { error: "A rejection reason is required. Please explain why the document is being rejected." },
+/home/z/my-project/src/app/api/reviews/route.ts:17:    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/legislation/route.ts:76:  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/legislation/route.ts:83:      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+/home/z/my-project/src/app/api/legislation/route.ts:110:  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/app/api/legislation/route.ts:145:  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+/home/z/my-project/src/lib/sms.ts:10:// FALLBACK: if Twilio is not configured (any required var missing), the
+/home/z/my-project/src/lib/__tests__/t50-sweep-awaiting-review.test.ts:34:    // Two required rules, 1-year renewal each
+/home/z/my-project/src/lib/__tests__/t50-sweep-awaiting-review.test.ts:37:        data: { documentType: docType, required: true, renewalYears: 1 },
+/home/z/my-project/src/app/api/v1/unions/[unionId]/documents/route.ts:38://   - file (File, required, max 50MB, PDF-only)
+/home/z/my-project/src/app/api/v1/unions/[unionId]/documents/route.ts:39://   - documentType (string, required)
+/home/z/my-project/src/app/api/v1/unions/[unionId]/documents/route.ts:40://   - title (string, required — becomes the version's fileName)
+/home/z/my-project/src/app/api/v1/unions/[unionId]/documents/route.ts:148:  // Validate required fields
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:29:    //   1. !rule.required → NOT_APPLICABLE
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:37:    //   - Rule "Type A" required=true, renewalYears=1 → doc APPROVED, uploaded 30d ago → COMPLIANT
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:38:    //   - Rule "Type B" required=true, renewalYears=1 → doc APPROVED, uploaded 335d ago → EXPIRING
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:39:    //   - Rule "Type C" required=true, renewalYears=1 → doc APPROVED, uploaded 400d ago → OVERDUE
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:40:    //   - Rule "Type D" required=true, renewalYears=1 → doc PENDING → AWAITING_REVIEW
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:41:    //   - Rule "Type E" required=true, renewalYears=1 → no doc → MISSING
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:42:    //   - Rule "Type F" required=false → NOT_APPLICABLE (no doc needed)
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:52:        data: { documentType: docType, required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:56:      data: { documentType: "Type F", required: false, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:94:    // Type F: required=false → NOT_APPLICABLE
+/home/z/my-project/src/lib/__tests__/report-html-awaiting-review.test.ts:133:      data: { documentType: "Pending Doc", required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/t71-renewal-clock-at-approval.test.ts:33:      data: { documentType: "Constitution", required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/t71-renewal-clock-at-approval.test.ts:84:      data: { documentType: "Constitution", required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/t71-renewal-clock-at-approval.test.ts:129:      data: { documentType: "Constitution", required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/t71-renewal-clock-at-approval.test.ts:176:        data: { documentType: docType, required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/t71-renewal-clock-at-approval.test.ts:223:        data: { documentType: docType, required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/t71-renewal-clock-at-approval.test.ts:283:      data: { documentType: "RecentlyApproved", required: true, renewalYears: 1 },
+/home/z/my-project/src/app/api/v1/compliance/status/route.ts:18:// Returns a single union's compliance status (all required document types +
+/home/z/my-project/src/app/api/v1/compliance/status/route.ts:28://   unionId  — required, the union to query
+/home/z/my-project/src/app/api/v1/compliance/status/route.ts:72:      { error: "The 'unionId' query parameter is required." },
+/home/z/my-project/src/lib/__tests__/feedback-link.test.ts:19://   4. BACKLOG.md exists + has the three required sections (Bugs,
+/home/z/my-project/src/lib/__tests__/feedback-link.test.ts:98:describe("Step 7: BACKLOG.md exists with required sections + templates", () => {
+/home/z/my-project/src/lib/__tests__/search-utils.test.ts:36:    const text = "secret ballot is required for all elections";
+/home/z/my-project/src/app/api/public/unions/route.ts:13:// PUBLIC endpoint — no auth required. Searches the union registry by
+/home/z/my-project/src/app/api/public/unions/[id]/route.ts:7:// PUBLIC endpoint — no auth required. Returns a single union's public
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:335:    // — not "0 of 0 required (0%)"
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:610:// - Every required type renders including zero-on-file
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:613:// - Fill proportion = onFile / required (asserted numerically)
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:614:// - Edge cases: on-file=0, missing=0, required=0 (omitted + logged)
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:625:describe("required vs on-file — per-type meters", () => {
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:626:  // Simulate the live DB: 13 required types, 6 unions each
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:647:  it("every required type renders — including zero-on-file types", () => {
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:667:      return { documentType: docType, required: TOTAL_UNIONS, onFile, missing: TOTAL_UNIONS - onFile };
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:696:  it("fill proportion = onFile / required (asserted numerically)", () => {
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:700:      const expectedFill = entry.required > 0 ? (entry.onFile / entry.required) * 100 : 0;
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:702:      const componentFill = entry.required > 0 ? (entry.onFile / entry.required) * 100 : 0;
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:710:    expect(financialReturn.required).toBe(6);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:716:    expect(regCert.required).toBe(6);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:722:    expect(welfare.required).toBe(6);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:730:    expect(welfare.required).toBe(6);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:743:      expect(entry.onFile).toBe(entry.required);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:748:  it("edge: required = 0 → type omitted from output (component logs loudly)", () => {
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:749:    // A type with required=0 (totalUnions=0)
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:755:    // With totalUnions=0, required=0, so missing=0
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:757:    expect(entries[0].required).toBe(0);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:763:  it("edge: on-file > required → data inconsistency (component logs, does NOT clamp)", () => {
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:770:    expect(entries[0].required).toBe(6);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:786:    expect(financialReturnAfter.required).toBe(6);
+/home/z/my-project/src/lib/__tests__/dashboard-mutation.test.ts:819:    expect(welfare.required).toBe(6);
+/home/z/my-project/src/lib/__tests__/dashboard-trend.test.ts:423:    { documentType: "Annual Return", renewalYears: 1, required: true },
+/home/z/my-project/src/lib/__tests__/dashboard-trend.test.ts:424:    { documentType: "Financial Statement", renewalYears: 1, required: true },
+/home/z/my-project/src/lib/__tests__/text-extraction.test.ts:19:// Check if the required system tools are available. Cache the result so we
+/home/z/my-project/src/app/api/notifications/route.ts:34:      { error: "Authentication required." },
+/home/z/my-project/src/lib/__tests__/t50-awaiting-review-expiresAt.test.ts:28:    // 4 required rules, each 1-year renewal
+/home/z/my-project/src/lib/__tests__/t50-awaiting-review-expiresAt.test.ts:31:        data: { documentType: docType, required: true, renewalYears: 1 },
+/home/z/my-project/src/lib/__tests__/dashboard-status-config.test.ts:154:    it("NOT_APPLICABLE definition mentions rule.required", () => {
+/home/z/my-project/src/lib/__tests__/dashboard-status-config.test.ts:156:      expect(def).toContain("rule.required");
+/home/z/my-project/src/app/api/notifications/[id]/read/route.ts:32:      { error: "Authentication required." },
+/home/z/my-project/src/lib/__tests__/dashboard-layout.test.ts:82:    "required-vs-on-file",
+/home/z/my-project/src/lib/__tests__/dashboard-layout.test.ts:115:      "required-vs-on-file",
+/home/z/my-project/src/lib/__tests__/dashboard-layout.test.ts:143:      "required-vs-on-file",  // Row 5, left (wider)
+/home/z/my-project/src/lib/__tests__/dashboard-layout.test.ts:267:    const metersIdx = source.indexOf('data-testid="required-vs-on-file"');
+/home/z/my-project/src/lib/__tests__/dashboard-layout.test.ts:288:    const metersIdx = source.indexOf('data-testid="required-vs-on-file"');
+/home/z/my-project/src/lib/__tests__/dashboard-layout.test.ts:316:      'data-testid="required-vs-on-file"',
+/home/z/my-project/src/app/api/dashboard/stats/route.ts:33:      { error: "Authentication required." },
+/home/z/my-project/src/lib/__tests__/dashboard-snapshot.test.ts:64://   - 2 ComplianceRules (required, 1-year renewal) — fewer than the prod 13
+/home/z/my-project/src/lib/__tests__/dashboard-snapshot.test.ts:79:  { documentType: "Financial Return", renewalYears: 1, required: true },
+/home/z/my-project/src/lib/__tests__/dashboard-snapshot.test.ts:80:  { documentType: "Financial Membership List", renewalYears: 1, required: true },
+/home/z/my-project/src/lib/__tests__/dashboard-snapshot.test.ts:254:      expect(parseCapturedWith('{"foo":"bar"}')).toBeNull(); // missing required fields
+/home/z/my-project/src/lib/__tests__/dashboard-snapshot.test.ts:290:        data: { documentType: "Audit Report", renewalYears: 1, required: true },
+/home/z/my-project/src/lib/__tests__/step1-behavioral-scoping.test.ts:28:  const rule = await testDb.complianceRule.create({ data: { documentType: "Constitution", required: true, renewalYears: 1, retentionYrs: 5 } });
+/home/z/my-project/src/app/api/dashboard/activity/route.ts:35:      { error: "Authentication required." },
+/home/z/my-project/src/lib/__tests__/step4-credentials.test.ts:38:    expect(src).toContain("required in production");
+/home/z/my-project/src/app/api/dashboard/document-types/route.ts:10:// required document types and totalUnions — powers the "Required vs On-File"
+/home/z/my-project/src/app/api/dashboard/document-types/route.ts:53:  // Fetch on-file doc counts + required rules + totalUnions in parallel
+/home/z/my-project/src/app/api/dashboard/document-types/route.ts:56:    db.complianceRule.findMany({ where: { required: true }, select: { documentType: true } }),
+/home/z/my-project/src/app/api/dashboard/document-types/route.ts:70:  // Required types list (for the required-vs-on-file comparison)
+/home/z/my-project/src/lib/__tests__/op01-hardening.test.ts:58:    expect(instrSrc).toMatch(/is required in production/);
+
+[Showing results with pagination = limit: 250]

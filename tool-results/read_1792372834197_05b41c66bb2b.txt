@@ -1,0 +1,737 @@
+     1→// =============================================================================
+     2→// Vocabulary — the single source of truth for all user-facing labels.
+     3→//
+     4→// Every label the user sees in the UI should come from this file. No component
+     5→// should hardcode status labels, view titles, or review-status text.
+     6→//
+     7→// This file unifies:
+     8→//   - Compliance status labels (was STATUS_CONFIG in status-config.ts)
+     9→//   - Review status labels (was duplicated 4x across components)
+    10→//   - Task status labels (was hardcoded in tasks.tsx)
+    11→//   - Contact-update status labels (was hardcoded in contact-requests.tsx)
+    12→//   - Webhook delivery status labels (was hardcoded in webhooks.tsx)
+    13→//   - Union status labels (was in status-badge.tsx)
+    14→//   - View titles (was inconsistent: "Compliance Matrix" vs "Compliance Status")
+    15→//   - The "Resources" vs "Legislation" naming (resolved: "Resources")
+    16→//
+    17→// NAMING DECISIONS:
+    18→//   1. "Resources" is the unified user-facing label (houses acts, regulations,
+    19→//      articles, + amendments — not just legislation). The internal route
+    20→//      name remains "legislation" for backward compatibility.
+    21→//   2. "Pending" (document review) → "Pending Review" (more descriptive,
+    22→//      matches the majority usage across 4 components)
+    23→//   3. "N/A" → "Not Applicable" (full word, consistent with the other 4)
+    24→//   4. "Compliance Matrix" → kept as the staff-facing title; portal uses
+    25→//      "Compliance Status" (simpler for reps — intentional difference)
+    26→// =============================================================================
+    27→
+    28→import {
+    29→  CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban,
+    30→  Clock, XCircle as RejectIcon,
+    31→  type LucideIcon,
+    32→} from "lucide-react";
+    33→
+    34→// =============================================================================
+    35→// Compliance statuses (COMPLIANT / EXPIRING / OVERDUE / AWAITING_REVIEW / MISSING / NOT_APPLICABLE)
+    36→// =============================================================================
+    37→
+    38→export type ComplianceStatus =
+    39→  | "COMPLIANT"
+    40→  | "EXPIRING"
+    41→  | "OVERDUE"
+    42→  | "AWAITING_REVIEW"
+    43→  | "MISSING"
+    44→  | "NOT_APPLICABLE";
+    45→
+    46→export interface StatusConfig {
+    47→  label: string;
+    48→  /** Abbreviated label for space-constrained UI (matrix cells, KPI tiles). Equals label unless an abbreviation is already used on screen. */
+    49→  shortLabel: string;
+    50→  icon: LucideIcon;
+    51→  /** Tailwind classes for badge rendering. */
+    52→  cell: string;
+    53→  dot: string;
+    54→  definition: string;
+    55→}
+    56→
+    57→// PROVISIONAL(D4): see docs/decisions-and-defaults.md
+    58→// NOT_APPLICABLE uses label "Not Applicable" (canonical) + shortLabel "N/A"
+    59→// for space-constrained UI. Other statuses use shortLabel = label.
+    60→export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, StatusConfig> = {
+    61→  COMPLIANT: {
+    62→    label: "Compliant",
+    63→    shortLabel: "Compliant",
+    64→    icon: CheckCircle2,
+    65→    // STEP 6 (polish): use tailwind color stops (not chart tokens) so the
+    66→    // bg+text pair is guaranteed WCAG-AA contrast in both light + dark.
+    67→    // Chart tokens at /15 opacity over card gave 3.29:1 in light mode
+    68→    // (chart-3 on chart-3/15 — same hue, insufficient luminance diff).
+    69→    // green-800 on green-100 = 6.49:1 (verified by contrast-check.ts).
+    70→    cell: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
+    71→    dot: "bg-chart-3",
+    72→    definition: "Document filed, approved by Registrar, with renewal date (counted from approval date) more than 90 days away.",
+    73→  },
+    74→  EXPIRING: {
+    75→    label: "Expiring",
+    76→    shortLabel: "Expiring",
+    77→    icon: AlertTriangle,
+    78→    // STEP 6: amber pair (was chart-4 tokens — failed in dark mode at
+    79→    // 1.39:1 because accent-foreground is dark navy on a barely-tinted
+    80→    // dark card). amber-800 on amber-100 = 6.37:1.
+    81→    cell: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
+    82→    dot: "bg-chart-4",
+    83→    definition: "Document filed and approved, but renewal date (counted from approval date) is within 90 days.",
+    84→  },
+    85→  OVERDUE: {
+    86→    label: "Overdue",
+    87→    shortLabel: "Overdue",
+    88→    icon: XCircle,
+    89→    // STEP 6: red pair (was destructive tokens — failed in light mode at
+    90→    // 4.01:1). red-800 on red-100 = 6.80:1.
+    91→    cell: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
+    92→    dot: "bg-destructive",
+    93→    definition: "Document filed and approved, but renewal date (counted from approval date) has passed.",
+    94→  },
+    95→  AWAITING_REVIEW: {
+    96→    label: "Awaiting Review",
+    97→    shortLabel: "Awaiting Review",
+    98→    icon: Clock,
+    99→    cell: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900",
+   100→    dot: "bg-blue-500",
+   101→    definition: "Document has been uploaded by the union but the Registrar has not yet approved it (or has rejected it). The union has done their part — this is not a gap in compliance, it's an item on the Registrar's desk.",
+   102→  },
+   103→  MISSING: {
+   104→    label: "Missing",
+   105→    shortLabel: "Missing",
+   106→    icon: FileQuestion,
+   107→    cell: "bg-muted text-muted-foreground border-border",
+   108→    dot: "bg-muted-foreground/40",
+   109→    definition: "No document has been filed for this type, or a previously-filed document was disposed under retention rules. The union needs to file a new document.",
+   110→  },
+   111→  NOT_APPLICABLE: {
+   112→    label: "Not Applicable",
+   113→    shortLabel: "N/A",
+   114→    icon: Ban,
+   115→    cell: "bg-muted/50 text-muted-foreground border-border",
+   116→    dot: "bg-muted-foreground/20",
+   117→    definition: "Document type is not required for this union.",
+   118→  },
+   119→};
+   120→
+   121→// =============================================================================
+   122→// Review statuses (PENDING / APPROVED / REJECTED) — for Document.reviewStatus
+   123→// =============================================================================
+   124→
+   125→export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
+   126→
+   127→export interface ReviewStatusConfig {
+   128→  label: string;
+   129→  icon: LucideIcon;
+   130→  /** Tailwind classes for badge rendering. */
+   131→  tone: string;
+   132→  /** Plain-language definition (for tooltips, glossary, onboarding). */
+   133→  definition?: string;
+   134→}
+   135→
+   136→export const REVIEW_STATUS_CONFIG: Record<ReviewStatus, ReviewStatusConfig> = {
+   137→  PENDING: {
+   138→    label: "Pending Review",
+   139→    icon: Clock,
+   140→    tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
+   141→    definition:
+   142→      "Document has been uploaded by a union representative or officer, but the Registrar has not yet approved it. A document in this state does NOT count toward compliance — it must be approved first.",
+   143→  },
+   144→  APPROVED: {
+   145→    label: "Approved",
+   146→    icon: CheckCircle2,
+   147→    tone: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
+   148→    definition:
+   149→      "Document has been reviewed and approved by the Registrar. Only approved documents count toward compliance.",
+   150→  },
+   151→  REJECTED: {
+   152→    label: "Rejected",
+   153→    icon: RejectIcon,
+   154→    tone: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
+   155→    definition:
+   156→      "Document was reviewed by the Registrar and rejected. The union should upload a corrected version. A rejected document does NOT count toward compliance.",
+   157→  },
+   158→};
+   159→
+   160→// =============================================================================
+   161→// Task statuses — ALIGNED with the Prisma TaskStatus enum.
+   162→//
+   163→// The Prisma enum (prisma/schema.prisma) defines:
+   164→//   PENDING | IN_PROGRESS | COMPLETED | CANCELLED
+   165→//
+   166→// This config MUST mirror those exact keys. The test in dashboard-nav.test.ts
+   167→// ("TASK_STATUS_CONFIG keys match the Prisma TaskStatus enum") fails if they
+   168→// drift — so a future enum change either updates this map or fails loudly.
+   169→//
+   170→// Previous versions of this map used TODO/DONE/CANCELLED (invented names that
+   171→// didn't match the DB). That caused silent failures: a lookup with a real
+   172→// status (PENDING/COMPLETED) found no match, and the raw enum value was shown
+   173→// to users in capitals. The contract test prevents that from recurring.
+   174→// =============================================================================
+   175→
+   176→export type TaskStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+   177→
+   178→export const TASK_STATUS_CONFIG: Record<TaskStatus, { label: string; tone: string; definition: string }> = {
+   179→  PENDING: {
+   180→    label: "To Do",
+   181→    tone: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300",
+   182→    definition: "Task has been created but not yet started. This is the default state for new tasks.",
+   183→  },
+   184→  IN_PROGRESS: {
+   185→    label: "In Progress",
+   186→    tone: "bg-blue-100 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300",
+   187→    definition: "Task is actively being worked on by the assignee.",
+   188→  },
+   189→  COMPLETED: {
+   190→    label: "Done",
+   191→    tone: "bg-green-100 text-green-800 dark:bg-green-950/30 dark:text-green-300",
+   192→    definition: "Task has been finished. Completed tasks stay on the list for audit history.",
+   193→  },
+   194→  CANCELLED: {
+   195→    label: "Cancelled",
+   196→    tone: "bg-muted text-muted-foreground",
+   197→    definition: "Task has been cancelled and is no longer being worked on. The task stays on the list for audit history — it is not deleted.",
+   198→  },
+   199→};
+   200→
+   201→// =============================================================================
+   202→// Contact-update statuses (PENDING / APPROVED / REJECTED) — same enum values
+   203→// as review statuses but different context. Same labels.
+   204→// =============================================================================
+   205→
+   206→export const CONTACT_UPDATE_STATUS_CONFIG = REVIEW_STATUS_CONFIG;
+   207→
+   208→// =============================================================================
+   209→// Webhook delivery statuses (PENDING / DELIVERED / FAILED)
+   210→// =============================================================================
+   211→
+   212→export type WebhookDeliveryStatus = "PENDING" | "DELIVERED" | "FAILED";
+   213→
+   214→export const WEBHOOK_DELIVERY_STATUS_CONFIG: Record<
+   215→  WebhookDeliveryStatus,
+   216→  { label: string; icon: LucideIcon; tone: string }
+   217→> = {
+   218→  PENDING: {
+   219→    label: "Pending",
+   220→    icon: Clock,
+   221→    tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
+   222→  },
+   223→  DELIVERED: {
+   224→    label: "Delivered",
+   225→    icon: CheckCircle2,
+   226→    tone: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
+   227→  },
+   228→  FAILED: {
+   229→    label: "Failed",
+   230→    icon: XCircle,
+   231→    tone: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
+   232→  },
+   233→};
+   234→
+   235→// =============================================================================
+   236→// Union statuses (ACTIVE / SUSPENDED / DEREGISTERED)
+   237→// =============================================================================
+   238→
+   239→export type UnionStatus = "ACTIVE" | "SUSPENDED" | "DEREGISTERED";
+   240→
+   241→export const UNION_STATUS_CONFIG: Record<
+   242→  UnionStatus,
+   243→  {
+   244→    label: string;
+   245→    icon: LucideIcon;
+   246→    variant: "default" | "secondary" | "destructive" | "outline";
+   247→    className: string;
+   248→    /** Plain-language definition for the public glossary + tooltips. */
+   249→    definition: string;
+   250→    /** One-line plain-language summary for the public glossary. */
+   251→    plainLanguage: string;
+   252→  }
+   253→> = {
+   254→  ACTIVE: {
+   255→    label: "Active",
+   256→    icon: CheckCircle2,
+   257→    variant: "default",
+   258→    // STEP 6 (polish): WCAG-AA-compliant tailwind color pair (was chart-3
+   259→    // tokens — failed at 3.29:1 in light mode). green-800 on green-100
+   260→    // = 6.49:1. Matches StatusBadge STATUS_CONFIG.
+   261→    className: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
+   262→    definition:
+   263→      "The union is currently registered and operating. It has met the requirements of the Industrial Organizations Act and its registration is in good standing.",
+   264→    plainLanguage:
+   265→      "The union is registered and operating. It is in good standing with the Registrar.",
+   266→  },
+   267→  SUSPENDED: {
+   268→    label: "Suspended",
+   269→    icon: Clock,
+   270→    variant: "secondary",
+   271→    // STEP 6: amber pair (was accent tokens — failed at 1.39:1 in dark
+   272→    // mode). amber-800 on amber-100 = 6.37:1. Matches StatusBadge.
+   273→    className: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
+   274→    definition:
+   275→      "The union's registration has been temporarily suspended by the Registrar. A suspended union cannot operate as a registered trade union, but the suspension may be lifted once the issues are resolved.",
+   276→    plainLanguage:
+   277→      "The union's registration is temporarily on hold. It cannot operate as a registered union, but the suspension can be lifted.",
+   278→  },
+   279→  DEREGISTERED: {
+   280→    label: "Deregistered",
+   281→    icon: XCircle,
+   282→    variant: "secondary",
+   283→    className: "bg-muted text-muted-foreground border-border",
+   284→    definition:
+   285→      "The union's registration has been cancelled by the Registrar. A deregistered union is no longer recognised as a trade union under the Industrial Organizations Act. The record is kept on the register for historical reference.",
+   286→    plainLanguage:
+   287→      "The union is no longer registered. It is not recognised as a trade union. The record is kept for history.",
+   288→  },
+   289→};
+   290→
+   291→// =============================================================================
+   292→// Role labels — translates stored Role enum values to human-readable labels
+   293→// =============================================================================
+   294→
+   295→export type UserRole = "REGISTRAR" | "INSPECTOR" | "OFFICER";
+   296→
+   297→export const ROLE_LABELS: Record<UserRole, string> = {
+   298→  // IA-3: user-facing labels. Internal enum values unchanged (REGISTRAR,
+   299→  // INSPECTOR, OFFICER). "Industrial Registrar" + "Union Official" are the
+   300→  // formal titles used in user-facing text; "Inspector" stays as-is.
+   301→  REGISTRAR: "Industrial Registrar",
+   302→  INSPECTOR: "Inspector",
+   303→  OFFICER: "Union Official",
+   304→};
+   305→
+   306→export function getRoleLabel(role: string): string {
+   307→  return ROLE_LABELS[role as UserRole] ?? role;
+   308→}
+   309→
+   310→// =============================================================================
+   311→// Notification type labels — translates stored NotificationType enum values
+   312→// =============================================================================
+   313→
+   314→export type NotificationTypeLabel = "COMPLIANCE" | "TASK";
+   315→
+   316→export const NOTIFICATION_TYPE_LABELS: Record<NotificationTypeLabel, string> = {
+   317→  COMPLIANCE: "Compliance Alert",
+   318→  TASK: "Task Update",
+   319→};
+   320→
+   321→export function getNotificationTypeLabel(type: string): string {
+   322→  return NOTIFICATION_TYPE_LABELS[type as NotificationTypeLabel] ?? type;
+   323→}
+   324→
+   325→// =============================================================================
+   326→// View titles — the canonical heading for each view.
+   327→//
+   328→// These labels MIRROR the nav-structure.ts destination labels. The two must
+   329→// stay in sync: the nav item, the breadcrumb, the palette row, and the page
+   330→// heading should all show the SAME name for a given destination. The
+   331→// `dashboard-nav.test.ts` test "VIEW_TITLES mirrors NAV_STRUCTURE labels"
+   332→// fails if they drift.
+   333→//
+   334→// Routes here that AREN'T in NAV_STRUCTURE (e.g. "document-detail",
+   335→// "account-security") are special-case views reachable via deep links but
+   336→// not via the nav bar. They get a title for the page heading + breadcrumb,
+   337→// but no nav entry.
+   338→// =============================================================================
+   339→
+   340→export const VIEW_TITLES: Record<string, string> = {
+   341→  dashboard: "Dashboard",
+   342→  unions: "Unions",
+   343→  "my-union": "My Union",
+   344→  documents: "Documents",
+   345→  "document-detail": "Document Details",
+   346→  compliance: "Compliance",
+   347→  "configure-rules": "Rules",
+   348→  compare: "Compare",
+   349→  tasks: "Tasks",
+   350→  search: "Search",
+   351→  reviews: "Review Queue",
+   352→  // IA-1: "Retention Queue" → "Retention & Disposal"
+   353→  retention: "Retention & Disposal",
+   354→  "contact-requests": "Contact Updates",
+   355→  calendar: "Calendar",
+   356→  // IA-1: "Audit" → "Audit Log" (matches the nav label)
+   357→  audit: "Audit Log",
+   358→  users: "Users",
+   359→  // IA-1: "Security" → "Access Monitoring"
+   360→  security: "Access Monitoring",
+   361→  "api-keys": "API Keys",
+   362→  webhooks: "Webhooks",
+   363→  legislation: "Resources",
+   364→  // IA-1: "Account Security" → "My sign-in & 2FA"
+   365→  "account-security": "My sign-in & 2FA",
+   366→  help: "Help & Guide",
+   367→};
+   368→
+   369→// =============================================================================
+   370→// Resources naming — the user-facing label is "Resources" everywhere.
+   371→// The internal route name is "legislation" (backward compatibility);
+   372→// the API endpoint is /api/legislation; the TypeScript type is LegislationEntry.
+   373→// Only the user-facing labels say "Resources".
+   374→// =============================================================================
+   375→
+   376→export const RESOURCES_LABEL = "Resources";
+   377→export const RESOURCES_ADD_LABEL = "Add Resource";
+   378→export const RESOURCES_EDIT_LABEL = "Edit Resource";
+   379→export const RESOURCES_EMPTY_TITLE = "No resources";
+   380→export const RESOURCES_EMPTY_ACTION = "Add Resource";
+   381→
+   382→// =============================================================================
+   383→// Feedback email — the address that the "Give feedback" link in the app
+   384→// shell sends to. This is the single place to change it.
+   385→//
+   386→// STEP 7 (feedback path): the value below is a PLACEHOLDER. Replace it
+   387→// with the actual stakeholder-feedback address (e.g. the Registrar's
+   388→// inbox or a shared support alias) before go-live. The test in
+   389→// feedback-link.test.ts asserts the constant is non-empty + looks like
+   390→// an email, so a missing @ will fail the build.
+   391→// =============================================================================
+   392→
+   393→export const FEEDBACK_EMAIL = "registrar@example.com";
+   394→
+   395→/**
+   396→ * Build a mailto: URL for the "Give feedback" link, pre-filled with the
+   397→ * current page URL and the user's role. The body is a short prompt so
+   398→ * the user knows what to type.
+   399→ *
+   400→ * @param currentUrl The current page URL (window.location.href from the caller).
+   401→ * @param roleLabel The user's role label (e.g. "Registrar", "Officer").
+   402→ * @returns A mailto: URL string.
+   403→ */
+   404→export function buildFeedbackMailto(currentUrl: string, roleLabel: string): string {
+   405→  const subject = `Feedback on the Register of Trade Unions`;
+   406→  const body =
+   407→    `I'd like to give feedback on the Register of Trade Unions.\n\n` +
+   408→    `Page: ${currentUrl}\n` +
+   409→    `My role: ${roleLabel}\n\n` +
+   410→    `What I was trying to do:\n\n` +
+   411→    `What I expected:\n\n` +
+   412→    `What actually happened:\n\n` +
+   413→    `(Delete anything above that isn't relevant. The more specific you are, ` +
+   414→    `the easier it is to act on.)`;
+   415→  // encodeURI handles the common cases. Line breaks (%0A) need explicit
+   416→  // handling because encodeURI does NOT encode them.
+   417→  const encoded = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+   418→  return encoded;
+   419→}
+   420→
+   421→// =============================================================================
+   422→// Document type categories — IA-3.
+   423→//
+   424→// The 13 canonical document types (from prisma/seed.ts) grouped into 4
+   425→// categories for the upload picker + union Documents tab. This is the
+   426→// single source of truth for the grouping — both UI surfaces read from
+   427→// here so they stay in sync.
+   428→//
+   429→// Categories:
+   430→//   Registration  — the founding documents (permanent, rarely re-filed)
+   431→//   Annual Filings — documents filed on a yearly cycle
+   432→//   Governance    — documents about the union's leadership + elections
+   433→//   Oversight     — documents produced by the Registrar's office
+   434→//
+   435→// If a document type from the DB is NOT in any category (e.g. a custom
+   436→// type added later), it falls through to an "Other" group at the bottom.
+   437→// =============================================================================
+   438→
+   439→export interface DocumentTypeCategory {
+   440→  label: string;
+   441→  /** Short plain-language description of what this category covers. */
+   442→  description: string;
+   443→  documentTypes: string[];
+   444→  /**
+   445→   * Whether this category is "internal" — produced by the Industrial
+   446→   * Registrar's office, not filed by unions. Internal categories are
+   447→   * hidden from Union Officials (they can't upload these types, can't
+   448→   * see them in their Documents tab, and don't see them in their
+   449→   * compliance matrix). The Industrial Registrar + Inspector still see
+   450→   * them.
+   451→   *
+   452→   * IA-4: the "Oversight" category (Inspection Reports, Awards, General
+   453→   * Matters) is internal. The other 3 categories are union-filed.
+   454→   */
+   455→  internal?: boolean;
+   456→}
+   457→
+   458→export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
+   459→  {
+   460→    label: "Registration",
+   461→    description:
+   462→      "Founding documents that establish the union's legal existence. Permanent — rarely re-filed after initial registration.",
+   463→    documentTypes: [
+   464→      "Application for Registration",
+   465→      "Registration Certificate",
+   466→      "Constitution",
+   467→    ],
+   468→  },
+   469→  {
+   470→    label: "Annual Filings",
+   471→    description:
+   472→      "Documents filed on a yearly cycle. Must be renewed each year to stay compliant.",
+   473→    documentTypes: [
+   474→      "Financial Return",
+   475→      "Financial Membership List",
+   476→      "Affiliations",
+   477→      "Welfare Fund",
+   478→    ],
+   479→  },
+   480→  {
+   481→    label: "Governance",
+   482→    description:
+   483→      "Documents about the union's leadership, elections, and internal governance. Renewed every 3 years.",
+   484→    documentTypes: [
+   485→      "Election of Office Bearers",
+   486→      "Secret Ballots",
+   487→      "General Secretary Appointments",
+   488→    ],
+   489→  },
+   490→  {
+   491→    label: "Oversight",
+   492→    description:
+   493→      "Documents produced by the Industrial Registrar's office during oversight of the union. Renewed annually.",
+   494→    documentTypes: [
+   495→      "Inspection Reports",
+   496→      "Awards",
+   497→      "General Matters",
+   498→    ],
+   499→    // IA-4: internal — these types are produced by the Industrial
+   500→    // Registrar, not filed by unions. Hidden from Union Officials.
+   501→    internal: true,
+   502→  },
+   503→];
+   504→
+   505→/**
+   506→ * Group a flat list of document type strings into categories.
+   507→ * Types not in any category go into an "Other" group at the bottom.
+   508→ * Categories with zero matching types are omitted.
+   509→ */
+   510→export function groupDocumentTypesByCategory(
+   511→  documentTypes: string[],
+   512→): DocumentTypeCategory[] {
+   513→  const typeSet = new Set(documentTypes);
+   514→  const grouped: DocumentTypeCategory[] = [];
+   515→  const seen = new Set<string>();
+   516→
+   517→  for (const cat of DOCUMENT_TYPE_CATEGORIES) {
+   518→    const inCategory = cat.documentTypes.filter((t) => typeSet.has(t));
+   519→    if (inCategory.length > 0) {
+   520→      grouped.push({ label: cat.label, description: cat.description, documentTypes: inCategory });
+   521→      for (const t of inCategory) seen.add(t);
+   522→    }
+   523→  }
+   524→
+   525→  // "Other" group for types not in any category
+   526→  const others = documentTypes.filter((t) => !seen.has(t));
+   527→  if (others.length > 0) {
+   528→    grouped.push({ label: "Other", description: "Document types not in a standard category.", documentTypes: others });
+   529→  }
+   530→
+   531→  return grouped;
+   532→}
+   533→
+   534→/**
+   535→ * The set of document types that are "internal" (produced by the
+   536→ * Industrial Registrar, not filed by unions). Union Officials should
+   537→ * not see these in their upload picker, Documents tab, or compliance
+   538→ * matrix.
+   539→ *
+   540→ * IA-4: derived from DOCUMENT_TYPE_CATEGORIES where `internal: true`.
+   541→ */
+   542→export const INTERNAL_DOCUMENT_TYPES: ReadonlySet<string> = new Set(
+   543→  DOCUMENT_TYPE_CATEGORIES
+   544→    .filter((cat) => cat.internal)
+   545→    .flatMap((cat) => cat.documentTypes),
+   546→);
+   547→
+   548→/**
+   549→ * Check if a document type is internal (Industrial Registrar only).
+   550→ */
+   551→export function isInternalDocumentType(documentType: string): boolean {
+   552→  return INTERNAL_DOCUMENT_TYPES.has(documentType);
+   553→}
+   554→
+   555→/**
+   556→ * Filter a list of document types to exclude internal types.
+   557→ * Used by the Union Official's upload picker, Documents tab, + compliance
+   558→ * matrix to hide Oversight-category types (Inspection Reports, Awards,
+   559→ * General Matters).
+   560→ *
+   561→ * @param documentTypes The full list of document types.
+   562→ * @returns The list with internal types removed.
+   563→ */
+   564→export function filterOutInternalTypes(documentTypes: string[]): string[] {
+   565→  return documentTypes.filter((t) => !INTERNAL_DOCUMENT_TYPES.has(t));
+   566→}
+   567→
+   568→/**
+   569→ * Filter a list of document types to only include internal types.
+   570→ * Used by the Industrial Registrar's views when they want to see only
+   571→ * the internal (Oversight) types.
+   572→ */
+   573→export function filterToInternalTypes(documentTypes: string[]): string[] {
+   574→  return documentTypes.filter((t) => INTERNAL_DOCUMENT_TYPES.has(t));
+   575→}
+   576→
+   577→// =============================================================================
+   578→// Helpers
+   579→// =============================================================================
+   580→
+   581→export function getComplianceStatusLabel(status: ComplianceStatus): string {
+   582→  return COMPLIANCE_STATUS_CONFIG[status]?.label ?? status;
+   583→}
+   584→
+   585→export function getComplianceStatusShortLabel(status: ComplianceStatus): string {
+   586→  return COMPLIANCE_STATUS_CONFIG[status]?.shortLabel ?? status;
+   587→}
+   588→
+   589→export function getReviewStatusLabel(status: ReviewStatus): string {
+   590→  return REVIEW_STATUS_CONFIG[status]?.label ?? status;
+   591→}
+   592→
+   593→export function getTaskStatusLabel(status: TaskStatus): string {
+   594→  return TASK_STATUS_CONFIG[status]?.label ?? status;
+   595→}
+   596→
+   597→export function getUnionStatusLabel(status: UnionStatus): string {
+   598→  return UNION_STATUS_CONFIG[status]?.label ?? status;
+   599→}
+   600→
+   601→export function getViewTitle(route: string): string {
+   602→  return VIEW_TITLES[route] ?? route;
+   603→}
+   604→
+   605→// =============================================================================
+   606→// Notification linkUrl helpers — canonical format for all notification links.
+   607→//
+   608→// CANONICAL FORMAT (one agreed style, used everywhere):
+   609→//   Staff notifications:  /?view=<view>       (e.g., /?view=reviews)
+   610→//   Portal notifications: /portal?view=<view> (e.g., /portal?view=contact)
+   611→//
+   612→// Every notification creator calls staffLinkUrl() or portalLinkUrl() — never
+   613→// string-builds. Every consumer (AppShell, and historically PortalShell
+   614→// before the /portal app was removed in D7) calls the matching
+   615→// audience-aware parser. Email templates call resolveLinkUrlForEmail() to
+   616→// get an absolute URL that works when clicked from an email client.
+   617→//
+   618→// AUDIENCE-AWARE PARSING (prevents silent cross-audience failures):
+   619→//   parseStaffLinkUrl  — only honors /?view=X, IGNORES /portal?view=X.
+   620→//   parsePortalLinkUrl — only honors /portal?view=X, IGNORES /?view=X.
+   621→//
+   622→// Why: before audience-aware parsing, a staff user who received a portal
+   623→// link (/portal?view=contact) would have "contact" extracted by the generic
+   624→// parseLinkUrl, then onNavigate("contact") would fire — but the staff app
+   625→// has no "contact" view, so the user silently landed on the Dashboard.
+   626→// With audience-aware parsing, the staff app ignores the portal link entirely
+   627→// (the notification is still marked as read, just no navigation).
+   628→//
+   629→// The generic parseLinkUrl() is kept for backward compat + debugging — it
+   630→// extracts ?view= from any link regardless of audience. Production code
+   631→// should use the audience-aware variants.
+   632→// =============================================================================
+   633→
+   634→/**
+   635→ * Build a canonical staff notification linkUrl.
+   636→ * @param view The view key (e.g., "reviews", "compliance", "tasks")
+   637→ * @returns A URL like "/?view=reviews"
+   638→ */
+   639→export function staffLinkUrl(view: string): string {
+   640→  return `/?view=${view}`;
+   641→}
+   642→
+   643→/**
+   644→ * Build a canonical portal notification linkUrl.
+   645→ * @param view The portal view key (e.g., "contact", "documents", "compliance")
+   646→ * @returns A URL like "/portal?view=contact"
+   647→ */
+   648→export function portalLinkUrl(view: string): string {
+   649→  return `/portal?view=${view}`;
+   650→}
+   651→
+   652→/**
+   653→ * Parse a notification linkUrl + extract the view key.
+   654→ * Works for both staff (/?view=X) and portal (/portal?view=X) formats.
+   655→ *
+   656→ * This is the GENERIC parser — it extracts ?view= from any link regardless
+   657→ * of audience. Production code should use the audience-aware variants
+   658→ * (parseStaffLinkUrl, parsePortalLinkUrl) to prevent cross-audience silent
+   659→ * failures. This generic parser is kept for backward compat + debugging.
+   660→ *
+   661→ * @returns The view key (e.g., "reviews"), or null if no ?view= param found.
+   662→ */
+   663→export function parseLinkUrl(linkUrl: string | null | undefined): string | null {
+   664→  if (!linkUrl) return null;
+   665→  const match = linkUrl.match(/[?&]view=([^&]+)/);
+   666→  return match ? decodeURIComponent(match[1]) : null;
+   667→}
+   668→
+   669→/**
+   670→ * Parse a STAFF notification linkUrl — only honors /?view=X format.
+   671→ * Ignores portal links (/portal?view=X) to prevent cross-audience silent
+   672→ * failures. Used by AppShell (the staff notification bell).
+   673→ *
+   674→ * @returns The view key (e.g., "reviews"), or null if the link is not a
+   675→ *          staff link or has no ?view= param.
+   676→ */
+   677→export function parseStaffLinkUrl(linkUrl: string | null | undefined): string | null {
+   678→  if (!linkUrl) return null;
+   679→  // Staff links start with /?view= or just ?view= (relative). They do NOT
+   680→  // start with /portal. This prevents a portal link from being honored by
+   681→  // the staff app.
+   682→  if (linkUrl.startsWith("/portal")) return null;
+   683→  const match = linkUrl.match(/[?&]view=([^&]+)/);
+   684→  return match ? decodeURIComponent(match[1]) : null;
+   685→}
+   686→
+   687→/**
+   688→ * Parse a PORTAL notification linkUrl — only honors /portal?view=X format.
+   689→ * Ignores staff links (/?view=X) to prevent cross-audience silent failures.
+   690→ * Used historically by PortalShell (the representative notification bell,
+   691→ * removed in D7). Kept because /api/contact-requests/[id]/{approve,reject}
+   692→ * still calls portalLinkUrl() to build notification linkUrls.
+   693→ *
+   694→ * @returns The view key (e.g., "contact"), or null if the link is not a
+   695→ *          portal link or has no ?view= param.
+   696→ */
+   697→export function parsePortalLinkUrl(linkUrl: string | null | undefined): string | null {
+   698→  if (!linkUrl) return null;
+   699→  // Portal links must start with /portal. This prevents a staff link
+   700→  // (/?view=X) from being honored by the portal.
+   701→  if (!linkUrl.startsWith("/portal")) return null;
+   702→  const match = linkUrl.match(/[?&]view=([^&]+)/);
+   703→  return match ? decodeURIComponent(match[1]) : null;
+   704→}
+   705→
+   706→/**
+   707→ * Resolve a relative linkUrl to an absolute URL for email rendering.
+   708→ * Uses NEXT_PUBLIC_APP_URL if set, otherwise falls back to the provided base URL.
+   709→ *
+   710→ * @param linkUrl The relative linkUrl (e.g., "/?view=reviews")
+   711→ * @param fallbackBaseUrl The base URL to use if NEXT_PUBLIC_APP_URL is not set
+   712→ * @returns An absolute URL (e.g., "http://localhost:3000/?view=reviews")
+   713→ */
+   714→export function resolveLinkUrlForEmail(
+   715→  linkUrl: string | null | undefined,
+   716→  fallbackBaseUrl: string,
+   717→): string | null {
+   718→  if (!linkUrl) return null;
+   719→  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || fallbackBaseUrl;
+   720→  // Remove trailing slash from base + leading slash from linkUrl to avoid double slashes
+   721→  const cleanBase = baseUrl.replace(/\/+$/, "");
+   722→  const cleanLink = linkUrl.startsWith("/") ? linkUrl : `/${linkUrl}`;
+   723→  return `${cleanBase}${cleanLink}`;
+   724→}
+   725→
+   726→/**
+   727→ * Infer the audience (staff vs portal) from a linkUrl.
+   728→ * Used by the email template to choose the right button label
+   729→ * ("View in Dashboard" vs "View in Portal").
+   730→ *
+   731→ * @returns "portal" if the link starts with /portal, "staff" otherwise.
+   732→ */
+   733→export function inferLinkAudience(linkUrl: string | null | undefined): "staff" | "portal" {
+   734→  if (!linkUrl) return "staff";
+   735→  return linkUrl.startsWith("/portal") ? "portal" : "staff";
+   736→}
+   737→
