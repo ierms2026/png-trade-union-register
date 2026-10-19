@@ -299,7 +299,7 @@ export default function Home() {
       case "configure-rules":
         return <ComplianceView key="compliance-redirect-rules" initialTab="rules" user={currentUser} onNavigate={handleNavigate} />;
       case "tasks": return <TasksView />;
-      case "reviews": return <ReviewsView />;
+      case "reviews": return <ReviewsView user={currentUser} />;
       case "retention":
         // The retention view is hidden when the retention flag is off.
         // If someone lands on ?view=retention via a stale bookmark or

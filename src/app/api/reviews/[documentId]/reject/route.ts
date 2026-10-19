@@ -52,6 +52,10 @@ export async function POST(
       unionId: true,
       reviewStatus: true,
       rejectionReason: true,
+      // Wave 3 / Item 1: capture first-approval state for the audit beforeJson.
+      // Rejection clears these fields (cancels the pending two-person approval).
+      firstApprovedById: true,
+      firstApprovedAt: true,
       union: { select: { unionName: true, registrationNo: true } },
       versions: {
         orderBy: { versionNumber: "desc" },
@@ -73,6 +77,10 @@ export async function POST(
       reviewedById: user.id,
       reviewedAt: now,
       rejectionReason: reason,
+      // Wave 3 / Item 1: clear the pending first-approval (if any). Either
+      // approver can reject — this cancels the two-person workflow.
+      firstApprovedById: null,
+      firstApprovedAt: null,
     },
   });
 
@@ -97,6 +105,8 @@ export async function POST(
         registrationNo: existing.union.registrationNo,
         reviewStatus: existing.reviewStatus,
         rejectionReason: existing.rejectionReason,
+        firstApprovedAt: existing.firstApprovedAt?.toISOString() ?? null,
+        firstApprovedById: existing.firstApprovedById,
       }),
       afterJson: JSON.stringify({
         documentType: existing.documentType,
@@ -106,6 +116,8 @@ export async function POST(
         reviewStatus: "REJECTED",
         reviewedAt: now.toISOString(),
         rejectionReason: reason,
+        firstApprovedAt: null,
+        firstApprovedById: null,
       }),
       severity: Severity.WARNING,
     },

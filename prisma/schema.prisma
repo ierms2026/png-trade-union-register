@@ -62,6 +62,11 @@ model User {
   assignedTasks        Task[]         @relation("TaskAssignee")
   createdTasks         Task[]         @relation("TaskCreator")
   reviewedDocuments    Document[]     @relation("DocumentReviewer")
+  // Wave 3 / Item 1: documents this user gave FIRST approval to (two-person
+  // approval workflow). The final APPROVED state is recorded via
+  // reviewedDocuments (reviewedById) — this relation only tracks the FIRST
+  // approver, who must be a DIFFERENT user from the final reviewer.
+  firstApprovedDocuments Document[]   @relation("DocumentFirstApprover")
   legalHoldsPlaced     LegalHold[]    @relation("LegalHoldPlacer")
   legalHoldsLifted     LegalHold[]    @relation("LegalHoldLifter")
   dispositionsRequested DispositionRequest[] @relation("DispositionRequester")
@@ -224,6 +229,18 @@ model Document {
   reviewedById     String?
   reviewedAt       DateTime?
   rejectionReason  String?
+  // Wave 3 / Item 1: Two-person approval workflow for document review.
+  // When a Registrar gives first approval, firstApprovedAt + firstApprovedById
+  // are set. The document STAYS in reviewStatus = PENDING until a DIFFERENT
+  // Registrar confirms (sets reviewStatus = APPROVED). The first approver can
+  // withdraw their approval (clears these fields, document stays PENDING).
+  // Either approver can reject (sets reviewStatus = REJECTED + clears these).
+  // We deliberately don't extend the ReviewStatus enum (PENDING_SECOND_APPROVAL)
+  // to avoid touching every status check across the codebase — the
+  // `firstApprovedAt != null && reviewStatus === PENDING` state IS the
+  // "awaiting second approval" state.
+  firstApprovedById String?
+  firstApprovedAt   DateTime?
   archivedAt       DateTime?
   archivedReason   String?
   // Per-document public visibility — the Registrar controls which documents
@@ -235,6 +252,7 @@ model Document {
   union            Union             @relation(fields: [unionId], references: [id], onDelete: Cascade)
   versions         DocumentVersion[]
   reviewedBy       User?             @relation("DocumentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  firstApprovedBy  User?             @relation("DocumentFirstApprover", fields: [firstApprovedById], references: [id], onDelete: SetNull)
   legalHolds         LegalHold[]
   dispositionRequests DispositionRequest[]
 

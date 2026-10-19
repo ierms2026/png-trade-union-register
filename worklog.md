@@ -1738,3 +1738,133 @@ Stage Summary:
     7. Log in as OFFICER → go to Search view → verify the "All officers" dropdown is HIDDEN (Officers' search is already self-scoped — the filter is meaningless for them).
     8. Try an invalid assignee (e.g. manually set ?assignee=nonexistent-id in the URL) → verify 0 results returned (no error, no leak).
 - Wave 2 status: ALL THREE items COMPLETE (Item 1 — compliance card; Item 2 — inline audit trail; Item 3 — assigned officer filter). Ready to move to Wave 3 (two-person approval workflow, document view audit log) or any other priority the user picks.
+
+---
+Task ID: 8
+Agent: main (Wave 3 — two-person approval + document view audit log)
+Task: Audit Wave 3 — two-person approval workflow for document review + document view audit log
+
+Work Log:
+- User skipped the clarification questions, instructing me to proceed with reasonable defaults based on existing context. Chose these defaults (documented in the worklog for future reference):
+  * Item 1 scope: REVIEWS ONLY (document review Approve/Reject). Retention stays one-click (already has ConfirmDialog pattern from prior work).
+  * Item 1 second approver: ANY OTHER REGISTRAR (simplest, role-constrained — must be a different user from the first approver).
+  * Item 1 UI: yellow badge everywhere + new "Awaiting Second Approval" bucket at the TOP of the Review Queue (shown first because it needs attention from a different Registrar).
+  * Item 1 behaviors: reversible first approval (Withdraw button) + rejection cancels (either approver can reject during pending state) + notify other Registrars on first approval + full audit trail. NO auto-timeout (would need a cron — out of scope for Wave 3).
+  * Item 1 schema: added `firstApprovedById String?` + `firstApprovedAt DateTime?` to Document. Did NOT extend the ReviewStatus enum (would touch every status check across the codebase). The state `firstApprovedAt != null && reviewStatus === PENDING` IS the "awaiting second approval" state.
+  * Item 2 events: detail page view only (preview + download already have their own audit entries from prior work).
+  * Item 2 metadata: NO PII — actor + document ID + timestamp + view method (UI vs API). No IP, no user agent.
+
+Item 1 — Two-person approval workflow:
+
+Schema:
+- MOD prisma/schema.prisma: added `firstApprovedById String?` + `firstApprovedAt DateTime?` to Document. Added named relation `firstApprovedBy User? @relation("DocumentFirstApprover", ...)`. Added back-relation `firstApprovedDocuments Document[] @relation("DocumentFirstApprover")` on User. Documented the design decision (don't extend ReviewStatus enum — use firstApprovedAt != null + PENDING as the "awaiting second approval" state).
+- Ran `npm run db:push` to sync the schema (SQLite + dev workflow — no migration files).
+
+API:
+- MOD src/app/api/reviews/[documentId]/approve/route.ts: rewrote the state machine. THREE branches:
+  1. FIRST APPROVAL (firstApprovedAt is null + caller is Registrar): set firstApprovedAt + firstApprovedById, keep reviewStatus = PENDING. Race-safe via updateMany with where.firstApprovedAt = null. Audit action: `document_review_first_approve`. Notifies all OTHER Registrars via createNotificationForUsers (excludes caller). Returns `stage: "first_approval"`.
+  2. SECOND APPROVAL (firstApprovedAt is set + caller is DIFFERENT Registrar): set reviewStatus = APPROVED + reviewedAt + reviewedById. Race-safe via updateMany with where.firstApprovedById = { not: user.id }. Preserves firstApprovedAt + firstApprovedById (audit trail). Audit action: `document_review_approve` (unchanged). Notifies the uploading Officer (existing behavior preserved). Returns `stage: "second_approval"`.
+  3. SAME PERSON (firstApprovedAt is set + caller IS the first approver): 400 "Cannot second your own approval".
+  Also handles the race-condition 409 (document no longer pending).
+- NEW src/app/api/reviews/[documentId]/withdraw/route.ts: first approver can take back their first approval. Guards: only the first approver (firstApprovedById === caller.id) can withdraw; only while reviewStatus === PENDING. Race-safe updateMany. Clears firstApprovedAt + firstApprovedById. Audit action: `document_review_withdraw_first_approval`. Does NOT notify anyone (silent revert — the stale "second approval needed" notification is not retracted). Returns 200 with reviewStatus: PENDING.
+- MOD src/app/api/reviews/[documentId]/reject/route.ts: now clears firstApprovedAt + firstApprovedById when rejecting (cancels the pending two-person workflow). Either approver can reject. Audit beforeJson captures the first-approval state for traceability.
+- MOD src/app/api/reviews/route.ts: GET now returns TWO buckets — `pending` (no first approval) + `awaitingSecondApproval` (first approval set, still PENDING). Each item includes firstApprovedById + firstApprovedAt + firstApproverEmail (resolved via batched user lookup — no N+1).
+
+UI:
+- MOD src/app/page.tsx: passes `user={currentUser}` to ReviewsView (needed for the Withdraw button guard — only the first approver sees Withdraw).
+- MOD src/components/app/views/reviews.tsx: rewrote with TWO buckets. The "Awaiting Second Approval" section is shown FIRST (needs attention from a different Registrar). Each bucket has a header + count badge + descriptive text. New ReviewCard component with stage-aware behavior:
+  * `stage="pending_first"`: shows "Approve" button (records FIRST approval).
+  * `stage="awaiting_second"` + current user is the first approver: shows "Withdraw" button instead (can't second own approval).
+  * `stage="awaiting_second"` + current user is a DIFFERENT Registrar: shows "Confirm Approval" button (different label from "Approve" to make it clear this is the FINALIZING click).
+  * Either stage: shows "Reject" button (cancels everything).
+  Yellow "Awaiting 2nd approval" badge with ShieldCheck icon on awaiting cards. "First approved by X on Y" line shows who gave first approval + when. Toast messages differentiate first vs second approval.
+- MOD src/components/app/views/document-detail.tsx: added yellow "Awaiting 2nd approval" badge to the document header (shown when firstApprovedAt != null + reviewStatus === PENDING). Updated the DocumentDetail interface to include firstApprovedAt. Updated formatAuditAction to handle the new audit actions: `document_review_first_approve` → "First approval given", `document_review_withdraw_first_approval` → "First approval withdrawn".
+
+Item 2 — Document view audit log:
+
+API:
+- MOD src/app/api/documents/[id]/route.ts: on every successful GET, writes a `document_view` audit log entry. Captures:
+  * actorId + actorName (user ID + email)
+  * entityType: "Document", entityId: the document ID
+  * action: "document_view"
+  * afterJson: { documentType, unionId, unionName, viewMethod }
+  * viewMethod: "UI" (session auth, user.scopes === null) vs "API" (API key auth, user.scopes !== null) — distinguishes human views from programmatic access
+  * severity: INFO (views are benign)
+  * NO IP, NO user agent (per the user's defaults — no PII beyond actor identity)
+  Best-effort: wrapped in try/catch — audit write failures don't fail the API request (the user still gets their document). Deliberately doesn't log to console (could leak the document ID to server logs).
+
+Inline audit trail integration:
+- The inline audit trail on the document-detail page (built in Wave 2 / Item 2) fetches /api/audit?entityType=Document&entityId=<id>&limit=5. Since the view audit entries are written with that exact entityType + entityId, they automatically appear in the inline trail. No additional wiring needed — view audits will be interspersed with review approvals, rejections, etc. (showing the last 5 entries, most recent first).
+- MOD src/components/app/views/document-detail.tsx: formatAuditAction updated to map `document_view` → "Document viewed".
+
+Tests:
+- NEW src/lib/__tests__/wave3-two-person-approval.test.ts (44 tests):
+  * Schema: Document has firstApprovedById + firstApprovedAt; named relation DocumentFirstApprover; User has back-relation; ReviewStatus enum NOT extended (no PENDING_SECOND_APPROVAL).
+  * Approve API: rejects OFFICER (403); Branch 1 first approval (sets fields, keeps PENDING, race-safe); Branch 1 audit action document_review_first_approve; Branch 1 notifies other Registrars (excludes caller); Branch 1 returns stage: "first_approval"; Branch 2 second approval (different Registrar finalizes); Branch 2 race-safe with firstApprovedById: { not: user.id }; Branch 3 same person 400; preserves uploading Officer notification.
+  * Withdraw API: endpoint exists; rejects non-REGISTRAR (403); rejects non-first-approver (403); rejects after finalization (409); race-safe; clears fields; audit action document_review_withdraw_first_approval; does NOT notify (silent revert).
+  * Reject API: clears firstApproved* fields; captures state in beforeJson.
+  * Reviews GET: returns two buckets; includes firstApproval metadata; splits by firstApprovedAt != null; batched user lookup (no N+1).
+  * ReviewsView: accepts user prop; fetches ReviewsResponse; renders both sections with count badges; awaiting bucket shown ABOVE pending bucket (verified via <h2> heading position, not just string match — initial test was fooled by the comment block); Withdraw button; "Confirm Approval" label; yellow badge with ShieldCheck; differentiated toasts; "First approved by" line; calls withdraw API.
+  * page.tsx: passes user prop to ReviewsView.
+  * DocumentDetailView: DocumentDetail interface has firstApprovedAt; header shows yellow badge when firstApprovedAt + PENDING; formatAuditAction handles new actions.
+- NEW src/lib/__tests__/wave3-document-view-audit.test.ts (14 tests):
+  * API writes auditLog.create on every GET; action is document_view; entityType is Document; entityId is the document ID; severity is INFO; viewMethod captured (UI vs API via user.scopes check); afterJson has documentType + unionId + unionName; does NOT log IP/user-agent (PII guard — checks both the file source AND the auditLog.create call block); best-effort (try/catch); imports Severity.
+  * formatAuditAction maps document_view → "Document viewed"; has fallback for unknown actions.
+  * Inline audit trail fetches with the right URL params (entityType=Document + entityId + limit=5); view audits automatically appear in the inline trail.
+
+Verification:
+- Lint: PASS for all 10 changed files (npx eslint → 0 errors). Full `npm run lint` shows 33 pre-existing errors + 7 warnings in unrelated files (baseline before Wave 3 was also 33+7 — no new errors introduced).
+- Type check: PASS (tsc --noEmit → 0 errors).
+- Unit tests: PASS — 76 files / 1133 tests (was 1075/74 after Wave 2; +2 files, +58 tests, 0 regressions). Initial run had 1 test failure (the "Awaiting Second Approval section appears first" test was matching the comment block, not the actual <h2> heading — fixed by matching the heading text ">Awaiting Second Approval<" instead of the bare string).
+- Build: PASS (NEXT_BUILD with SESSION_SECRET + DEMO_PASSWORD env vars → exit 0, "✓ Compiled successfully in 26.3s", 62/62 static pages — unchanged from Wave 2; the new withdraw route is dynamic, not static).
+
+Stage Summary:
+- Files modified: 8
+  * prisma/schema.prisma (+18 lines — two new fields + named relation + back-relation + design rationale comment)
+  * src/app/api/documents/[id]/route.ts (+52 lines — view audit log + firstApprovedAt serialization)
+  * src/app/api/reviews/[documentId]/approve/route.ts (+182 lines — three-branch state machine + other-Registrars notification)
+  * src/app/api/reviews/[documentId]/reject/route.ts (+12 lines — clears first-approval state + captures in audit)
+  * src/app/api/reviews/route.ts (+85 lines — two-bucket response + first-approver email lookup)
+  * src/app/page.tsx (+1 line — passes user to ReviewsView)
+  * src/components/app/views/document-detail.tsx (+17 lines — yellow badge + firstApprovedAt in interface + formatAuditAction updates)
+  * src/components/app/views/reviews.tsx (+317 lines — two-bucket UI + ReviewCard refactor + Withdraw + yellow badges)
+- Files added: 3
+  * src/app/api/reviews/[documentId]/withdraw/route.ts (NEW endpoint, 117 lines)
+  * src/lib/__tests__/wave3-two-person-approval.test.ts (44 tests, 270 lines)
+  * src/lib/__tests__/wave3-document-view-audit.test.ts (14 tests, 130 lines)
+- Migration steps:
+  * Schema change: `npm run db:push` was run. The dev SQLite DB at db/custom.db now has the two new columns on Document (firstApprovedById, firstApprovedAt). The change is backward-compatible (both fields are nullable, default null). Production deployments will need to run `prisma db push` (or `prisma migrate deploy` if migrations are added later).
+  * NO env change, NO new env vars.
+  * NO data migration needed — existing APPROVED documents remain APPROVED (their firstApprovedAt stays null, which is correct since the two-person workflow wasn't in place when they were approved).
+- Manual test steps:
+  * Two-person approval — happy path:
+    1. `npm run dev` → log in as REGISTRAR A → go to Review Queue.
+    2. Verify the queue has a "Pending First Review" section with uploaded documents. (If empty, upload a document as an Officer first.)
+    3. Click "Approve" on a document → verify toast says "First approval recorded. Another Registrar needs to confirm to finalize the approval. They've been notified."
+    4. Verify the document moves to a NEW section at the top: "Awaiting Second Approval" with a yellow badge.
+    5. Verify the document shows "First approved by [your email] on [timestamp]".
+    6. The "Approve" button should now show "Confirm Approval" for OTHER Registrars.
+    7. In a different browser/incognito, log in as REGISTRAR B → go to Review Queue → verify the document appears in "Awaiting Second Approval".
+    8. Click "Confirm Approval" → verify toast says "Document approved. The document now counts toward the union's compliance score."
+    9. Verify the document disappears from the Review Queue (it's now APPROVED).
+    10. Open the document-detail page → verify the document header shows the "Approved" badge (NOT the yellow "Awaiting 2nd approval" badge).
+    11. Scroll to the inline Audit Trail → verify there are entries for "First approval given" + "Document approved" + "Document viewed" (the latter from your own view).
+  * Two-person approval — withdraw path:
+    1. As REGISTRAR A, give first approval to a document (it goes to "Awaiting Second Approval").
+    2. Verify the button on your card now shows "Withdraw" (not "Approve" or "Confirm Approval" — you can't second your own approval).
+    3. Click "Withdraw" → verify toast says "First approval withdrawn. The document is back in the pending queue. No notification was sent."
+    4. Verify the document moves back to "Pending First Review".
+    5. Check the Audit Trail on the document-detail page → verify a "First approval withdrawn" entry appears.
+  * Two-person approval — reject cancels:
+    1. As REGISTRAR A, give first approval to a document.
+    2. As REGISTRAR B, click "Reject" on the same document (with a reason).
+    3. Verify the document is now REJECTED (not in the Review Queue anymore).
+    4. Check the Audit Trail → verify a "Document rejected" entry appears, and the beforeJson shows firstApprovedAt was set (the pending two-person approval was cancelled).
+  * Document view audit log:
+    1. As REGISTRAR, open any document-detail page.
+    2. Refresh the page 2-3 times.
+    3. Scroll to the inline Audit Trail at the bottom.
+    4. Verify "Document viewed" entries appear (multiple, one per refresh — the trail shows the last 5).
+    5. Each entry should show your email as the actor.
+    6. (If using an API key) Call `curl -H "Authorization: Bearer <key>" /api/documents/<id>` → verify a "Document viewed" entry appears in the audit log with viewMethod: "API" in the afterJson.
+- Wave 3 status: BOTH items COMPLETE (Item 1 — two-person approval workflow; Item 2 — document view audit log). Ready to move to Wave 4 (mobile/a11y improvements) or any other priority the user picks.

@@ -5,10 +5,22 @@ import { Role } from "@prisma/client";
 
 // =============================================================================
 // GET /api/reviews
-// Lists documents pending Registrar review (reviewStatus = PENDING, not
-// disposed, has at least one version). Computed live — never stored as a
-// separate queue table (same pattern as /api/retention).
-// AUTH: REGISTRAR only.
+// -----------------------------------------------------------------------------
+// Lists documents pending Registrar review. Wave 3 / Item 1: TWO BUCKETS:
+//   - pending: documents with NO first approval yet (firstApprovedAt = null).
+//     These need a first Registrar to click "Approve".
+//   - awaitingSecondApproval: documents with first approval (firstApprovedAt
+//     != null) but reviewStatus still PENDING. These need a DIFFERENT
+//     Registrar (not the first approver) to click "Approve" to finalize.
+//
+// Both buckets are computed live from Document rows (no separate queue table
+// — same pattern as /api/retention). AUTH: REGISTRAR only.
+//
+// Each item includes firstApprovedById + firstApprovedAt + firstApproverEmail
+// so the UI can:
+//   - Show a "First approved by X at Y" badge in the second bucket.
+//   - Show a "Withdraw" button ONLY to the first approver.
+//   - Show a "Cannot second your own approval" message to the first approver.
 // =============================================================================
 
 export async function GET() {
@@ -31,6 +43,8 @@ export async function GET() {
       documentType: true,
       unionId: true,
       union: { select: { id: true, unionName: true, registrationNo: true } },
+      firstApprovedById: true,
+      firstApprovedAt: true,
       versions: {
         orderBy: { versionNumber: "desc" },
         take: 1,
@@ -47,8 +61,10 @@ export async function GET() {
     orderBy: { updatedAt: "desc" },
   });
 
-  // Resolve uploader emails in a single IN query (DocumentVersion has
-  // uploadedById but no relation to User).
+  // Resolve uploader emails + first-approver emails in two batched queries
+  // (DocumentVersion has uploadedById but no relation to User; Document has
+  // firstApprovedById but no relation to User either — same pattern as the
+  // existing uploader lookup).
   const uploaderIds = [
     ...new Set(
       docs
@@ -56,18 +72,30 @@ export async function GET() {
         .filter((id): id is string => id !== null && id !== undefined),
     ),
   ];
-  const uploaders =
-    uploaderIds.length > 0
+  const firstApproverIds = [
+    ...new Set(
+      docs
+        .map((d) => d.firstApprovedById)
+        .filter((id): id is string => id !== null && id !== undefined),
+    ),
+  ];
+  const allUserIds = [...new Set([...uploaderIds, ...firstApproverIds])];
+
+  const users =
+    allUserIds.length > 0
       ? await db.user.findMany({
-          where: { id: { in: uploaderIds } },
+          where: { id: { in: allUserIds } },
           select: { id: true, email: true },
         })
       : [];
-  const uploaderById = new Map(uploaders.map((u) => [u.id, u.email]));
+  const userEmailById = new Map(users.map((u) => [u.id, u.email]));
 
-  const pending = docs.map((doc) => {
+  // Split into the two buckets.
+  const pending: ReviewItem[] = [];
+  const awaitingSecondApproval: ReviewItem[] = [];
+  for (const doc of docs) {
     const latest = doc.versions[0];
-    return {
+    const item: ReviewItem = {
       documentId: doc.id,
       documentType: doc.documentType,
       unionId: doc.union.id,
@@ -78,10 +106,37 @@ export async function GET() {
       fileExtension: latest.fileExtension,
       uploadedAt: latest.uploadedAt.toISOString(),
       uploadedById: latest.uploadedById,
-      uploadedByEmail: latest.uploadedById ? uploaderById.get(latest.uploadedById) ?? null : null,
+      uploadedByEmail: latest.uploadedById ? userEmailById.get(latest.uploadedById) ?? null : null,
       fileSize: latest.fileSize,
+      firstApprovedById: doc.firstApprovedById,
+      firstApprovedAt: doc.firstApprovedAt?.toISOString() ?? null,
+      firstApproverEmail: doc.firstApprovedById ? userEmailById.get(doc.firstApprovedById) ?? null : null,
     };
-  });
+    if (doc.firstApprovedAt !== null) {
+      awaitingSecondApproval.push(item);
+    } else {
+      pending.push(item);
+    }
+  }
 
-  return NextResponse.json({ pending });
+  return NextResponse.json({ pending, awaitingSecondApproval });
+}
+
+interface ReviewItem {
+  documentId: string;
+  documentType: string;
+  unionId: string;
+  unionName: string;
+  registrationNo: string;
+  versionNumber: number;
+  fileName: string;
+  fileExtension: string | null;
+  uploadedAt: string;
+  uploadedById: string | null;
+  uploadedByEmail: string | null;
+  fileSize: number;
+  // Wave 3 / Item 1: two-person approval workflow metadata.
+  firstApprovedById: string | null;
+  firstApprovedAt: string | null;
+  firstApproverEmail: string | null;
 }

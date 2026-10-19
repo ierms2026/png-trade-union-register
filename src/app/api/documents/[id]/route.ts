@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
-import { Role } from "@prisma/client";
+import { Role, Severity } from "@prisma/client";
 import {
   calculateStatus,
   computeExpiryDateFromApproval,
@@ -57,6 +57,9 @@ export async function GET(
       rejectionReason: true,
       disposedAt: true,
       snoozedUntil: true,
+      // Wave 3 / Item 1: two-person approval workflow metadata.
+      firstApprovedById: true,
+      firstApprovedAt: true,
       createdAt: true,
       updatedAt: true,
       currentVersionId: true,
@@ -161,6 +164,9 @@ export async function GET(
     rejectionReason: doc.rejectionReason,
     disposedAt: doc.disposedAt?.toISOString() ?? null,
     snoozedUntil: doc.snoozedUntil?.toISOString() ?? null,
+    // Wave 3 / Item 1: serialize the two-person approval fields. Stays null
+    // for documents that haven't received first approval yet.
+    firstApprovedAt: doc.firstApprovedAt?.toISOString() ?? null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
     versions: doc.versions.map((v) => ({
@@ -178,6 +184,50 @@ export async function GET(
       renewalYears: rule?.renewalYears ?? null,
     },
   };
+
+  // --- Wave 3 / Item 2: Document view audit log ---------------------------
+  // Log every detail-page view. The audit entry is best-effort — failures
+  // don't fail the API request (the user still gets their document). The
+  // entry captures:
+  //   - actorId + actorName: who viewed (user ID + email, OR null for API key)
+  //   - entityType=Document + entityId: which document
+  //   - action="document_view": standard action name (formatAuditAction in
+  //     document-detail.tsx maps this to "Document viewed")
+  //   - afterJson: { viewMethod: "UI" | "API" } so the audit trail can
+  //     distinguish human views from API key access.
+  //
+  // NO PII BEYOND ACTOR IDENTITY: per the user's defaults selection, we do
+  // NOT log IP, user agent, or other request metadata. This avoids
+  // collecting PII that would need separate retention/privacy handling.
+  //
+  // The viewMethod is "API" when the request authenticated via API key
+  // (user.scopes is non-null for API-key auth, null for session-cookie auth
+  // per the AuthUser interface in src/lib/auth/auth-guard.ts), "UI" for
+  // session auth.
+  const viewMethod = user.scopes !== null ? "API" : "UI";
+  try {
+    await db.auditLog.create({
+      data: {
+        actorId: user.id,
+        actorName: user.email,
+        action: "document_view",
+        entityType: "Document",
+        entityId: id,
+        afterJson: JSON.stringify({
+          documentType: doc.documentType,
+          unionId: doc.union.id,
+          unionName: doc.union.unionName,
+          viewMethod,
+        }),
+        severity: Severity.INFO,
+      },
+    });
+  } catch {
+    // Audit log write failed — non-fatal. The user still gets their
+    // document. We deliberately don't log to console here because that
+    // could leak the document ID to server logs (the audit log is the
+    // correct place for that info).
+  }
 
   return NextResponse.json({ document });
 }

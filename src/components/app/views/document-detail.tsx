@@ -55,6 +55,10 @@ interface DocumentDetail {
   rejectionReason: string | null;
   disposedAt: string | null;
   snoozedUntil: string | null;
+  // Wave 3 / Item 1: two-person approval workflow — first approval metadata.
+  // firstApprovedAt != null + reviewStatus === "PENDING" means the document
+  // is in the "awaiting second approval" state.
+  firstApprovedAt: string | null;
   createdAt: string;
   updatedAt: string;
   currentVersionId: string | null;
@@ -134,6 +138,14 @@ export function DocumentDetailView({
                   <StatusIcon className="mr-1 h-3 w-3" />
                   {cfg.label}
                 </Badge>
+                {/* Wave 3 / Item 1: yellow "Awaiting 2nd approval" badge when
+                    the document has first approval but is still PENDING. */}
+                {doc.firstApprovedAt && doc.reviewStatus === "PENDING" && (
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900 dark:hover:bg-amber-950/30">
+                    <ShieldCheck className="mr-1 h-3 w-3" />
+                    Awaiting 2nd approval
+                  </Badge>
+                )}
                 {doc.disposedAt && (
                   <Badge variant="outline" className="bg-muted text-muted-foreground">
                     Disposed
@@ -590,9 +602,14 @@ function InlineAuditTrail({ documentId }: { documentId: string }) {
 // e.g. "document_review_approve" → "Document review approved"
 function formatAuditAction(action: string): string {
   // Common document actions — map to friendly past-tense labels.
+  // Wave 3 / Item 1: includes two-person approval workflow actions
+  // (first_approve, withdraw_first_approval).
+  // Wave 3 / Item 2: includes document_view (logged on every detail-page view).
   const ACTION_LABELS: Record<string, string> = {
+    document_review_first_approve: "First approval given",
     document_review_approve: "Document approved",
     document_review_reject: "Document rejected",
+    document_review_withdraw_first_approval: "First approval withdrawn",
     document_retention_approve: "Retention approved",
     document_retention_reject: "Retention rejected",
     document_disposition_execute: "Disposition executed",
