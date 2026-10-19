@@ -315,7 +315,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
               variant="ghost"
               size="icon"
               onClick={() => setSearchOpen(true)}
-              className="sm:hidden"
+              className="h-11 w-11 sm:hidden"
               title="Search (Cmd+K)"
             >
               <Search className="h-5 w-5" />
@@ -324,7 +324,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon" className="relative h-11 w-11">
                   <Bell className="h-5 w-5" />
                   {unreadCount > 0 && (
                     <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">

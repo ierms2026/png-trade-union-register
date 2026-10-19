@@ -330,8 +330,9 @@ function DocumentRow({
           <div className="flex shrink-0 items-center gap-1">
             {doc.latestVersion && (
               <Button
-                size="sm"
+                size="icon"
                 variant="ghost"
+                className="h-11 w-11"
                 onClick={onPreview}
                 title="Preview document"
               >
@@ -339,7 +340,7 @@ function DocumentRow({
               </Button>
             )}
             <Link href={`/?view=document-detail&id=${doc.id}`}>
-              <Button size="sm" variant="ghost" title="View details">
+              <Button size="icon" variant="ghost" className="h-11 w-11" title="View details">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </Link>

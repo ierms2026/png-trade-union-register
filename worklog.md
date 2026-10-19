@@ -1585,3 +1585,80 @@ Stage Summary:
   5. Hover any cell — the existing tooltip with union name, doc type, status, expiry, document ID still appears (no tooltip regression).
   6. Toggle dark mode — icon color follows the existing cell text color tokens (green-800/green-300, red-800/red-300, etc.) so contrast is preserved.
 - Constraints honored: no unrelated page touched, no functionality removed, no new UI library introduced (icon is from existing lucide-react import).
+
+---
+Task ID: 6
+Agent: main (Wave 1 / Item 2)
+Task: Audit Wave 1 — Immediate Fixes (High risk, Small effort), Item 2: Button touch targets ≥44×44 CSS pixels (WCAG 2.5.5)
+
+Work Log:
+- Delegated read-only audit to Explore subagent (Task ID 6-a in the audit message). The subagent read src/components/ui/button.tsx to confirm the shadcn defaults:
+  * `size="icon"` → `size-9` → 36×36px (VIOLATION)
+  * `size="sm"` → `h-8` → 32px tall (VIOLATION when icon-only)
+  * `size="default"` → `h-9` → 36px tall (acceptable for AA when text-bearing, out of scope)
+- Found 15 icon-only button violations across 8 files in src/components/app/**:
+  * 3× `h-7 w-7` (28×28) — welcome-panel dismiss, tasks cancel, tasks delete
+  * 2× `h-8 w-8` (32×32) — legislation edit, legislation delete
+  * 4× `size="sm"` icon-only (32×~36) — documents preview, documents view details, document-detail preview version, document-detail download version
+  * 2× `h-9 w-9` (36×36) — theme-toggle placeholder + actual
+  * 2× bare `size="icon"` (36×36) — calendar prev month, calendar next month
+  * 2× bare `size="icon"` (36×36) — app-shell mobile search trigger, app-shell notifications bell
+- Applied fix per call site (no global primitive change):
+  * welcome-panel.tsx:148 — `h-7 w-7` → `h-11 w-11`, icon `h-3.5 w-3.5` → `h-4 w-4`
+  * tasks.tsx:279 (cancel) + tasks.tsx:287 (delete) — `h-7 w-7` → `h-11 w-11`, icon `h-3.5 w-3.5` → `h-4 w-4`
+  * legislation.tsx:101 (edit) + legislation.tsx:102 (delete) — `h-8 w-8` → `h-11 w-11`, icon `h-3.5 w-3.5` → `h-4 w-4`
+  * documents.tsx:333 + documents.tsx:343 — `size="sm"` → `size="icon"` + `className="h-11 w-11"`
+  * document-detail.tsx:291 + document-detail.tsx:299 — same pattern as documents.tsx
+  * theme-toggle.tsx:16 (placeholder) + theme-toggle.tsx:23 (actual) — `h-9 w-9` → `h-11 w-11` (both updated to avoid hydration layout shift)
+  * calendar.tsx:175 (prev) + calendar.tsx:181 (next) — added `className="h-11 w-11"`
+  * app-shell.tsx:318 (mobile search) — merged `h-11 w-11` into existing `className="sm:hidden"` → `className="h-11 w-11 sm:hidden"`
+  * app-shell.tsx:327 (notifications bell) — merged `h-11 w-11` into existing `className="relative"` → `className="relative h-11 w-11"`
+- Verified no remaining violations via ripgrep:
+  * `size="icon"` + `h-7 w-7|h-8 w-8|h-9 w-9` — 0 matches in src/components/app
+  * `size="sm"` followed by an icon-only child element — 0 matches
+- Created contract test file: src/lib/__tests__/wave1-button-touch-targets.test.ts (5 tests). Tests assert:
+  1. Every `<Button size="icon">` in src/components/app/** has `h-11 w-11` in its className.
+  2. No `<Button size="sm">` is used as an icon-only button (must switch to `size="icon"` + h-11 w-11).
+  3. No `<Button size="icon">` uses a sub-44px override (h-7/h-8/h-9/h-10 — regression guard).
+  4. The 15 expected fix sites are present (sanity check — confirms the audit was acted on, not just that no violations exist).
+  5. The global Button primitive (src/components/ui/button.tsx) was NOT modified — `icon: "size-9"` and `sm: "h-8 ..."` must still be the original shadcn defaults. Guards against an over-eager future PR that would change every button globally.
+- Fixed a regex `s` flag compatibility issue in the test (TS lib target was pre-ES2018). Used `[^>]*?` (character class, works without /s) instead of `.*?` with /s flag for the icon-button match.
+
+Verification:
+- Lint: PASS for changed files (8 component files + 1 test file → 0 new errors). Full `npm run lint` shows 33 pre-existing errors in unrelated files (op01-hardening tests, dispatcher.ts, sms.ts, welcome-panel.tsx line 91 setState-in-effect) — NOT introduced by this change. Baseline before Wave 1 was also 33 errors. Stash-diff confirms welcome-panel.tsx:91 error pre-existed my touch-target edit.
+- Type check: PASS (tsc --noEmit → 0 errors). Initially had 1 error from /s regex flag — fixed.
+- Unit tests: PASS — 71 files / 1029 tests (was 1024/70 after Wave 1 Item 1; +5 tests in 1 new file, 0 regressions).
+- Build: PASS (NEXT_BUILD with SESSION_SECRET + DEMO_PASSWORD env vars → exit 0, "✓ Compiled successfully in 27.3s", 61/61 static pages).
+
+Stage Summary:
+- Files modified: 8 (all in src/components/app/**):
+  * src/components/app/welcome-panel.tsx (1 button)
+  * src/components/app/theme-toggle.tsx (2 buttons — placeholder + actual)
+  * src/components/app/app-shell.tsx (2 buttons — mobile search + notifications bell)
+  * src/components/app/views/tasks.tsx (2 buttons — cancel + delete)
+  * src/components/app/views/legislation.tsx (2 buttons — edit + delete)
+  * src/components/app/views/documents.tsx (2 buttons — preview + view details)
+  * src/components/app/views/document-detail.tsx (2 buttons — preview version + download version)
+  * src/components/app/views/calendar.tsx (2 buttons — prev + next month)
+- Files added: 1 (src/lib/__tests__/wave1-button-touch-targets.test.ts — 5 contract tests, 225 lines).
+- Migration steps: NONE. No schema change, no env change, no DB migration. Pure CSS-class swap on icon-only buttons.
+- Constraints honored:
+  * No unrelated page touched (only 8 component files containing icon-only buttons).
+  * No functionality removed (no onClick, title, aria-label, or variant changed — only `className` size + a `size="sm"`→`size="icon"` swap on icon-only buttons).
+  * No new UI library introduced (existing shadcn `<Button>` + Tailwind classes only).
+  * Global Button primitive (src/components/ui/button.tsx) NOT modified — guards against changing every button in the app.
+  * Text-bearing buttons (e.g., "Save", "Cancel", "Export CSV") NOT touched — they have inherent width from text and the shadcn default h-9 (36px) is acceptable for AA.
+- Manual test steps:
+  1. `npm run dev` → log in as REGISTRAR.
+  2. On touch device (or use browser devtools "Toggle device toolbar" → mobile dimensions), verify these buttons are easy to tap:
+    - Dashboard: dismiss the welcome panel (X button top-right of the panel)
+    - Tasks: cancel + delete buttons on each task card
+    - Legislation: edit + delete buttons on each legislation entry
+    - Documents: preview (eye) + view details (chevron) buttons on each document tile
+    - Document detail: preview version (eye) + download version buttons per version
+    - Calendar: previous + next month navigation buttons
+    - App shell: theme toggle (sun/moon), notifications bell, mobile search trigger
+  3. With mouse, verify the buttons are still visually compact (they fit in their parent flex containers without overflow).
+  4. Tab through the dashboard and verify focus rings still appear correctly on each button (the shadcn focus-visible:ring-[3px] styling is unchanged).
+  5. Check dark mode — the icon color tokens (text-muted-foreground, text-destructive) still apply correctly to the now-larger buttons.
+- Wave 1 status: BOTH items (Item 1 — compliance cell icon+aria-label; Item 2 — button touch targets) COMPLETE. Ready to move to Wave 2 (record detail compliance card, inline audit trail, search improvements).

@@ -172,13 +172,13 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevMonth}>
+          <Button variant="outline" size="icon" className="h-11 w-11" onClick={prevMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-[140px] text-center text-sm font-medium">
             {new Date(year, month).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </div>
-          <Button variant="outline" size="icon" onClick={nextMonth}>
+          <Button variant="outline" size="icon" className="h-11 w-11" onClick={nextMonth}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={goToToday}>Today</Button>

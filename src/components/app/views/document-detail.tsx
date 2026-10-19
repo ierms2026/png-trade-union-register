@@ -288,16 +288,18 @@ export function DocumentDetailView({ documentId }: { documentId: string }) {
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
+                          className="h-11 w-11"
                           onClick={() => setPreviewVersion(v)}
                           title="Preview this version"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
+                          className="h-11 w-11"
                           asChild
                           title="Download this version"
                         >

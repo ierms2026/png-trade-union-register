@@ -276,16 +276,16 @@ function TaskRow({ task, onUpdated }: { task: Task; onUpdated: () => void }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-11 w-11"
                   onClick={handleCancel}
                   disabled={updating}
                   title="Cancel task"
                 >
-                  <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  <XCircle className="h-4 w-4 text-muted-foreground" />
                 </Button>
               )}
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDelete} title="Delete task">
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={handleDelete} title="Delete task">
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
               </Button>
             </div>
           </div>

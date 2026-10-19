@@ -145,11 +145,11 @@ export function WelcomePanel({ role, onDismiss }: WelcomePanelProps) {
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 shrink-0"
+            className="h-11 w-11 shrink-0"
             onClick={handleDismiss}
             aria-label="Dismiss welcome panel"
           >
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </CardContent>
