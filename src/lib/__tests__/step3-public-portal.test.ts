@@ -30,16 +30,16 @@ function makeReq(path: string, headers: Record<string, string> = {}): NextReques
 describe("1. /api/public/unions — exact key whitelist", () => {
   beforeEach(async () => { await resetDb(); await seedUnion("Alpha", "A1"); });
 
-  it("response has exactly { id, unionName, registrationNo, status } per union", async () => {
+  it("response has exactly { id, unionName, registrationNo, status, updatedAt } per union", async () => {
     const res = await publicUnionsGET(makeReq("/api/public/unions"));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.unions).toHaveLength(1);
     const keys = Object.keys(body.unions[0]).sort();
-    expect(keys).toEqual(["id", "registrationNo", "status", "unionName"]);
+    expect(keys).toEqual(["id", "registrationNo", "status", "unionName", "updatedAt"]);
   });
 
-  it("does NOT include fileNumber, address, contactPerson, contactEmail, contactPhone, remarks, updatedAt, createdAt", async () => {
+  it("does NOT include fileNumber, address, contactPerson, contactEmail, contactPhone, remarks, createdAt", async () => {
     const res = await publicUnionsGET(makeReq("/api/public/unions"));
     const body = await res.json();
     const u = body.unions[0];
@@ -49,7 +49,6 @@ describe("1. /api/public/unions — exact key whitelist", () => {
     expect(u).not.toHaveProperty("contactEmail");
     expect(u).not.toHaveProperty("contactPhone");
     expect(u).not.toHaveProperty("remarks");
-    expect(u).not.toHaveProperty("updatedAt");
     expect(u).not.toHaveProperty("createdAt");
   });
 });

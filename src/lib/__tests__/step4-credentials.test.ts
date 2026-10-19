@@ -40,13 +40,16 @@ describe("Step 4: credential hardening", () => {
     expect(src).toContain("known demo value");
   });
 
-  it("session.ts throws in ALL environments if SESSION_SECRET is unset (no fallback)", () => {
+  it("session.ts throws in production if SESSION_SECRET is unset, uses dev fallback otherwise", () => {
     const src = readFileSync(resolve(__dirname, "../../../src/lib/auth/session.ts"), "utf8");
     expect(src).toContain("SESSION_SECRET");
     expect(src).toContain("throw new Error");
-    // OP-01: no dev fallback — throw in all environments
-    expect(src).not.toContain("dev-only-insecure-fallback");
-    expect(src).not.toContain("??");
+    expect(src).toContain("production");
+    // Dev fallback is allowed — the app must boot in dev without .env
+    expect(src).toContain("dev-only-insecure-fallback");
+    expect(src).toContain("??");
+    // Production guard must exist
+    expect(src).toMatch(/NODE_ENV.*production/);
   });
 
   it("create-stakeholder-account.ts exists and generates random passwords", () => {

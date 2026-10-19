@@ -93,7 +93,7 @@ const PAGE_SIZE = 20;
 
 function readInitialState() {
   if (typeof window === "undefined") {
-    return { q: "", union: "all", documentType: "all", reviewStatus: "all", page: 1 };
+    return { q: "", union: "all", documentType: "all", reviewStatus: "all", startDate: "", endDate: "", sort: "uploadedAt_desc", page: 1 };
   }
   const params = new URLSearchParams(window.location.search);
   return {
@@ -101,6 +101,9 @@ function readInitialState() {
     union: params.get("union") ?? "all",
     documentType: params.get("documentType") ?? "all",
     reviewStatus: params.get("reviewStatus") ?? "all",
+    startDate: params.get("startDate") ?? "",
+    endDate: params.get("endDate") ?? "",
+    sort: params.get("sort") ?? "uploadedAt_desc",
     page: Math.max(1, parseInt(params.get("page") || "1", 10) || 1),
   };
 }
@@ -113,6 +116,9 @@ export function SearchView() {
   const [unionFilter, setUnionFilter] = useState(initial.union);
   const [typeFilter, setTypeFilter] = useState(initial.documentType);
   const [statusFilter, setStatusFilter] = useState(initial.reviewStatus);
+  const [startDateFilter, setStartDateFilter] = useState(initial.startDate);
+  const [endDateFilter, setEndDateFilter] = useState(initial.endDate);
+  const [sortBy, setSortBy] = useState(initial.sort);
   const [page, setPage] = useState(initial.page);
 
   // --- Fetch unions + document types for the filter dropdowns -------------
@@ -133,10 +139,13 @@ export function SearchView() {
     if (unionFilter !== "all") params.set("union", unionFilter);
     if (typeFilter !== "all") params.set("documentType", typeFilter);
     if (statusFilter !== "all") params.set("reviewStatus", statusFilter);
+    if (startDateFilter) params.set("startDate", startDateFilter);
+    if (endDateFilter) params.set("endDate", endDateFilter);
+    if (sortBy !== "uploadedAt_desc") params.set("sort", sortBy);
     params.set("page", String(page));
     params.set("limit", String(PAGE_SIZE));
     return `/api/search?${params.toString()}`;
-  }, [shouldFetch, submittedQuery, unionFilter, typeFilter, statusFilter, page]);
+  }, [shouldFetch, submittedQuery, unionFilter, typeFilter, statusFilter, startDateFilter, endDateFilter, sortBy, page]);
 
   const { data, loading, error, refetch } = useFetch<SearchResponse>(apiQuery);
 
@@ -153,6 +162,9 @@ export function SearchView() {
       setUnionFilter(state.union);
       setTypeFilter(state.documentType);
       setStatusFilter(state.reviewStatus);
+      setStartDateFilter(state.startDate);
+      setEndDateFilter(state.endDate);
+      setSortBy(state.sort);
       setPage(state.page);
     }
     window.addEventListener("popstate", handleUrlChange);
@@ -166,11 +178,14 @@ export function SearchView() {
   // --- Push the current state to the URL ----------------------------------
   // Called by "Search" submit, filter changes, and page changes. Builds a
   // fresh URL with all params, then pushes it.
-  function pushToUrl(overrides: { q?: string; union?: string; documentType?: string; reviewStatus?: string; page?: number }) {
+  function pushToUrl(overrides: { q?: string; union?: string; documentType?: string; reviewStatus?: string; startDate?: string; endDate?: string; sort?: string; page?: number }) {
     const q = overrides.q ?? submittedQuery;
     const union = overrides.union ?? unionFilter;
     const documentType = overrides.documentType ?? typeFilter;
     const reviewStatus = overrides.reviewStatus ?? statusFilter;
+    const startDate = overrides.startDate ?? startDateFilter;
+    const endDate = overrides.endDate ?? endDateFilter;
+    const sort = overrides.sort ?? sortBy;
     const newPage = overrides.page ?? page;
     const url = new URL(window.location.origin + "/");
     url.searchParams.set("view", "search");
@@ -178,6 +193,9 @@ export function SearchView() {
     if (union !== "all") url.searchParams.set("union", union);
     if (documentType !== "all") url.searchParams.set("documentType", documentType);
     if (reviewStatus !== "all") url.searchParams.set("reviewStatus", reviewStatus);
+    if (startDate) url.searchParams.set("startDate", startDate);
+    if (endDate) url.searchParams.set("endDate", endDate);
+    if (sort !== "uploadedAt_desc") url.searchParams.set("sort", sort);
     if (newPage > 1) url.searchParams.set("page", String(newPage));
     window.history.pushState({}, "", url.toString());
   }
@@ -224,12 +242,31 @@ export function SearchView() {
     pushToUrl({ reviewStatus: value, page: 1 });
   }
 
+  function handleStartDateChange(value: string) {
+    setStartDateFilter(value);
+    setPage(1);
+    pushToUrl({ startDate: value, page: 1 });
+  }
+
+  function handleEndDateChange(value: string) {
+    setEndDateFilter(value);
+    setPage(1);
+    pushToUrl({ endDate: value, page: 1 });
+  }
+
+  function handleSortChange(value: string) {
+    setSortBy(value);
+    pushToUrl({ sort: value });
+  }
+
   function handleClearFilters() {
     setUnionFilter("all");
     setTypeFilter("all");
     setStatusFilter("all");
+    setStartDateFilter("");
+    setEndDateFilter("");
     setPage(1);
-    pushToUrl({ union: "all", documentType: "all", reviewStatus: "all", page: 1 });
+    pushToUrl({ union: "all", documentType: "all", reviewStatus: "all", startDate: "", endDate: "", page: 1 });
   }
 
   function handlePageChange(newPage: number) {
@@ -239,7 +276,7 @@ export function SearchView() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  const hasFilters = unionFilter !== "all" || typeFilter !== "all" || statusFilter !== "all";
+  const hasFilters = unionFilter !== "all" || typeFilter !== "all" || statusFilter !== "all" || startDateFilter !== "" || endDateFilter !== "";
   const results = data?.results ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 0;
@@ -361,6 +398,38 @@ export function SearchView() {
                 <SelectItem value="PENDING">Pending Review</SelectItem>
                 <SelectItem value="APPROVED">Approved</SelectItem>
                 <SelectItem value="REJECTED">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Date-range filter */}
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => handleStartDateChange(e.target.value)}
+              className="h-9 w-[140px]"
+              aria-label="Start date"
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => handleEndDateChange(e.target.value)}
+              className="h-9 w-[140px]"
+              aria-label="End date"
+            />
+          </div>
+          {/* Sort dropdown */}
+          <div className="w-44">
+            <Select value={sortBy} onValueChange={handleSortChange}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="uploadedAt_desc">Newest first</SelectItem>
+                <SelectItem value="uploadedAt_asc">Oldest first</SelectItem>
+                <SelectItem value="documentType_asc">Document type A–Z</SelectItem>
+                <SelectItem value="unionName_asc">Union name A–Z</SelectItem>
               </SelectContent>
             </Select>
           </div>

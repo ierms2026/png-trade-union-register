@@ -22,6 +22,14 @@ import { getUnionScope } from "@/lib/auth/union-scope";
 //                         "Constitution", "Financial Return")
 //   ?reviewStatus=Y     — restrict to a review status (PENDING / APPROVED /
 //                         REJECTED). Case-insensitive.
+//   ?startDate=YYYY-MM-DD — restrict to versions uploaded on/after this date
+//   ?endDate=YYYY-MM-DD   — restrict to versions uploaded on/before this date
+//
+// SORTING:
+//   ?sort=uploadedAt_desc  — (default) newest first
+//   ?sort=uploadedAt_asc   — oldest first
+//   ?sort=documentType_asc — alphabetical by document type
+//   ?sort=unionName_asc    — alphabetical by union name
 //
 // PAGINATION:
 //   ?page=N   — 1-indexed page number (default 1)
@@ -93,6 +101,9 @@ export async function GET(req: NextRequest) {
   const unionFilter = url.searchParams.get("union"); // union ID
   const documentTypeFilter = url.searchParams.get("documentType");
   const reviewStatusFilter = url.searchParams.get("reviewStatus");
+  const startDate = url.searchParams.get("startDate"); // YYYY-MM-DD
+  const endDate = url.searchParams.get("endDate"); // YYYY-MM-DD
+  const sortParam = url.searchParams.get("sort") || "uploadedAt_desc";
 
   // Pagination params
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
@@ -160,6 +171,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Date-range filter on DocumentVersion.uploadedAt
+  const versionWhere: Record<string, unknown> = {};
+  if (startDate) {
+    const parsed = new Date(startDate + "T00:00:00.000Z");
+    if (!isNaN(parsed.getTime())) {
+      versionWhere.uploadedAt = { ...(versionWhere.uploadedAt as object), gte: parsed };
+    }
+  }
+  if (endDate) {
+    const parsed = new Date(endDate + "T23:59:59.999Z");
+    if (!isNaN(parsed.getTime())) {
+      versionWhere.uploadedAt = { ...(versionWhere.uploadedAt as object), lte: parsed };
+    }
+  }
+
   // IA-3: search across document content (textContent), document type
   // (documentType), and file name (fileName). The OR clause matches any of
   // the three; the document-level where (scoping + filters) is ANDed on top.
@@ -170,7 +196,25 @@ export async function GET(req: NextRequest) {
       { document: { ...documentWhere, documentType: { contains: whitespaceFlexibleQuery } } },
     ],
     document: documentWhere,
+    ...versionWhere,
   };
+
+  // --- Sort logic ---------------------------------------------------------
+  // Valid sort values: uploadedAt_desc (default), uploadedAt_asc,
+  // documentType_asc, unionName_asc. Invalid values fall back to default.
+  let orderBy: Record<string, unknown> = { uploadedAt: "desc" };
+  switch (sortParam) {
+    case "uploadedAt_asc":
+      orderBy = { uploadedAt: "asc" };
+      break;
+    case "documentType_asc":
+      orderBy = { document: { documentType: "asc" } };
+      break;
+    case "unionName_asc":
+      orderBy = { document: { union: { unionName: "asc" } } };
+      break;
+    // default: uploadedAt_desc — already set
+  }
 
   // --- Get total count (for pagination) ----------------------------------
   // We need the total matching count to compute totalPages + show
@@ -199,7 +243,7 @@ export async function GET(req: NextRequest) {
         },
       },
     },
-    orderBy: { uploadedAt: "desc" },
+    orderBy,
     skip,
     take: limit,
   });
