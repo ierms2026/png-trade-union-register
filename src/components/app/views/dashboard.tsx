@@ -1593,54 +1593,12 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
         </p>
       </div>
 
-      {/* === Row 0: Welcome Panel (first login per role, dismissible) ===
-          Shows 3-4 lines on what this role can do here. Dismissed state
-          is stored in localStorage per role — see welcome-panel.tsx. */}
-      <WelcomePanel role={user.role} />
 
-      {/* === Row 1: Quick Actions (full width) === */}
-      {/* Quick Actions — derived from NAV_STRUCTURE via getQuickActions.
-          One source of truth: the destinations + their quickAction metadata
-          live in nav-structure.ts. The dashboard just renders whatever
-          getQuickActions returns for the current role. No hard-coded role
-          checks or button definitions here — those would drift from the
-          nav the moment someone adds a destination without updating this
-          block. */}
-      {onNavigate && (
-        <div data-testid="quick-actions" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {getQuickActions(user.role as StaffRole).map((action) => {
-            const Icon = action.icon;
-            if (action.kind === "external" && action.href) {
-              return (
-                <a
-                  key={`qa-${action.route}`}
-                  href={action.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button variant="outline" className="h-auto w-full flex-col gap-1 py-3">
-                    <Icon className="h-5 w-5 text-primary" />
-                    <span className="text-xs font-medium">{action.label}</span>
-                  </Button>
-                </a>
-              );
-            }
-            return (
-              <Button
-                key={`qa-${action.route}`}
-                variant="outline"
-                className="h-auto flex-col gap-1 py-3"
-                onClick={() => onNavigate(action.route)}
-              >
-                <Icon className="h-5 w-5 text-primary" />
-                <span className="text-xs font-medium">{action.label}</span>
-              </Button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* === Row 2: KPI band (7 cards) ===
+      {/* === Row 1: KPI band (7 cards) — the reason you visit a dashboard ===
+          Design review fix #1: moved to the TOP (was Row 2, below Welcome +
+          Quick Actions which ate the above-the-fold). KPIs are the data the
+          user came for — they go first. Welcome Panel + Quick Actions moved
+          below the KPIs.
           6.1: rate promoted here as the 3rd card. auto-fit so the 7 cards
           wrap responsively (never shrink below 140px wide — readability
           floor). DOM order = reading order: Total Unions · Documents ·
@@ -1729,6 +1687,53 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           })}
         </div>
       ) : null}
+
+      {/* === Row 2: Quick Actions (compact, with section header) ===
+          Design review fix #2: was Row 1 (top of page, no header, 5th button
+          awkwardly alone). Moved below the KPI band with a clear section
+          header so it reads as 'now that you've seen the state, here's what
+          you can do'. The 5th button (Compliance Report) is now in the same
+          grid as the others — no more awkward orphan. */}
+      {onNavigate && (
+        <section data-testid="quick-actions" className="space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {getQuickActions(user.role as StaffRole).map((action) => {
+              const Icon = action.icon;
+              if (action.kind === "external" && action.href) {
+                return (
+                  <a
+                    key={`qa-${action.route}`}
+                    href={action.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button variant="outline" className="h-auto w-full flex-col gap-1 py-2.5">
+                      <Icon className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-medium">{action.label}</span>
+                    </Button>
+                  </a>
+                );
+              }
+              return (
+                <Button
+                  key={`qa-${action.route}`}
+                  variant="outline"
+                  className="h-auto flex-col gap-1 py-2.5"
+                  onClick={() => onNavigate(action.route)}
+                >
+                  <Icon className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium">{action.label}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* WelcomePanel AFTER the KPI band + Quick Actions — dismissible
+          one-time content doesn't belong above the data. */}
+      <WelcomePanel role={user.role} />
 
       {/* === Row 3: Needs Attention (wider) | Composition Bar ===
           6.1 final layout. Two-column at >=1024px (Tailwind `lg:`); stacks
