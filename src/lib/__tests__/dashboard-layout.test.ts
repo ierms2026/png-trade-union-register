@@ -123,9 +123,11 @@ describe("dashboard layout — chunk 6.1 DOM-order contract", () => {
   });
 
   it("DOM source order matches the contract (reading order = tab order)", () => {
-    // The contract: 1. Quick Actions → 2. KPI band → 3. Needs Attention +
-    //    Composition → 4. Heatmap → 5. Required-vs-on-file + Expiry Forecast
-    //    → 6. Trend + Recent Activity.
+    // Design-system fix: the order was reordered to put KPIs first (they're
+    // the reason you visit a dashboard). The new contract:
+    //   1. KPI band → 2. Quick Actions → 3. Needs Attention + Composition
+    //   → 4. Heatmap → 5. Required-vs-on-file + Expiry Forecast
+    //   → 6. Trend + Recent Activity.
     //
     // Within row 3, Needs Attention comes BEFORE Composition Bar
     //    (actionability first per spec).
@@ -135,8 +137,8 @@ describe("dashboard layout — chunk 6.1 DOM-order contract", () => {
     const found = extractLayoutTestids(source);
     const order = found.map((f) => f.testid);
     const expectedOrder = [
-      "quick-actions",       // Row 1
-      "kpi-band",             // Row 2
+      "kpi-band",             // Row 1 (was Row 2 — moved to top per design review)
+      "quick-actions",        // Row 2 (was Row 1 — moved below KPIs with a section header)
       "needs-attention",      // Row 3, left (wider)
       "composition-bar",      // Row 3, right (narrower)
       "heatmap",              // Row 4, full width
@@ -327,25 +329,24 @@ describe("dashboard layout — chunk 6.1 DOM-order contract", () => {
     }
   });
 
-  it("tab order: first focusable after the KPI band is inside Needs Attention", () => {
-    // The KPI band's focusables are the <a> links wrapping the StatCards +
-    // the RateKpiCard's <button> tooltip trigger. After the KPI band's
-    // closing </div>, the next focusable element MUST be inside Needs
-    // Attention — this is the spec's "first focusable after the KPI band
-    // is inside Needs Attention (tab-order follows priority)" assertion.
+  it("tab order: first focusable after the KPI band is inside Quick Actions (then Needs Attention)", () => {
+    // Design-system fix: Quick Actions now sit between the KPI band and
+    // Needs Attention (was: KPI band → Needs Attention directly). The
+    // Quick Actions section has focusable buttons, so the first focusable
+    // after the KPI band is now inside Quick Actions. Needs Attention
+    // follows as the first focusable in Row 3.
     //
-    // We assert this via source order: the Needs Attention data-testid
-    // appears before any other interactive-element marker after the
-    // kpi-band block. The NeedsAttentionPanel component itself contains
-    // the first focusable element (a button or link in its rows); the
-    // other row-3 card (Composition Bar) has focusable segments too, but
-    // they come AFTER Needs Attention's focusables in source order.
+    // We assert the new order: kpi-band → quick-actions → needs-attention.
     const found = extractLayoutTestids(source);
     const kpiBandIdx = found.findIndex((f) => f.testid === "kpi-band");
+    const quickActionsIdx = found.findIndex((f) => f.testid === "quick-actions");
     const needsAttentionIdx = found.findIndex((f) => f.testid === "needs-attention");
     expect(kpiBandIdx).toBeGreaterThan(-1);
+    expect(quickActionsIdx).toBeGreaterThan(-1);
     expect(needsAttentionIdx).toBeGreaterThan(-1);
-    // Needs Attention is the very next testid after the KPI band.
-    expect(needsAttentionIdx).toBe(kpiBandIdx + 1);
+    // Quick Actions is immediately after KPI band.
+    expect(quickActionsIdx).toBe(kpiBandIdx + 1);
+    // Needs Attention follows Quick Actions.
+    expect(needsAttentionIdx).toBe(quickActionsIdx + 1);
   });
 });

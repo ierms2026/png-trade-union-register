@@ -16,6 +16,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/app/page-header";
 interface LegislationEntry {
   id: string; title: string; shortTitle: string; year: number;
   jurisdiction: string; category: string; summary: string; url: string; lastUpdated: string;
@@ -76,9 +77,7 @@ export function LegislationView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Resources</h1>
-          <p className="text-sm text-muted-foreground">Manage acts, regulations, articles, and amendments.</p>
-        </div>
+          <PageHeader title="Resources" description="Manage acts, regulations, articles, and amendments." />        </div>
         <Button onClick={handleAdd} className="gap-2"><Plus className="h-4 w-4" />Add Resource</Button>
       </div>
 

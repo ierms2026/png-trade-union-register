@@ -12,6 +12,7 @@ import { TableSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Audit view — filterable table with expandable before/after JSON diff.
 //
@@ -194,11 +195,7 @@ export function AuditView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
-          <p className="text-sm text-muted-foreground">
-            Complete record of all system actions. Filterable by entity, action, actor, and date range.
-          </p>
-        </div>
+          <PageHeader title="Audit Log" description="Complete record of all system actions. Filterable by entity, action, actor, and date range." />        </div>
         <a href={`/api/export/audit?entityType=${encodeURIComponent(entityType)}&action=${encodeURIComponent(action)}&actor=${encodeURIComponent(actor)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`} target="_blank" rel="noopener noreferrer">
           <Button variant="outline" className="gap-2">
             <FileDown className="h-4 w-4" />

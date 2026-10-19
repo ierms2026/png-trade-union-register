@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Security view — Registrar's security dashboard.
 //
@@ -107,10 +108,7 @@ export function SecurityView() {
 
   if (loading) return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Access Monitoring</h1>
-        <p className="text-sm text-muted-foreground">Auth health metrics and account management.</p>
-      </div>
+      <PageHeader title="Access Monitoring" description="Auth health metrics and account management." />
       <StatsSkeleton />
       <CardListSkeleton count={2} />
     </div>
@@ -140,13 +138,15 @@ export function SecurityView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Access Monitoring</h1>
-        <p className="text-sm text-muted-foreground">
-          Auth health metrics and account management. Generated at{" "}
-          {new Date(data.generatedAt).toLocaleString()}.
-        </p>
-      </div>
+      <PageHeader
+        title="Access Monitoring"
+        description={
+          <>
+            Auth health metrics and account management. Generated at{" "}
+            {new Date(data.generatedAt).toLocaleString()}.
+          </>
+        }
+      />
 
       {/* Overview cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">

@@ -21,6 +21,7 @@ import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // API Keys view — key list with create (one-time display) + revoke.
 // =============================================================================
@@ -58,11 +59,7 @@ export function ApiKeysView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
-          <p className="text-sm text-muted-foreground">
-            Programmatic access tokens for scripts and integrations.
-          </p>
-        </div>
+          <PageHeader title="API Keys" description="Programmatic access tokens for scripts and integrations." />        </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New Key

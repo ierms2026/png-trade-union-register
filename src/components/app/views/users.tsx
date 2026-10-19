@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { validateEmail, isValid } from "@/lib/validation";
 import { FieldError } from "@/components/app/field-error";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Users view — user list with create/disable/reset-2fa.
 //
@@ -59,18 +60,16 @@ export function UsersView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-sm text-muted-foreground">
-            {data.users.length} user{data.users.length !== 1 ? "s" : ""}.
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New User
-        </Button>
-      </div>
+      <PageHeader
+        title="Users"
+        description={`${data?.users.length ?? 0} user${(data?.users.length ?? 0) !== 1 ? "s" : ""}.`}
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New User
+          </Button>
+        }
+      />
 
       {data.users.length === 0 ? (
         <EmptyState

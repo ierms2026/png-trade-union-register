@@ -22,6 +22,7 @@ import { TableSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Configure Rules view — list + edit compliance rules with "Preview Impact".
 //
@@ -86,11 +87,7 @@ export function ConfigureRulesView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Configure Rules</h1>
-        <p className="text-sm text-muted-foreground">
-          Edit document-type compliance rules. Changes take effect immediately across all unions.
-        </p>
-      </div>
+        <PageHeader title="Configure Rules" description="Edit document-type compliance rules. Changes take effect immediately across all unions." />      </div>
 
       <Card>
         <CardHeader>

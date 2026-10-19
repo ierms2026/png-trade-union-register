@@ -194,7 +194,9 @@ describe("Public portal design fix: main content spacing tightened", () => {
   const src = readFileSync(PUBLIC_PORTAL, "utf-8");
 
   it("main has space-y-8 (was space-y-10 — tighter rhythm between hero + list)", () => {
-    expect(src).toMatch(/<main className="mx-auto max-w-4xl space-y-8 p-4 py-10">/);
+    // Design review follow-up: py was also reduced from py-10 to py-8 in
+    // a subsequent round (header-to-title gap was too large).
+    expect(src).toMatch(/<main className="mx-auto max-w-4xl space-y-8 p-4 py-8">/);
     expect(src).not.toMatch(/space-y-10/);
   });
 });
@@ -221,8 +223,12 @@ describe("Public portal design fix: no regressions in functionality", () => {
     expect(src).toMatch(/Last updated/);
   });
 
-  it("footer still has the legal citation (the proper home for it)", () => {
-    expect(src).toMatch(/in accordance with the Industrial Organizations Act/);
+  it("footer no longer has the redundant legal citation (removed — hero already cites the Act)", () => {
+    // Design review follow-up: the footer's "published in accordance with
+    // the Industrial Organizations Act" line was removed because the hero
+    // already cites the Act inline. The footer now has: org name,
+    // department, contact info, copyright — no redundant legal text.
+    expect(src).not.toMatch(/in accordance with the Industrial Organizations Act/);
   });
 
   it("filter Input still has aria-label (Wave 5 a11y fix preserved)", () => {

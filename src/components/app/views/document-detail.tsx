@@ -17,6 +17,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { DocumentPreviewModal } from "@/components/app/document-preview-modal";
 import type { ComplianceStatus } from "@/lib/dashboard/status-config";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // DocumentDetailView — chunk 11
 //
@@ -133,8 +134,7 @@ export function DocumentDetailView({
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <FileText className="h-5 w-5 text-muted-foreground" />
-                <h1 className="text-2xl font-bold tracking-tight">{doc.documentType}</h1>
-                <Badge variant="outline" className={cfg.tone}>
+                <PageHeader title="{doc.documentType}" /><Badge variant="outline" className={cfg.tone}>
                   <StatusIcon className="mr-1 h-3 w-3" />
                   {cfg.label}
                 </Badge>

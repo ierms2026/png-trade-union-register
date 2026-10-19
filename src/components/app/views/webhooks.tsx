@@ -24,6 +24,7 @@ import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // WebhooksView — chunk 9 staff view (REGISTRAR-only)
 //
@@ -106,11 +107,7 @@ export function WebhooksView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Webhooks</h1>
-          <p className="text-sm text-muted-foreground">
-            Register external endpoints to receive event notifications (e.g., compliance status changes)
-          </p>
-        </div>
+          <PageHeader title="Webhooks" description="Register external endpoints to receive event notifications (e.g., compliance status changes)" />        </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Register Endpoint

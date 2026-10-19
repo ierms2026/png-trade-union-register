@@ -16,6 +16,7 @@ import { useFetch } from "@/components/app/use-fetch";
 import { CalendarSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Calendar view — monthly grid with 4 tabs (all/documents/tasks/compliance).
 //
@@ -158,9 +159,7 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
-        <p className="text-sm text-muted-foreground">Tasks, document uploads, and compliance events. Click an event to navigate to its source.</p>
-      </div>
+        <PageHeader title="Calendar" description="Tasks, document uploads, and compliance events. Click an event to navigate to its source." />      </div>
 
       {/* Tabs + month navigation */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

@@ -19,6 +19,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { DocumentPreviewModal } from "@/components/app/document-preview-modal";
 import { REVIEW_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Reviews view — pending document review queue for the Registrar.
 // Mirrors the retention view's structure. Each card has View, Approve, and
@@ -131,20 +132,26 @@ export function ReviewsView({ user }: { user?: { id: string; role: string } }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Review Queue</h1>
-        <p className="text-sm text-muted-foreground">
-          Documents uploaded by Union Officials, awaiting your review. Pending documents don&apos;t count toward compliance until approved.
-          {totalPending > 0 && (
-            <span className="ml-1">
-              · <span className="font-medium text-foreground">{pending.length}</span> need first review
-              {awaiting.length > 0 && (
-                <> · <span className="font-medium text-amber-700 dark:text-amber-400">{awaiting.length}</span> awaiting second approval</>
-              )}
-            </span>
-          )}
-        </p>
-      </div>
+      <PageHeader
+        title="Review Queue"
+        description={
+          <>
+            Documents uploaded by Union Officials, awaiting your review. Pending documents don&apos;t count toward compliance until approved.
+            {totalPending > 0 && (
+              <span className="ml-1">
+                {" · "}
+                <span className="font-medium text-foreground">{pending.length}</span> need first review
+                {awaiting.length > 0 && (
+                  <>
+                    {" · "}
+                    <span className="font-medium text-amber-700 dark:text-amber-400">{awaiting.length}</span> awaiting second approval
+                  </>
+                )}
+              </span>
+            )}
+          </>
+        }
+      />
 
       {totalPending === 0 ? (
         <EmptyState icon={FileCheck} title="No documents pending review"

@@ -9,6 +9,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusGlossary, type GlossaryEntry } from "@/components/app/status-glossary";
 import { RegistrarContactInfo } from "@/components/app/registrar-contact-info";
+import { PageHeader } from "@/components/app/page-header";
 import {
   COMPLIANCE_STATUS_CONFIG,
   REVIEW_STATUS_CONFIG,
@@ -200,8 +201,7 @@ export function HelpGuideView({ userRole, onNavigate }: HelpGuideViewProps) {
       <div>
         <div className="flex items-center gap-2">
           <HelpCircle className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">Help &amp; Guide</h1>
-        </div>
+          <PageHeader title="Help &amp; Guide" /></div>
         <p className="mt-1 text-sm text-muted-foreground">
           A short guide to your role, the tasks you&apos;ll do most, and what the status terms mean.
         </p>

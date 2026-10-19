@@ -82,6 +82,7 @@ interface UnionsResponse {
 
 import { REVIEW_STATUS_CONFIG as REVIEW_STATUS } from "@/lib/dashboard/vocabulary";
 
+import { PageHeader } from "@/components/app/page-header";
 export function DocumentsView() {
   const [unionFilter, setUnionFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -127,11 +128,7 @@ export function DocumentsView() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
-        <p className="text-sm text-muted-foreground">
-          All documents across all unions. Use filters to narrow down, or click a document to view its details + version history.
-        </p>
-      </div>
+        <PageHeader title="Documents" description="All documents across all unions. Use filters to narrow down, or click a document to view its details + version history." />      </div>
 
       {/* Filters */}
       <Card>

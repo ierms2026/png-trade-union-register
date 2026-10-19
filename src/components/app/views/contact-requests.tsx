@@ -23,6 +23,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { CONTACT_UPDATE_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // ContactRequestsView — chunk 5 staff-side view (REGISTRAR-only)
 //
@@ -157,11 +158,7 @@ export function ContactRequestsView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Contact Updates</h1>
-          <p className="text-sm text-muted-foreground">
-            Review contact-info changes submitted by union representatives
-          </p>
-        </div>
+          <PageHeader title="Contact Updates" description="Review contact-info changes submitted by union representatives" />        </div>
         <Select value={statusFilter} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-40" aria-label="Filter by status">
             <SelectValue />

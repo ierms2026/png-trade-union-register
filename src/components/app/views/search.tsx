@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { Highlight } from "@/components/app/highlight";
 import { REVIEW_STATUS_CONFIG, groupDocumentTypesByCategory } from "@/lib/dashboard/vocabulary";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // SearchView — full-text search with filters + pagination.
 //
@@ -344,11 +345,7 @@ export function SearchView() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Search Documents</h1>
-        <p className="text-sm text-muted-foreground">
-          Full-text search across all uploaded PDF documents. Matches are highlighted in the snippets below.
-        </p>
-      </div>
+        <PageHeader title="Search Documents" description="Full-text search across all uploaded PDF documents. Matches are highlighted in the snippets below." />      </div>
 
       {/* Search bar */}
       <form onSubmit={handleSubmit} className="flex gap-2">

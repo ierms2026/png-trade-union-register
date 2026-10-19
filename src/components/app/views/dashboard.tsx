@@ -38,6 +38,7 @@ import { WelcomePanel } from "@/components/app/welcome-panel";
 import { DefinitionPopover } from "@/components/app/definition-popover";
 import { groupDocumentTypesByCategory, type DocumentTypeCategory } from "@/lib/dashboard/vocabulary";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Dashboard view — the landing page for authenticated users.
 //
@@ -1587,11 +1588,7 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Overview of the union registry and compliance status.
-        </p>
-      </div>
+        <PageHeader title="Dashboard" description="Overview of the union registry and compliance status." />      </div>
 
 
       {/* === Row 1: KPI band (7 cards) — the reason you visit a dashboard ===

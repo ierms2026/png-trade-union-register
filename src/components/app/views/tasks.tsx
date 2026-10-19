@@ -30,6 +30,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/dashboard/vocabulary";
 import { EmptyState } from "@/components/app/empty-state";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Tasks view — task list with click-to-cycle status + create dialog.
 //
@@ -97,18 +98,16 @@ export function TasksView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-sm text-muted-foreground">
-            {data.tasks.length} task{data.tasks.length !== 1 ? "s" : ""}.
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Task
-        </Button>
-      </div>
+      <PageHeader
+        title="Tasks"
+        description={`${data?.tasks.length ?? 0} task${(data?.tasks.length ?? 0) !== 1 ? "s" : ""}.`}
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Task
+          </Button>
+        }
+      />
 
       {data.tasks.length === 0 ? (
         <EmptyState

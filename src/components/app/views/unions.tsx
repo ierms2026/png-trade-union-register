@@ -54,6 +54,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 import { DocumentPreviewModal } from "@/components/app/document-preview-modal";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Unions view — registry list + detail with document tiles + upload dialog.
 //
@@ -465,26 +466,26 @@ export function UnionsView({
   // --- Union list view ---
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Registered Unions</h1>
-          <p className="text-sm text-muted-foreground">
-            {data.unions.length} registered union{data.unions.length !== 1 ? "s" : ""}.
-          </p>
-        </div>
-        {user.role === "REGISTRAR" && (
-          <Button onClick={() => setRegisterDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Register New Union
-          </Button>
-        )}
-        <a href="/api/export/unions" target="_blank" rel="noopener noreferrer">
-          <Button variant="outline" className="gap-2">
-            <FileDown className="h-4 w-4" />
-            Export CSV
-          </Button>
-        </a>
-      </div>
+      <PageHeader
+        title="Registered Unions"
+        description={`${data?.unions.length ?? 0} registered union${(data?.unions.length ?? 0) !== 1 ? "s" : ""}.`}
+        actions={
+          <>
+            {user.role === "REGISTRAR" && (
+              <Button onClick={() => setRegisterDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Register New Union
+              </Button>
+            )}
+            <a href="/api/export/unions" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                Export CSV
+              </Button>
+            </a>
+          </>
+        }
+      />
 
       {/* Filter box — reactive, no submit button (same pattern as public portal) */}
       <div className="relative">

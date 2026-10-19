@@ -28,6 +28,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { validateRequired } from "@/lib/validation";
 import { FieldError } from "@/components/app/field-error";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Account Security view — 2FA setup/verify/disable + active sessions.
 //
@@ -62,11 +63,7 @@ export function AccountSecurityView({ user }: { user: AuthUser }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">My sign-in & 2FA</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your two-factor authentication and active sessions.
-        </p>
-      </div>
+        <PageHeader title="My sign-in & 2FA" description="Manage your two-factor authentication and active sessions." />      </div>
 
       <TwoFactorSection user={user} />
       <NotificationPreferencesSection />

@@ -20,6 +20,7 @@ import { TableSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { EmptyState } from "@/components/app/empty-state";
 
+import { PageHeader } from "@/components/app/page-header";
 // =============================================================================
 // Compare view — side-by-side compliance comparison of 2-6 unions.
 //
@@ -119,11 +120,7 @@ export function CompareView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Compare Unions</h1>
-        <p className="text-sm text-muted-foreground">
-          Select 2-6 unions to compare their compliance status side-by-side.
-        </p>
-      </div>
+        <PageHeader title="Compare Unions" description="Select 2-6 unions to compare their compliance status side-by-side." />      </div>
 
       {/* Union picker */}
       <Card>
