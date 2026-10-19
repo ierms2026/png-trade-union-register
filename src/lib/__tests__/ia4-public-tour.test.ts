@@ -147,12 +147,26 @@ describe("IA-4: public portal has 4 tabs including About", () => {
     expect(content).toContain("RegistrarContactInfo");
   });
 
-  it("the hero links to Resources + About", () => {
+  it("the nav bar links to Resources + About (canonical location for tab navigation)", () => {
+    // Design review (Wave 5 follow-up): the hero previously had inline
+    // "View resources" + "About this register" links, but they duplicated
+    // the nav bar (which already has Register / Resources / About / Help
+    // tabs). Removed from the hero to reduce visual noise — the nav bar
+    // is the single source of truth for tab navigation.
     const file = join(SRC_ROOT, "src/components/app/public-portal.tsx");
     const content = readFileSync(file, "utf-8");
-    // The hero must have quick links to the Resources + About tabs.
-    expect(content).toMatch(/View resources/);
-    expect(content).toMatch(/About this register/);
+    // The nav bar must still have Resources + About tab buttons.
+    expect(content).toMatch(/handleTabChange\("resources"\)/);
+    expect(content).toMatch(/handleTabChange\("about"\)/);
+    // The hero must NO LONGER contain the inline "View resources" /
+    // "About this register" CTAs (they were removed as duplicates).
+    // We scope the check to the renderHero function body to avoid
+    // false-positives from the nav bar's tab labels.
+    const heroMatch = content.match(/function renderHero\(\)[\s\S]*?\n  \}/);
+    expect(heroMatch, "renderHero function must exist").not.toBeNull();
+    const heroBody = heroMatch![0];
+    expect(heroBody).not.toMatch(/View resources/);
+    expect(heroBody).not.toMatch(/About this register/);
   });
 });
 

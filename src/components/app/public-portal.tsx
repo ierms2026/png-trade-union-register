@@ -92,59 +92,70 @@ export function PublicPortal({ onStaffLogin }: Props) {
     const lastUpdated = all.length > 0
       ? new Date(Math.max(...all.map((u) => new Date(u.updatedAt).getTime()))).toLocaleDateString("en-PG", { year: "numeric", month: "long", day: "numeric" })
       : null;
+    // Design review fix #1 (focal point) + #2 (type hierarchy):
+    // The hero was 7 competing elements (badge + h1 + 2 paragraphs + last-
+    // updated + legal citation + 2 inline links). Cut to 3 elements: a
+    // quiet official eyebrow, the h1 (now clearly dominant at 5xl), and ONE
+    // supporting line. The legal citation moves to the footer; the inline
+    // links duplicate the nav bar (already there as Resources / About tabs).
     return (
-      <div className="space-y-4 text-center">
-        <div className="flex items-center justify-center gap-3">
-          <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={48} height={39} className="h-12 w-auto" />
-          <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-accent bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-accent-foreground shadow-sm">
-            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-4z" /><path d="M9 12l2 2 4-4" /></svg>
-            Published by the Industrial Registrar
+      <div className="space-y-3 text-center">
+        <div className="flex items-center justify-center gap-2">
+          <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={32} height={26} className="h-8 w-auto" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/5 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-accent-foreground">
+            <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M12 2L4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-4z" /><path d="M9 12l2 2 4-4" /></svg>
+            Office of The Industrial Registrar
           </span>
         </div>
-        <h1 className="text-4xl font-bold tracking-tight">Register of Trade Unions</h1>
-        <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+        {/* Type hierarchy fix: h1 is now 5xl + tight tracking — clearly
+            dominant. Was text-4xl which is only ~1.5x the body text (text-lg),
+            so the headline didn't read as the page title. */}
+        <h1 className="text-5xl font-bold tracking-tight">Register of Trade Unions</h1>
+        {/* ONE supporting line at text-base (down from text-lg) so it
+            clearly steps down from the h1. The Industrial Organizations
+            Act link is inline — the legal citation + the inline CTAs are
+            removed (they duplicate the nav bar's Resources + About tabs).
+            The last-updated date is merged into this line as a quiet suffix. */}
+        <p className="mx-auto max-w-2xl text-base text-muted-foreground">
           The official public list of trade unions registered under the{" "}
-          <a href="/legislation/industrial-relations-act-1962.pdf" target="_blank" rel="noopener noreferrer" className="font-semibold text-foreground underline decoration-accent decoration-2 underline-offset-4 hover:decoration-accent/60">Industrial Organizations Act</a>
-          . Published by the Office of The Industrial Registrar for transparency and public verification.
+          <a href="/legislation/industrial-relations-act-1962.pdf" target="_blank" rel="noopener noreferrer" className="font-medium text-foreground underline decoration-accent decoration-2 underline-offset-4 hover:decoration-accent/60">Industrial Organizations Act</a>
+          {lastUpdated && <> · <span className="text-muted-foreground/70">Last updated {lastUpdated}</span></>}
         </p>
-        {lastUpdated && <p className="text-xs text-muted-foreground">Last updated: {lastUpdated}</p>}
-        <p className="mx-auto max-w-xl text-xs italic text-muted-foreground/80">
-          This register is published in accordance with Section 5 of the Industrial Organizations Act, which requires the Registrar to maintain a public register of registered trade unions.
-        </p>
-        {/* IA-4: quick links to Resources + About from the hero. */}
-        <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
-          <button onClick={() => handleTabChange("resources")} className="font-medium text-primary underline decoration-accent decoration-2 underline-offset-4 hover:decoration-accent/60">View resources</button>
-          <span className="text-muted-foreground/40">·</span>
-          <button onClick={() => handleTabChange("about")} className="font-medium text-primary underline decoration-accent decoration-2 underline-offset-4 hover:decoration-accent/60">About this register</button>
-        </div>
       </div>
     );
   }
 
   function renderSearch() {
     return (
-      <div className="space-y-4">
-        <div className="space-y-2 text-center">
-          <h2 className="text-lg font-semibold">Registered Unions</h2>
+      <div className="space-y-6">
+        <div className="space-y-1.5 text-center">
+          {/* Type hierarchy fix: h2 is now text-2xl (was text-lg) so it
+              clearly steps down from the h1 (text-5xl) and clearly above
+              body text (text-base). Description at text-sm + muted. */}
+          <h2 className="text-2xl font-semibold tracking-tight">Registered Unions</h2>
           <p className="text-sm text-muted-foreground">All trade unions currently on the public register. Click a union to view its published documents.</p>
         </div>
-        {/* IA-4: status key — explains the 3 union status badges shown in the list. */}
-        <div className="flex flex-wrap items-center justify-center gap-4 rounded-md border bg-muted/30 px-4 py-2 text-xs">
-          <span className="font-medium text-muted-foreground">Status key:</span>
+        {/* Design review fix #3: status key was 3 entries crammed into ONE
+            row at text-xs — cramped + hard to scan. Rebuilt as a vertical
+            legend (one row per status) with the icon + label + plain-
+            language description on each row. The box is wider (max-w-md,
+            centered) so each row has breathing room. */}
+        <div className="mx-auto max-w-md space-y-1.5 rounded-md border bg-muted/30 px-4 py-3">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status key</p>
           {Object.values(UNION_STATUS_CONFIG).map((cfg) => {
             const Icon = cfg.icon;
             return (
-              <span key={cfg.label} className="flex items-center gap-1.5">
-                <Icon className="h-3 w-3" aria-hidden="true" />
+              <div key={cfg.label} className="flex items-baseline gap-2 text-sm">
+                <Icon className="h-3.5 w-3.5 flex-shrink-0 self-center" aria-hidden="true" />
                 <span className="font-medium">{cfg.label}</span>
                 <span className="text-muted-foreground">— {cfg.plainLanguage}</span>
-              </span>
+              </div>
             );
           })}
         </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Filter by name or registration number..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input placeholder="Filter by name or registration number..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" aria-label="Filter unions by name or registration number" />
         </div>
         {unionsLoading ? (
           <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => (<Card key={i}><CardContent className="flex items-center justify-between p-4"><div className="space-y-2"><div className="h-5 w-48 animate-pulse rounded bg-muted" /><div className="h-4 w-32 animate-pulse rounded bg-muted" /></div><div className="h-6 w-16 animate-pulse rounded bg-muted" /></CardContent></Card>))}</div>
@@ -155,9 +166,18 @@ export function PublicPortal({ onStaffLogin }: Props) {
           <div className="space-y-2">
             {filteredUnions.map((u) => (
               <Link key={u.id} href={`/unions/${u.registrationNo}`}>
+                {/* Design review fix #3: row is now a tighter scannable unit.
+                    Union name is the primary line (font-medium, text-base).
+                    Reg number is a quiet secondary line (text-sm, muted).
+                    Status badge is ALIGNED via items-center so it reads as
+                    part of the row, not floating. The left-border accent on
+                    hover is preserved (visual cue that the row is clickable). */}
                 <Card className="cursor-pointer transition-colors hover:bg-muted/50 border-l-2 border-solid border-l-transparent hover:border-l-accent">
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div><p className="font-medium">{u.unionName}</p><p className="text-sm text-muted-foreground">Reg. No: {u.registrationNo}</p></div>
+                  <CardContent className="flex items-center justify-between gap-4 p-4">
+                    <div className="min-w-0">
+                      <p className="text-base font-medium leading-tight">{u.unionName}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">Reg. No. {u.registrationNo}</p>
+                    </div>
                     <StatusBadge status={u.status} withHelp />
                   </CardContent>
                 </Card>
@@ -319,7 +339,7 @@ export function PublicPortal({ onStaffLogin }: Props) {
           <button onClick={() => handleTabChange("help")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "help" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Help</button>
         </div>
       </div>
-      <main className="mx-auto max-w-4xl space-y-10 p-4 py-10">
+      <main className="mx-auto max-w-4xl space-y-8 p-4 py-10">
         {renderHero()}
         {tab === "register" ? renderSearch() : tab === "resources" ? renderLegislation() : tab === "about" ? renderAbout() : renderHelp()}
       </main>
