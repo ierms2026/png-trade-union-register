@@ -330,9 +330,11 @@ function CreateUserDialog({
               <FieldError error={errors.email} />
             </div>
             <div className="space-y-2">
-              <Label>Role</Label>
+              {/* Wave 5 / a11y: htmlFor + id so screen readers announce the
+                  label when the Select is focused (WCAG 1.3.1 + 3.3.2). */}
+              <Label htmlFor="user-role">Role</Label>
               <Select value={role} onValueChange={setRole}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="user-role"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="REGISTRAR">Registrar</SelectItem>
                   <SelectItem value="INSPECTOR">Inspector</SelectItem>
@@ -342,9 +344,9 @@ function CreateUserDialog({
             </div>
             {role === "OFFICER" && (
               <div className="space-y-2">
-                <Label>Assigned Union</Label>
+                <Label htmlFor="user-union">Assigned Union</Label>
                 <Select value={unionId} onValueChange={setUnionId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="user-union"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Select a union...</SelectItem>
                     {unionsData?.unions.map((u) => (

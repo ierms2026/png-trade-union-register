@@ -5,7 +5,8 @@ import { getComplianceStatusLabel, COMPLIANCE_STATUS_CONFIG, VIEW_TITLES, groupD
 import { CompareView } from "@/components/app/views/compare";
 import { ConfigureRulesView } from "@/components/app/views/configure-rules";
 import { type ComplianceStatus } from "@/lib/dashboard/status-config";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { handleTabKeyDown } from "@/lib/dashboard/tabs";
 import { CheckCircle2, AlertTriangle, XCircle, FileQuestion, Ban, FileText, Loader2, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +112,16 @@ export function ComplianceView({
     ? ["overview", "compare", "rules"]
     : ["overview", "compare"];
 
+  // Wave 5 / a11y: ref to the tablist container + useEffect to move focus
+  // to the active tab after arrow-key navigation. The handleTabKeyDown
+  // helper updates `tab` state; this effect runs after the re-render and
+  // focuses the new active tab (the one with tabIndex=0).
+  const tablistRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const active = tablistRef.current?.querySelector('[role="tab"][tabindex="0"]') as HTMLButtonElement | null;
+    active?.focus();
+  }, [tab]);
+
   return (
     <div className="space-y-6">
       {/* Wave 4 / a11y #4: restore a page-level <h1> for screen-reader
@@ -121,8 +132,8 @@ export function ComplianceView({
           changing the visual layout. */}
       <h1 className="sr-only">Compliance</h1>
       {/* Tab bar */}
-      <div className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Compliance view sections">
-        {tabs.map((t) => (
+      <div ref={tablistRef} className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Compliance view sections">
+        {tabs.map((t, i) => (
           <button
             key={t}
             type="button"
@@ -130,6 +141,7 @@ export function ComplianceView({
             aria-selected={tab === t}
             tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
+            onKeyDown={(e) => handleTabKeyDown(e, i, tabs.length, (nextIdx) => setTab(tabs[nextIdx]))}
             aria-current={tab === t ? "page" : undefined}
             className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               tab === t
@@ -269,7 +281,7 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
             Generate Report
           </Button>
           <Select value={filter} onValueChange={(v) => setFilter(v as StatusFilter)}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" aria-label="Filter by compliance status">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

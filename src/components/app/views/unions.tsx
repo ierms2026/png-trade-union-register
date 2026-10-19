@@ -1,9 +1,10 @@
 "use client";
 import { getUnionStatusLabel, getComplianceStatusLabel, groupDocumentTypesByCategory, filterOutInternalTypes, isInternalDocumentType } from "@/lib/dashboard/vocabulary";
+import { handleTabKeyDown } from "@/lib/dashboard/tabs";
 import type { ComplianceMatrixResponse } from "@/lib/compliance/matrix";
 import Link from "next/link";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import {
   Building2,
   Upload,
@@ -143,6 +144,14 @@ export function UnionsView({
     initialTab === "history" && !isOfficer ? "history" :
     "overview";
   const [hubTab, setHubTab] = useState<UnionHubTab>(validInitialTab);
+  // Wave 5 / a11y: ref + effect for arrow-key nav on the union-detail tab bar.
+  // Declared at the top level (hooks can't be conditional). The ref is only
+  // attached when the detail view renders; the effect is a no-op otherwise.
+  const hubTablistRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const active = hubTablistRef.current?.querySelector('[role="tab"][tabindex="0"]') as HTMLButtonElement | null;
+    active?.focus();
+  }, [hubTab]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadDocType, setUploadDocType] = useState<string>("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -252,8 +261,8 @@ export function UnionsView({
         </Card>
 
         {/* IA-2: Tab bar */}
-        <div className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Union hub sections">
-          {hubTabs.map((t) => (
+        <div ref={hubTablistRef} className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Union hub sections">
+          {hubTabs.map((t, i) => (
             <button
               key={t}
               type="button"
@@ -261,6 +270,7 @@ export function UnionsView({
               aria-selected={hubTab === t}
               tabIndex={hubTab === t ? 0 : -1}
               onClick={() => setHubTab(t)}
+              onKeyDown={(e) => handleTabKeyDown(e, i, hubTabs.length, (nextIdx) => setHubTab(hubTabs[nextIdx]))}
               aria-current={hubTab === t ? "page" : undefined}
               className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 hubTab === t
@@ -478,12 +488,13 @@ export function UnionsView({
 
       {/* Filter box — reactive, no submit button (same pattern as public portal) */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <Input
           placeholder="Filter by name or registration number..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
+          aria-label="Filter unions by name or registration number"
         />
       </div>
 
@@ -920,9 +931,9 @@ function EditUnionDialog({
           {/* Status — Registrar only */}
           {isRegistrar && (
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label htmlFor="union-status-filter">Status</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
+                <SelectTrigger id="union-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1084,9 +1095,9 @@ function UploadDialog({ unionId, defaultDocType, open, onClose, onUploaded, user
         </DialogHeader>
         <form onSubmit={handleUpload} className="space-y-4">
           <div className="space-y-2">
-            <Label>Document Type</Label>
+            <Label htmlFor="upload-document-type">Document Type</Label>
             <Select value={documentType} onValueChange={setDocumentType} required>
-              <SelectTrigger>
+              <SelectTrigger id="upload-document-type">
                 <SelectValue placeholder="Select a document type" />
               </SelectTrigger>
               <SelectContent>
@@ -1252,9 +1263,9 @@ function RegisterUnionDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label htmlFor="union-edit-status">Status</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
+                <SelectTrigger id="union-edit-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

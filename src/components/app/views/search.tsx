@@ -362,6 +362,7 @@ export function SearchView() {
             className="pl-9 pr-9"
             autoFocus
             minLength={2}
+            aria-label="Search document contents"
           />
           {inputValue && (
             <button
@@ -391,7 +392,7 @@ export function SearchView() {
           {/* Union filter */}
           <div className="w-48">
             <Select value={unionFilter} onValueChange={handleUnionChange}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9" aria-label="Filter by union">
                 <SelectValue placeholder="All unions" />
               </SelectTrigger>
               <SelectContent>
@@ -407,7 +408,7 @@ export function SearchView() {
           {/* Document type filter — IA-3: grouped by category */}
           <div className="w-48">
             <Select value={typeFilter} onValueChange={handleTypeChange}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9" aria-label="Filter by document type">
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
@@ -428,7 +429,7 @@ export function SearchView() {
           {/* Review status filter */}
           <div className="w-40">
             <Select value={statusFilter} onValueChange={handleStatusChange}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9" aria-label="Filter by review status">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -447,7 +448,7 @@ export function SearchView() {
           {showAssigneeFilter && (
             <div className="w-56">
               <Select value={assigneeFilter} onValueChange={handleAssigneeChange}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9" aria-label="Filter by assigned officer">
                   <SelectValue placeholder="All officers" />
                 </SelectTrigger>
                 <SelectContent>
@@ -482,7 +483,7 @@ export function SearchView() {
           {/* Sort dropdown */}
           <div className="w-44">
             <Select value={sortBy} onValueChange={handleSortChange}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9" aria-label="Sort results">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

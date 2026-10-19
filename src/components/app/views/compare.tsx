@@ -152,7 +152,7 @@ export function CompareView() {
           {/* Add union dropdown */}
           {availableUnions.length > 0 && selectedIds.length < 6 && (
             <Select onValueChange={addUnion}>
-              <SelectTrigger className="w-full md:w-80">
+              <SelectTrigger className="w-full md:w-80" aria-label="Add a union to compare">
                 <SelectValue placeholder="+ Add a union to compare" />
               </SelectTrigger>
               <SelectContent>

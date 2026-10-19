@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { handleTabKeyDown } from "@/lib/dashboard/tabs";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,12 @@ const EVENT_LINKS: Record<string, string> = {
 
 export function CalendarView({ onNavigate }: { onNavigate?: (view: string, params?: { unionId?: string; unionTab?: string }) => void }) {
   const [tab, setTab] = useState<Tab>("all");
+  // Wave 5 / a11y: ref + effect for arrow-key nav on the calendar tab bar.
+  const tablistRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const active = tablistRef.current?.querySelector('[role="tab"][tabindex="0"]') as HTMLButtonElement | null;
+    active?.focus();
+  }, [tab]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<{ dateStr: string; events: CalendarEvent[] } | null>(null);
 
@@ -161,8 +168,8 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
             (role=tablist + role=tab + aria-selected + roving tabIndex).
             Also adds focus-visible:ring-2 (was missing — keyboard users
             had no visible focus indicator). */}
-        <div className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Calendar view types">
-          {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
+        <div ref={tablistRef} className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Calendar view types">
+          {(Object.keys(TAB_LABELS) as Tab[]).map((t, i) => (
             <button
               key={t}
               type="button"
@@ -170,6 +177,10 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
               aria-selected={tab === t}
               tabIndex={tab === t ? 0 : -1}
               onClick={() => setTab(t)}
+              onKeyDown={(e) => {
+                const tabKeys = Object.keys(TAB_LABELS) as Tab[];
+                handleTabKeyDown(e, i, tabKeys.length, (nextIdx) => setTab(tabKeys[nextIdx]));
+              }}
               className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}

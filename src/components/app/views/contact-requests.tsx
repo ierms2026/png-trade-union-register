@@ -163,7 +163,7 @@ export function ContactRequestsView() {
           </p>
         </div>
         <Select value={statusFilter} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" aria-label="Filter by status">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

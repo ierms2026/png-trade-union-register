@@ -154,9 +154,9 @@ export function DocumentsView() {
 
             {/* Union filter */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Union</label>
+              <label htmlFor="docs-union-filter" className="text-xs font-medium text-muted-foreground">Union</label>
               <Select value={unionFilter} onValueChange={setUnionFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger id="docs-union-filter" className="w-[200px]">
                   <SelectValue placeholder="All unions" />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,9 +172,9 @@ export function DocumentsView() {
 
             {/* Document type filter — from ComplianceRule, not from results */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Document Type</label>
+              <label htmlFor="docs-type-filter" className="text-xs font-medium text-muted-foreground">Document Type</label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger id="docs-type-filter" className="w-[200px]">
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -188,9 +188,9 @@ export function DocumentsView() {
 
             {/* Status filter */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Review Status</label>
+              <label htmlFor="docs-status-filter" className="text-xs font-medium text-muted-foreground">Review Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger id="docs-status-filter" className="w-[160px]">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>

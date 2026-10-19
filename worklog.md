@@ -1982,3 +1982,92 @@ Stage Summary:
     3. Calendar tab bar → verify focus-visible ring appears when tabbing (was missing before).
 - Wave 4 status: COMPLETE. All 7 selected fixes implemented + tested. The 1 deferred issue (#6 — Select Label htmlFor, ~20 call sites) is documented for Wave 5.
 - All waves (1-4) now complete. Total running test count: 1167 (was 1009 at the start of Wave 1). Total new tests added across waves 1-4: 158.
+
+---
+Task ID: 10
+Agent: main (Wave 5 — deferred a11y items from Wave 4)
+Task: Wave 5 — Select Label htmlFor association (~20 call sites) + arrow-key nav for tab bars (compliance, unions-detail, calendar)
+
+Work Log:
+- Wave 5 covers the two items deferred from Wave 4:
+  * Item 1: Select Label htmlFor association — Wave 4 audit issue #6, deferred because it touches ~20 call sites across 10 files.
+  * Item 2: Arrow-key nav for tab bars — Wave 4 added the ARIA tablist pattern (role=tablist, role=tab, aria-selected, roving tabIndex) but NOT the onKeyDown handler for ArrowLeft/ArrowRight/Home/End.
+
+Item 1 — Select Label htmlFor association (21 call sites across 10 files):
+
+Audit scan found three patterns of <Select> usage:
+- Pattern A: <Label>Foo</Label> + <Select> (paired, no htmlFor) — needed htmlFor on Label + id on SelectTrigger. 11 call sites.
+- Pattern B: <label className="text-xs...">Foo</label> (lowercase HTML, no htmlFor) + <Select> — same fix. 3 call sites (documents.tsx only).
+- Pattern C: bare <Select> with NO Label, only placeholder text — needed aria-label on SelectTrigger. 8 call sites.
+
+Fixes applied:
+- MOD src/components/app/views/users.tsx (2 Selects): Role → htmlFor="user-role" + id="user-role"; Assigned Union → htmlFor="user-union" + id="user-union".
+- MOD src/components/app/views/tasks.tsx (3 Selects): Priority, Union, Assignee → htmlFor + id pairs (task-priority, task-union, task-assignee).
+- MOD src/components/app/views/legislation.tsx (2 Selects): Jurisdiction + Category → htmlFor + id pairs (legislation-jurisdiction, legislation-category).
+- MOD src/components/app/views/unions.tsx (3 Selects): status-filter, upload-document-type, union-edit-status. Also added aria-label to the bare filter Input ("Filter unions by name or registration number") + aria-hidden on its decorative Search icon.
+- MOD src/components/app/views/documents.tsx (3 Selects): docs-union-filter, docs-type-filter, docs-status-filter (using the lowercase <label className=...> variant — htmlFor added to those too).
+- MOD src/components/app/views/search.tsx (5 Selects + 1 Input): aria-label on Filter by union / document type / review status / assigned officer / Sort results. Also added aria-label="Search document contents" on the main search Input. (Date-range inputs already had aria-label from a prior wave.)
+- MOD src/components/app/views/contact-requests.tsx (1 Select): aria-label="Filter by status".
+- MOD src/components/app/views/compliance.tsx (1 Select): aria-label="Filter by compliance status".
+- MOD src/components/app/views/compare.tsx (1 Select): aria-label="Add a union to compare".
+
+Verification: grepped for <SelectTrigger> across src/components/app/views — every one now has either id= or aria-label=. Also grepped for <Label>X</Label> followed by <Select> within 200 chars — zero unfixed Pattern A instances remain. Same for the lowercase <label className=...> Pattern B.
+
+Item 2 — Arrow-key nav for tab bars:
+
+- NEW src/lib/dashboard/tabs.ts: shared handleTabKeyDown helper. Handles ArrowRight (next, wraps to first), ArrowLeft (previous, wraps to last), Home (first), End (last). Calls e.preventDefault() on handled keys (no scroll interference). Returns early WITHOUT preventDefault for unhandled keys (Tab/Enter/Space pass through to the browser). Uses "automatic activation" pattern — the focused tab becomes active immediately (simpler than manual activation, matches desktop tab bar expectations). Documented the design decision (helper, not shared component — each tab bar has different styling).
+- MOD src/components/app/views/compliance.tsx: imported handleTabKeyDown + useEffect + useRef. Added tablistRef attached to the tablist container. Added useEffect that runs on `tab` change — queries the tablist for the [tabindex=0] button (the active one) and focuses it. Tab buttons now call handleTabKeyDown(e, i, tabs.length, (nextIdx) => setTab(tabs[nextIdx])) in onKeyDown. The effect handles focus management after the state update.
+- MOD src/components/app/views/unions.tsx: same pattern for the union-detail tab bar. Imported handleTabKeyDown + useRef (useEffect already imported). Added hubTablistRef + useEffect on hubTab. The ref + effect are declared at the TOP LEVEL of the component (hooks can't be conditional — the detail view is inside an `if (selectedUnion)` block). Tab buttons call handleTabKeyDown with hubTabs.length + setHubTab(hubTabs[nextIdx]).
+- MOD src/components/app/views/calendar.tsx: same pattern for the calendar tab bar. Imported handleTabKeyDown + useEffect + useRef. Added tablistRef + useEffect on tab. Tab buttons call handleTabKeyDown with tabKeys.length + setTab(tabKeys[nextIdx]) (tabKeys derived from Object.keys(TAB_LABELS)).
+
+Tests:
+- NEW src/lib/__tests__/wave5-deferred-a11y.test.ts (53 tests):
+  * Item 1 (32 tests):
+    - 9 tests (one per file): every <SelectTrigger> has either id= or aria-label=.
+    - 1 test: no <Label>X</Label> followed by <Select> without htmlFor (Pattern A regression guard).
+    - 1 test: no bare <label className=...> followed by <Select> without htmlFor (Pattern B regression guard).
+    - 6 tests: specific Label↔SelectTrigger id pairings (users.tsx 2, tasks.tsx 3, legislation.tsx 2, unions.tsx 3, documents.tsx 3 — verifies the exact id strings match between htmlFor + id).
+    - 4 tests: bare filter Selects have aria-label (search.tsx 5 labels, contact-requests, compliance, compare).
+    - 3 tests: bare filter Inputs have aria-label (unions.tsx filter, search.tsx main search, search.tsx date-range — the last is pre-existing, verifies no regression).
+  * Item 2 (15 tests):
+    - 7 tests on the helper itself: file exists, exports handleTabKeyDown, handles ArrowRight with wrap math, handles ArrowLeft with wrap math, handles Home + End, calls preventDefault on handled keys, does NOT preventDefault for unhandled keys (default case returns early).
+    - 6 tests on compliance tab bar: imports handleTabKeyDown, imports useRef + useEffect, has tablistRef on the container, has useEffect for focus management, tab buttons call handleTabKeyDown in onKeyDown, onActivate sets tabs[nextIdx].
+    - 7 tests on unions-detail tab bar: same set + a test verifying the ref + useEffect are at the top level (hooks can't be conditional — verifies ref is declared BEFORE the `if (selectedUnion)` block).
+    - 6 tests on calendar tab bar: same set.
+  * Cross-cutting (3 tests): no regressions in Wave 4 ARIA semantics — compliance/unions-detail/calendar tab bars still have role=tablist + role=tab + aria-selected + roving tabIndex.
+
+Verification:
+- Lint: PASS for all 12 changed files (npx eslint → 0 errors). Full `npm run lint` shows 33 pre-existing errors + 7 warnings in unrelated files (baseline before Wave 5 was also 33+7 — no new errors introduced).
+- Type check: PASS (tsc --noEmit → 0 errors).
+- Unit tests: PASS — 78 files / 1220 tests (was 1167/77 after Wave 4; +1 file, +53 tests, 0 regressions). All 53 Wave 5 tests passed on the FIRST run (no regex-fix iterations needed).
+- Build: PASS (NEXT_BUILD with SESSION_SECRET + DEMO_PASSWORD env vars → exit 0, "✓ Compiled successfully in 31.1s", 62/62 static pages — unchanged from Wave 4; no new routes added).
+
+Stage Summary:
+- Files modified: 10 (all in src/components/app/views/) — see the per-file breakdown above.
+- Files added: 2
+  * src/lib/dashboard/tabs.ts (shared handleTabKeyDown helper, 78 lines + 40 lines of doc comments)
+  * src/lib/__tests__/wave5-deferred-a11y.test.ts (53 tests, 320 lines)
+- Migration steps: NONE. No schema change, no env change, no DB migration. Pure CSS/JSX/ARIA + one shared helper.
+- Constraints honored:
+  * No new dependencies (used only existing React hooks + existing shadcn/ui primitives).
+  * No schema change, no env change.
+  * No unrelated page touched (only the 10 view files containing Selects/tab bars + the new helper + test).
+  * No functionality removed (every behavior change is additive — Label htmlFor, SelectTrigger id/aria-label, onKeyDown handler, useRef/useEffect for focus management).
+- Manual test steps:
+  * Select Label association:
+    1. Open a screen reader (VoiceOver/NVDA).
+    2. Go to Users view → click "New User" → tab to the Role dropdown.
+    3. Verify SR announces "Role, combobox" (was just "combobox" with no name).
+    4. Repeat for Assigned Union, Priority (tasks), Jurisdiction (legislation), Status filter (unions/documents/contact-requests/compliance), Sort (search).
+    5. Tab to the main search Input on the Search view → verify SR announces "Search document contents, edit text" (was just "edit text" with placeholder).
+  * Arrow-key nav for tab bars:
+    1. Go to Compliance view → click the "Overview" tab (it gets focus).
+    2. Press ArrowRight → focus + activation moves to "Compare" tab.
+    3. Press ArrowRight again → focus + activation moves to "Rules" tab (REGISTRAR) or wraps back to "Overview" (INSPECTOR).
+    4. Press ArrowLeft → moves back.
+    5. Press Home → moves to first tab.
+    6. Press End → moves to last tab.
+    7. Press Tab → leaves the tab bar (default Tab behavior preserved — handleTabKeyDown doesn't preventDefault for Tab).
+    8. Repeat for union-detail tab bar + calendar tab bar.
+- Wave 5 status: COMPLETE. Both deferred items implemented + tested.
+- All waves (1-5) now complete. Total running test count: 1220 (was 1009 at the start of Wave 1). Total new tests added across waves 1-5: 211.

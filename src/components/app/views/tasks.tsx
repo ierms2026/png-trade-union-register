@@ -378,9 +378,9 @@ function CreateTaskDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Priority</Label>
+              <Label htmlFor="task-priority">Priority</Label>
               <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="task-priority"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NORMAL">Normal</SelectItem>
                   <SelectItem value="HIGH">High</SelectItem>
@@ -394,9 +394,9 @@ function CreateTaskDialog({
           </div>
           {unionsData && unionsData.unions.length > 0 && (
             <div className="space-y-2">
-              <Label>Union (optional)</Label>
+              <Label htmlFor="task-union">Union (optional)</Label>
               <Select value={unionId} onValueChange={setUnionId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="task-union"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No specific union</SelectItem>
                   {unionsData.unions.map((u) => (
@@ -408,9 +408,9 @@ function CreateTaskDialog({
           )}
           {assigneesData && assigneesData.users.length > 0 && (
             <div className="space-y-2">
-              <Label>Assignee (optional)</Label>
+              <Label htmlFor="task-assignee">Assignee (optional)</Label>
               <Select value={assigneeId} onValueChange={setAssigneeId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="task-assignee"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Unassigned</SelectItem>
                   {assigneesData.users.map((u) => (
