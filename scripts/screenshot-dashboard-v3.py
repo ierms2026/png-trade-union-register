@@ -18,7 +18,7 @@ BASE = "http://127.0.0.1:3000"
 EMAIL = "registrar@example.com"
 PASSWORD = "Test!2345abc"
 DASHBOARD_URL = f"{BASE}/?view=dashboard"
-OUT = "/home/z/my-project/upload/dashboard-after-systemic.png"
+OUT = "/home/z/my-project/upload/dashboard-final.png"
 PROJECT = "/home/z/my-project"
 
 def start_server() -> subprocess.Popen:

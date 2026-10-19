@@ -145,7 +145,13 @@ function StatCard({ label, value, icon: Icon, color, href, ariaLabel, sparkline,
                     }}
                     className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-help"
                   >
-                    <CardDescription className="text-xs underline decoration-dotted underline-offset-2">{label}</CardDescription>
+                    {/* Design review fix: removed `underline decoration-dotted
+                        underline-offset-2` — the dotted underline read as a
+                        broken link or editing artifact, not as a "hover for
+                        definition" cue. The cursor-help class on the parent
+                        span already signals interactivity; the tooltip opens
+                        on hover/focus. No visible underline needed. */}
+                    <CardDescription className="text-xs">{label}</CardDescription>
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-xs">
@@ -243,9 +249,18 @@ function RateKpiCard({ numerator, denominator, percentage, sparklineValues }: Ra
       </CardHeader>
       <CardContent>
         {denominator === 0 ? (
-          // 1.2 edge case: zero denominator → "No requirements configured",
-          // bar not rendered. Per 1.2 handoff edge-case table.
-          <p className="text-xl font-bold text-muted-foreground">No requirements configured</p>
+          // Design review fix: was "No requirements configured" in text-xl
+          // font-bold — a long text string that broke the KPI band's numeric
+          // scan pattern + made this card taller than its neighbors. Now
+          // shows "—" (em-dash) in the same text-2xl font-bold as other
+          // cards' values, with a quiet "No requirements" subtitle. The
+          // card height stays consistent with the rest of the band.
+          <>
+            <div className="text-2xl font-bold text-muted-foreground">—</div>
+            <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+              No requirements
+            </p>
+          </>
         ) : (
           <>
             {/* 1.2: tooltip + keyboard-accessible trigger + aria-label for
