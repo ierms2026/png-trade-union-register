@@ -9,11 +9,12 @@ export const runtime = "nodejs";
 // GET /api/audit
 // -----------------------------------------------------------------------------
 // Paginated, filterable audit log endpoint. Powers the Audit view + the
-// Union Hub's "History" tab.
+// Union Hub's "History" tab + the document-detail inline audit trail.
 //
 // QUERY PARAMS:
 //   entityType, action, actor (actor name substring), startDate, endDate,
 //   unionId (IA-2: filter to a specific union's audit entries),
+//   entityId (Wave 2: filter to a specific entity, e.g. a document ID),
 //   page (1-based, default 1), limit (default 20, max 100)
 //
 // RESPONSE:
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const entityType = url.searchParams.get("entityType") || undefined;
+  const entityId = url.searchParams.get("entityId") || undefined;
   const action = url.searchParams.get("action") || undefined;
   const actor = url.searchParams.get("actor") || undefined;
   const startDate = url.searchParams.get("startDate") || undefined;
@@ -48,6 +50,9 @@ export async function GET(req: NextRequest) {
   // Build the where clause from filters
   const where: Record<string, unknown> = {};
   if (entityType) where.entityType = entityType;
+  // Wave 2: entityId filter — used by the document-detail inline audit trail
+  // to show only entries for THIS document (e.g. reviews, retention approvals).
+  if (entityId) where.entityId = entityId;
   if (action) where.action = { contains: action };
   if (actor) where.actorName = { contains: actor };
   if (unionId) where.unionId = unionId;

@@ -288,7 +288,7 @@ export default function Home() {
         return <UnionsView key={`unions-${initialUnionId ?? "none"}-${initialUnionTab ?? "default"}`} user={currentUser} initialUnionId={initialUnionId} initialTab={initialUnionTab} onNavigate={handleNavigate} />;
       case "documents": return <DocumentsView />;
       case "document-detail":
-        return <DocumentDetailView key={`doc-${documentDetailId ?? "none"}`} documentId={documentDetailId ?? ""} />;
+        return <DocumentDetailView key={`doc-${documentDetailId ?? "none"}`} documentId={documentDetailId ?? ""} user={currentUser} />;
       case "compliance":
         return <ComplianceView key={`compliance-${initialStatusFilter ?? "all"}-${initialComplianceTab ?? "overview"}`} initialFilter={initialStatusFilter} initialTab={initialComplianceTab} user={currentUser} onNavigate={handleNavigate} />;
       // IA-2: compare + configure-rules are now tabs inside ComplianceView.

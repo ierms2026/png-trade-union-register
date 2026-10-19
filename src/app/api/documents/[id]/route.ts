@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getAuthUserOrApiKey, hasScope } from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
+import {
+  calculateStatus,
+  computeExpiryDateFromApproval,
+} from "@/lib/compliance/calculator";
 
 // =============================================================================
 // GET /api/documents/[id]
@@ -112,6 +116,44 @@ export async function GET(
   });
   const uploaderMap = new Map(uploaders.map((u) => [u.id, u.email]));
 
+  // --- Wave 2 / Item 1: Compliance info for this document ----------------
+  // Compute the live compliance status + expiry date for THIS document, using
+  // the same pure calculator the compliance matrix uses. This powers the
+  // compliance card on the document-detail page (top, above versions).
+  //
+  // We look up the ComplianceRule for this documentType, then call
+  // calculateStatus(rule, doc, latestVersion). For the latestVersion, we
+  // need the uploadedAt field — already fetched in `doc.versions[0]` (the
+  // API orders versions by versionNumber desc, so versions[0] is the latest).
+  //
+  // NOTE: this is the same logic as buildComplianceMatrix in
+  // src/lib/compliance/matrix.ts, but called for a single document. We
+  // don't reuse fetchMatrixData() because that loads ALL unions + ALL
+  // documents (heavyweight — designed for the matrix view). For a single
+  // document-detail page, two targeted queries (rule + already-loaded
+  // versions) are far cheaper.
+  const rule = await db.complianceRule.findUnique({
+    where: { documentType: doc.documentType },
+  });
+  const latestVersionRow = doc.versions[0] ?? null;
+  const latestVersionForCalc = latestVersionRow
+    ? { uploadedAt: latestVersionRow.uploadedAt }
+    : null;
+  const complianceStatus = calculateStatus(rule, doc, latestVersionForCalc);
+  // Expiry is only meaningful for ACTIVE filings (COMPLIANT/EXPIRING/OVERDUE).
+  // Matches the matrix's exclusion logic in matrix.ts.
+  const complianceExpiresAt =
+    latestVersionForCalc &&
+    complianceStatus !== "NOT_APPLICABLE" &&
+    complianceStatus !== "MISSING" &&
+    complianceStatus !== "AWAITING_REVIEW"
+      ? computeExpiryDateFromApproval(
+          doc,
+          latestVersionForCalc,
+          rule?.renewalYears ?? 0,
+        ).toISOString()
+      : null;
+
   // Serialize dates
   const document = {
     ...doc,
@@ -127,6 +169,14 @@ export async function GET(
       uploadedByEmail: v.uploadedById ? (uploaderMap.get(v.uploadedById) ?? "Unknown") : "Unknown",
       effectiveDate: v.effectiveDate?.toISOString() ?? null,
     })),
+    // Wave 2 / Item 1: compliance snapshot — drives the compliance card on
+    // the document-detail page. Single source of truth: the calculator
+    // module (no second copy of the status logic).
+    compliance: {
+      status: complianceStatus,
+      expiresAt: complianceExpiresAt,
+      renewalYears: rule?.renewalYears ?? null,
+    },
   };
 
   return NextResponse.json({ document });

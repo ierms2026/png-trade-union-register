@@ -1,11 +1,11 @@
 "use client";
 
-import { getUnionStatusLabel } from "@/lib/dashboard/vocabulary";
+import { getUnionStatusLabel, COMPLIANCE_STATUS_CONFIG, getComplianceStatusLabel, REVIEW_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
 import { useState } from "react";
 import {
   FileText, Building2, ChevronLeft, Download, Eye, Clock,
   CheckCircle2, XCircle, Calendar, User, HardDrive, Hash,
-  AlertCircle, History,
+  AlertCircle, History, ShieldCheck, ScrollText, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { useFetch } from "@/components/app/use-fetch";
 import { CardListSkeleton } from "@/components/app/skeletons";
 import { ErrorState } from "@/components/app/error-state";
 import { DocumentPreviewModal } from "@/components/app/document-preview-modal";
+import type { ComplianceStatus } from "@/lib/dashboard/status-config";
 
 // =============================================================================
 // DocumentDetailView — chunk 11
@@ -68,15 +69,26 @@ interface DocumentDetail {
     contactPhone: string | null;
   };
   versions: DocumentVersion[];
+  // Wave 2 / Item 1: compliance snapshot — computed server-side by the
+  // /api/documents/[id] route using the same calculator as the matrix.
+  compliance?: {
+    status: ComplianceStatus;
+    expiresAt: string | null;
+    renewalYears: number | null;
+  };
 }
 
 interface DocumentDetailResponse {
   document: DocumentDetail;
 }
 
-import { REVIEW_STATUS_CONFIG } from "@/lib/dashboard/vocabulary";
-
-export function DocumentDetailView({ documentId }: { documentId: string }) {
+export function DocumentDetailView({
+  documentId,
+  user,
+}: {
+  documentId: string;
+  user?: { role: string };
+}) {
   const { data, loading, error, refetch } = useFetch<DocumentDetailResponse>(
     `/api/documents/${documentId}`,
   );
@@ -222,6 +234,19 @@ export function DocumentDetailView({ documentId }: { documentId: string }) {
         </CardContent>
       </Card>
 
+      {/* Wave 2 / Item 1: Compliance card — live status for THIS document.
+          Sits above the version history so the user sees "is this doc
+          compliant?" before drilling into version details. */}
+      {doc.compliance && (
+        <DocumentComplianceCard
+          status={doc.compliance.status}
+          expiresAt={doc.compliance.expiresAt}
+          renewalYears={doc.compliance.renewalYears}
+          reviewedAt={doc.reviewedAt}
+          disposedAt={doc.disposedAt}
+        />
+      )}
+
       {/* Version history */}
       <Card>
         <CardHeader>
@@ -321,6 +346,15 @@ export function DocumentDetailView({ documentId }: { documentId: string }) {
         </CardContent>
       </Card>
 
+      {/* Wave 2 / Item 2: Inline audit trail — last 5 entries for THIS
+          document. REGISTRAR + INSPECTOR only (the audit API returns 403
+          for Officers; we hide the section entirely rather than show an
+          error card — Officers have no business seeing audit data per
+          IA-2 + the existing Union Hub History tab pattern). */}
+      {user && user.role !== "OFFICER" && (
+        <InlineAuditTrail documentId={doc.id} />
+      )}
+
       {/* Preview modal */}
       {previewVersion && (
         <DocumentPreviewModal
@@ -335,6 +369,244 @@ export function DocumentDetailView({ documentId }: { documentId: string }) {
       )}
     </div>
   );
+}
+
+// =============================================================================
+// Wave 2 / Item 1: DocumentComplianceCard — live compliance status for the
+// document being viewed. Reuses the same STATUS_VISUAL tokens + label
+// function as the compliance matrix (single source of truth).
+// =============================================================================
+
+// Visual tokens for the compliance card. Same color pairs as the matrix cells
+// (COMPLIANCE_STATUS_CONFIG.cell in vocabulary.ts). Duplicated here as a
+// small lookup so we don't have to thread the type through vocabulary.ts's
+// StatusConfig — but the LABELS still come from COMPLIANCE_STATUS_CONFIG
+// (single source of truth for status names).
+const CARD_STATUS_VISUAL: Record<ComplianceStatus, { bg: string; border: string; text: string }> = {
+  COMPLIANT: { bg: "bg-green-50 dark:bg-green-950/30", border: "border-green-200 dark:border-green-900", text: "text-green-800 dark:text-green-300" },
+  EXPIRING: { bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-amber-200 dark:border-amber-900", text: "text-amber-800 dark:text-amber-300" },
+  OVERDUE: { bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-900", text: "text-red-800 dark:text-red-300" },
+  AWAITING_REVIEW: { bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-900", text: "text-blue-800 dark:text-blue-300" },
+  MISSING: { bg: "bg-muted", border: "border-border", text: "text-muted-foreground" },
+  NOT_APPLICABLE: { bg: "bg-muted/50", border: "border-border", text: "text-muted-foreground" },
+};
+
+function DocumentComplianceCard({
+  status,
+  expiresAt,
+  renewalYears,
+  reviewedAt,
+  disposedAt,
+}: {
+  status: ComplianceStatus;
+  expiresAt: string | null;
+  renewalYears: number | null;
+  reviewedAt: string | null;
+  disposedAt: string | null;
+}) {
+  const cfg = COMPLIANCE_STATUS_CONFIG[status];
+  const Icon = cfg.icon;
+  const visual = CARD_STATUS_VISUAL[status];
+  const label = getComplianceStatusLabel(status);
+  const definition = cfg.definition;
+
+  // Days until expiry — only meaningful for COMPLIANT/EXPIRING/OVERDUE.
+  // For other statuses we hide this row entirely.
+  const daysUntilExpiry = expiresAt
+    ? Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return (
+    <Card className={`${visual.border}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheck className="h-4 w-4" />
+          Compliance Status
+        </CardTitle>
+        <CardDescription>
+          Live status for this document, computed from the same rules as the compliance matrix.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Status row — big colored badge + label */}
+        <div className={`flex items-center gap-3 rounded-md border ${visual.border} ${visual.bg} p-3`}>
+          <Icon className={`h-6 w-6 ${visual.text}`} aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className={`text-base font-semibold ${visual.text}`}>{label}</p>
+            <p className="text-xs text-muted-foreground">{definition}</p>
+          </div>
+        </div>
+
+        {/* Details grid — expiry, approval date, renewal period */}
+        <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+          {expiresAt && daysUntilExpiry !== null && (
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Expires</p>
+              <p className="font-medium">
+                {new Date(expiresAt).toLocaleDateString()}
+              </p>
+              <p className={`text-xs ${daysUntilExpiry < 0 ? "text-red-600 dark:text-red-400" : daysUntilExpiry <= 90 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                {daysUntilExpiry < 0
+                  ? `${Math.abs(daysUntilExpiry)} day${Math.abs(daysUntilExpiry) === 1 ? "" : "s"} overdue`
+                  : daysUntilExpiry === 0
+                    ? "Expires today"
+                    : `${daysUntilExpiry} day${daysUntilExpiry === 1 ? "" : "s"} remaining`}
+              </p>
+            </div>
+          )}
+          {reviewedAt && (
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Approved On</p>
+              <p className="font-medium">{new Date(reviewedAt).toLocaleDateString()}</p>
+              <p className="text-xs text-muted-foreground">Renewal clock start</p>
+            </div>
+          )}
+          {renewalYears !== null && (
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Renewal Period</p>
+              <p className="font-medium">{renewalYears} year{renewalYears === 1 ? "" : "s"}</p>
+              <p className="text-xs text-muted-foreground">Per compliance rule</p>
+            </div>
+          )}
+          {disposedAt && (
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Disposed On</p>
+              <p className="font-medium">{new Date(disposedAt).toLocaleDateString()}</p>
+              <p className="text-xs text-muted-foreground">No longer active</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================================
+// Wave 2 / Item 2: InlineAuditTrail — last 5 audit entries for THIS document.
+//
+// Fetches /api/audit?entityType=Document&entityId=<docId>&limit=5. The audit
+// API returns 403 for Officers, but the parent component guards this render
+// with `user.role !== "OFFICER"` — so this component only mounts for
+// REGISTRAR + INSPECTOR.
+//
+// Shows a "View full audit log →" link at the bottom that deep-links to the
+// Audit view filtered to this document (the Audit view already supports
+// entityType + entityId filters via URL params).
+// =============================================================================
+
+interface AuditEntry {
+  id: string;
+  action: string;
+  actorName: string;
+  createdAt: string;
+  entityType: string;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+}
+
+interface AuditResponse {
+  entries: AuditEntry[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+function InlineAuditTrail({ documentId }: { documentId: string }) {
+  const { data, loading, error } = useFetch<AuditResponse>(
+    `/api/audit?entityType=Document&entityId=${encodeURIComponent(documentId)}&limit=5`,
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ScrollText className="h-4 w-4" />
+          Audit Trail
+        </CardTitle>
+        <CardDescription>
+          Last 5 audit entries for this document.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading audit entries…</p>
+        ) : error ? (
+          <p className="text-sm text-destructive">Error loading audit entries: {error}</p>
+        ) : !data || data.entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            No audit entries for this document yet. Actions like review, retention approval, and download will appear here.
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-2">
+              {data.entries.map((e) => (
+                <li
+                  key={e.id}
+                  className={`rounded-md border px-3 py-2 text-sm ${
+                    e.severity === "CRITICAL"
+                      ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30"
+                      : e.severity === "WARNING"
+                        ? "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"
+                        : "border-border bg-muted/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{formatAuditAction(e.action)}</span>
+                    <time className="text-xs text-muted-foreground">
+                      {new Date(e.createdAt).toLocaleString()}
+                    </time>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    by {e.actorName}
+                    {e.severity !== "INFO" && (
+                      <span className={`ml-2 inline-flex items-center gap-0.5 font-medium ${e.severity === "CRITICAL" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>
+                        <AlertCircle className="h-3 w-3" />
+                        {e.severity.toLowerCase()}
+                      </span>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            {data.total > data.entries.length && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Showing {data.entries.length} of {data.total} entries.{" "}
+                <Link
+                  href={`/?view=audit&entityType=Document&entityId=${encodeURIComponent(documentId)}`}
+                  className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+                >
+                  View full audit log
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Convert snake_case audit action names to human-readable labels.
+// e.g. "document_review_approve" → "Document review approved"
+function formatAuditAction(action: string): string {
+  // Common document actions — map to friendly past-tense labels.
+  const ACTION_LABELS: Record<string, string> = {
+    document_review_approve: "Document approved",
+    document_review_reject: "Document rejected",
+    document_retention_approve: "Retention approved",
+    document_retention_reject: "Retention rejected",
+    document_disposition_execute: "Disposition executed",
+    document_disposition_cancel: "Disposition cancelled",
+    document_legal_hold_place: "Legal hold placed",
+    document_legal_hold_lift: "Legal hold lifted",
+    document_upload: "Document uploaded",
+    document_version_uploaded: "New version uploaded",
+    document_view: "Document viewed",
+    document_download: "Document downloaded",
+    document_restore: "Version restored",
+    document_visibility_update: "Visibility updated",
+  };
+  return ACTION_LABELS[action] ?? action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function ContactRow({ label, value }: { label: string; value: string | null }) {

@@ -24,6 +24,11 @@ import { getUnionScope } from "@/lib/auth/union-scope";
 //                         REJECTED). Case-insensitive.
 //   ?startDate=YYYY-MM-DD — restrict to versions uploaded on/after this date
 //   ?endDate=YYYY-MM-DD   — restrict to versions uploaded on/before this date
+//   ?assignee=USER_ID   — Wave 2: restrict to documents in the union assigned
+//                         to this OFFICER user. Resolved server-side to a
+//                         unionId (the user's assignedUnionId) and applied
+//                         as an additional union filter. Ignored for OFFICER
+//                         callers (their search is already self-scoped).
 //
 // SORTING:
 //   ?sort=uploadedAt_desc  — (default) newest first
@@ -41,8 +46,9 @@ import { getUnionScope } from "@/lib/auth/union-scope";
 //
 // AUTH: Any authenticated role. Role-based scoping:
 //   - REGISTRAR + INSPECTOR → search across ALL unions' documents
-//   - OFFICER → scoped to their assigned union only. The ?union= filter
-//     is IGNORED for OFFICERs (they can only search their own union).
+//   - OFFICER → scoped to their assigned union only. The ?union= and
+//     ?assignee= filters are IGNORED for OFFICERs (they can only search
+//     their own union).
 //     (REPRESENTATIVE was removed in D7; OFFICER is the only union-scoped
 //     staff role.)
 //
@@ -103,6 +109,7 @@ export async function GET(req: NextRequest) {
   const reviewStatusFilter = url.searchParams.get("reviewStatus");
   const startDate = url.searchParams.get("startDate"); // YYYY-MM-DD
   const endDate = url.searchParams.get("endDate"); // YYYY-MM-DD
+  const assigneeFilter = url.searchParams.get("assignee"); // Wave 2: officer user ID
   const sortParam = url.searchParams.get("sort") || "uploadedAt_desc";
 
   // Pagination params
@@ -156,6 +163,40 @@ export async function GET(req: NextRequest) {
   } else if (unionFilter) {
     // Registrar/Inspector: honor the ?union= filter if set.
     documentWhere.unionId = unionFilter;
+  }
+
+  // Wave 2: ?assignee=USER_ID — resolve to a unionId and AND it into the
+  // document where. Ignored for OFFICER callers (their search is already
+  // self-scoped to their own union — the filter is meaningless for them).
+  //
+  // We look up the user (must be an OFFICER, must not be disabled, must have
+  // an assignedUnionId). If the lookup fails OR the user has no assigned
+  // union, we AND in a sentinel unionId ("__none__") that matches nothing —
+  // this makes the filter return 0 results, which is the correct semantic
+  // (an officer with no assigned union has no documents to find).
+  //
+  // If both ?union= and ?assignee= are set, both apply (AND). The result
+  // set is the intersection — only documents in BOTH the specified union
+  // AND the officer's assigned union. In practice users set one or the
+  // other, but ANDing is the safe default.
+  if (assigneeFilter && scope.kind !== "union") {
+    const officer = await db.user.findUnique({
+      where: { id: assigneeFilter },
+      select: { id: true, role: true, disabled: true, assignedUnionId: true },
+    });
+    if (
+      officer &&
+      officer.role === Role.OFFICER &&
+      !officer.disabled &&
+      officer.assignedUnionId
+    ) {
+      // AND with any existing unionId filter (intersection).
+      documentWhere.unionId = officer.assignedUnionId;
+    } else {
+      // Invalid assignee (not an officer, disabled, or no assigned union).
+      // Sentinel that matches nothing — 0 results, the correct semantic.
+      documentWhere.unionId = "__none__";
+    }
   }
 
   // Document type filter

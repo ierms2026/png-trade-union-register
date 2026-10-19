@@ -1662,3 +1662,79 @@ Stage Summary:
   4. Tab through the dashboard and verify focus rings still appear correctly on each button (the shadcn focus-visible:ring-[3px] styling is unchanged).
   5. Check dark mode — the icon color tokens (text-muted-foreground, text-destructive) still apply correctly to the now-larger buttons.
 - Wave 1 status: BOTH items (Item 1 — compliance cell icon+aria-label; Item 2 — button touch targets) COMPLETE. Ready to move to Wave 2 (record detail compliance card, inline audit trail, search improvements).
+
+---
+Task ID: 7
+Agent: main (Wave 2 — three sub-tasks)
+Task: Audit Wave 2 — record detail compliance card, inline audit trail, search improvements (assigned officer filter)
+
+Work Log:
+- Asked the user 5 clarifying questions (scope, card location, audit count, search features, style). Got: ALL THREE sub-tasks, card TOP-above-versions, LAST 5 audit entries, date range + assigned officer + sort controls (date range + sort were already done in a prior session — only assigned officer was new), match existing visual style.
+- Audit discovered the search view + API already had date-range + sort controls (implemented prior session per conversation summary). Only the assigned officer filter was new.
+
+Item 1 — Document compliance card:
+- MOD src/app/api/documents/[id]/route.ts: extended the GET handler to compute + return a `compliance` object. Uses the SAME pure calculator as the compliance matrix (calculateStatus + computeExpiryDateFromApproval from src/lib/compliance/calculator.ts — no second copy of status logic). Looks up the ComplianceRule for the document's type via findUnique({ where: { documentType } }) (the field is @unique in the schema). Returns `{ status, expiresAt, renewalYears }`. Expiry is null for MISSING / NOT_APPLICABLE / AWAITING_REVIEW (matches matrix.ts exclusion).
+- MOD src/components/app/views/document-detail.tsx: added `compliance?` field to the DocumentDetail interface; added a new DocumentComplianceCard component rendered ABOVE the version history card (per user choice). The card reuses COMPLIANCE_STATUS_CONFIG[status].icon + getComplianceStatusLabel(status) (T20 single-source-of-truth contract preserved). Shows: status icon + label + definition in a color-coded strip (matches the matrix's color pairs); details grid with Expires (date + days-remaining/overdue with red/amber/muted color coding), Approved On (reviewedAt), Renewal Period (renewalYears), Disposed On (if applicable).
+
+Item 2 — Inline audit trail (last 5):
+- MOD src/app/api/audit/route.ts: added ?entityId=<id> filter. Reads from URL, applies to where clause as `where.entityId = entityId`. Updated the docstring to mention the new param + the inline audit trail use case.
+- MOD src/components/app/views/document-detail.tsx: added a new InlineAuditTrail component rendered AFTER the version history card. Fetches `/api/audit?entityType=Document&entityId=<docId>&limit=5`. Shows entries with severity-tinted backgrounds (red for CRITICAL, amber for WARNING, muted for INFO). Each entry shows action (human-readable via formatAuditAction lookup table), actor name, timestamp, severity badge. When there are more than 5 entries, shows a "View full audit log →" deep-link to `/?view=audit&entityType=Document&entityId=<docId>`. Defensive: loading state, error state, and friendly empty state ("No audit entries for this document yet. Actions like review, retention approval, and download will appear here.").
+- MOD src/app/page.tsx: passes `user={currentUser}` to DocumentDetailView so the role guard works.
+- MOD src/components/app/views/document-detail.tsx signature: now accepts `user?: { role: string }`. The InlineAuditTrail is only rendered for non-OFFICER users (`user.role !== "OFFICER"`) — matches the Union Hub History tab pattern. The audit API would return 403 for Officers anyway, but hiding the section entirely is cleaner than showing an error card.
+- Added a formatAuditAction() helper that converts snake_case audit action names to past-tense English labels (e.g. "document_review_approve" → "Document approved"). Has a lookup table for the 14 common document actions + a fallback that Title-Cases the snake_case name (defensive — never shows raw snake_case to users).
+
+Item 3 — Search assigned officer filter:
+- NEW src/app/api/officers/route.ts: GET endpoint that lists OFFICER-role, non-disabled users + their assigned union name. AUTH: REGISTRAR + INSPECTOR (Officers get 403 — their search is already self-scoped, the filter is meaningless for them). Returns `{ officers: [{ id, email, assignedUnionId, unionName }] }`. Uses a batched union lookup (single db.union.findMany with `in` clause) instead of N+1 — the User model has assignedUnionId but NO Prisma relation to Union (the relation was never declared in the schema), so we do two queries + a client-side join. Strips sensitive fields (passwordHash, twoFactorSecret, passwordResetToken) via explicit `select`.
+- MOD src/app/api/search/route.ts: added ?assignee=USER_ID param. Resolves server-side to the officer's assignedUnionId (db.user.findUnique → check role === OFFICER + !disabled + assignedUnionId present). Applies as a union filter (ANDs with any existing ?union= filter). Skipped for OFFICER callers (scope.kind === "union" — their search is already self-scoped). Invalid assignee (non-officer, disabled, no assigned union) → sentinel unionId "__none__" that matches nothing (0 results, the correct semantic — and avoids leaking info about whether the user ID exists). Updated the docstring.
+- MOD src/components/app/views/search.tsx: added Officer + OfficersResponse interfaces. Added assigneeFilter state (initialized from URL ?assignee param, default "all"). Added useFetch<OfficersResponse>("/api/officers"). Added showAssigneeFilter = !officersError && officers.length > 0 (hides the dropdown for Officers + when there are no officers in the system). Added handleAssigneeChange handler. Added the dropdown UI between the Review status filter and the Date-range filter. Updated readInitialState, pushToUrl, handleUrlChange (Back/Forward sync), handleClear, handleClearFilters, hasFilters, and the apiQuery useMemo to include the assignee param. The dropdown shows "email — unionName" for each officer (e.g. "jane@example.com — Alpha Union") so users can identify the right officer without a separate lookup.
+
+Tests:
+- NEW src/lib/__tests__/wave2-doc-compliance-card.test.ts (11 tests): API imports the shared calculator; API looks up ComplianceRule; API returns compliance object; API excludes expiry for MISSING/NA/AWAITING_REVIEW; view imports COMPLIANCE_STATUS_CONFIG + getComplianceStatusLabel; view defines DocumentComplianceCard; card renders above version history; card only renders when doc.compliance present (defensive); card uses COMPLIANCE_STATUS_CONFIG[status].icon; card uses getComplianceStatusLabel (no hardcoded status literals — T20 contract); card shows days-until-expiry with red/amber/muted color coding.
+- NEW src/lib/__tests__/wave2-inline-audit-trail.test.ts (12 tests): API supports ?entityId; API docstring mentions the use case; view defines InlineAuditTrail; InlineAuditTrail fetches with entityType=Document + entityId + limit=5; view only renders for non-OFFICER users; page.tsx passes user prop; DocumentDetailView accepts user prop; "View full audit log" deep-link present; friendly empty state; loading state; error handling; formatAuditAction lookup table covers common document actions.
+- NEW src/lib/__tests__/wave2-search-assignee-filter.test.ts (23 tests): endpoint file exists; rejects unauthenticated (401); rejects OFFICER (403); only returns OFFICER-role + non-disabled users; returns id+email+assignedUnionId+unionName; doesn't return sensitive fields (passwordHash, twoFactorSecret, passwordResetToken); uses batched union lookup (no N+1); API reads ?assignee; API docstring documents the param + OFFICER bypass; API resolves assignee server-side (no client leak); API rejects invalid assignee with 0 results (sentinel "__none__"); API skips for OFFICER callers; view defines Officer interface + fetches /api/officers; view has assigneeFilter state; view initializes from URL; view only renders dropdown when /api/officers succeeds + has results; view sends ?assignee= to API; view pushes ?assignee= to URL; view includes assignee in handleClearFilters; view includes assignee in hasFilters; view handles Back/Forward; dropdown shows email + union name; dropdown includes "All officers" default option.
+
+Verification:
+- Lint: PASS for all 10 changed files (npx eslint → 0 errors). Full `npm run lint` shows 33 pre-existing errors + 7 warnings in unrelated files (baseline before Wave 2 was also 33+7 — no new errors introduced).
+- Type check: PASS (tsc --noEmit → 0 errors). Initially had 2 errors in officers/route.ts (used a non-existent `assignedUnion` Prisma relation — the User model has assignedUnionId but no relation field). Fixed by switching to a batched db.union.findMany + client-side join.
+- Unit tests: PASS — 74 files / 1075 tests (was 1029/71 after Wave 1 Item 2; +3 files, +46 tests, 0 regressions).
+- Build: PASS (NEXT_BUILD with SESSION_SECRET + DEMO_PASSWORD env vars → exit 0, "✓ Compiled successfully in 26.8s", 62/62 static pages — was 61, the new /api/officers route added one).
+
+Stage Summary:
+- Files modified: 6
+  * src/app/api/audit/route.ts (+7 lines — entityId filter)
+  * src/app/api/documents/[id]/route.ts (+50 lines — compliance computation + response field)
+  * src/app/api/search/route.ts (+45 lines — assignee param + resolution)
+  * src/app/page.tsx (+1 line — pass user to DocumentDetailView)
+  * src/components/app/views/document-detail.tsx (+282 lines — DocumentComplianceCard + InlineAuditTrail + formatAuditAction + types)
+  * src/components/app/views/search.tsx (+70 lines — Officer type, assignee state, dropdown UI, URL sync)
+- Files added: 4
+  * src/app/api/officers/route.ts (NEW endpoint, 103 lines)
+  * src/lib/__tests__/wave2-doc-compliance-card.test.ts (11 tests, 124 lines)
+  * src/lib/__tests__/wave2-inline-audit-trail.test.ts (12 tests, 110 lines)
+  * src/lib/__tests__/wave2-search-assignee-filter.test.ts (23 tests, 178 lines)
+- Migration steps: NONE. No schema change (uses existing assignedUnionId field — no new Prisma relation needed). No env change. No DB migration. The fix is pure API + UI.
+- Manual test steps:
+  * Compliance card:
+    1. `npm run dev` → log in as REGISTRAR → open any document (e.g. from Documents view, click a document).
+    2. Verify the "Compliance Status" card appears BETWEEN the Union Contact Information card and the Version History card.
+    3. Verify the card shows: a colored status strip (green/amber/red/blue/gray depending on status), the status label (e.g. "Compliant"), the definition, and a details grid with Expires/Approved On/Renewal Period.
+    4. Verify the days-remaining text is correctly color-coded (red for overdue, amber for ≤90 days, muted for >90 days).
+    5. Open a PENDING document — verify the card shows "Awaiting Review" with no expiry date (the expiry is null for AWAITING_REVIEW per the matrix exclusion).
+    6. Open a NOT_APPLICABLE document (if any) — verify the card shows "Not Applicable" with no expiry.
+  * Inline audit trail:
+    1. As REGISTRAR, on the same document-detail page, scroll to the bottom.
+    2. Verify the "Audit Trail" card appears AFTER the Version History card.
+    3. Verify it shows up to 5 audit entries with severity-tinted backgrounds.
+    4. Each entry should show: a human-readable action name (e.g. "Document approved" not "document_review_approve"), the actor name, timestamp, and severity badge (only for WARNING/CRITICAL).
+    5. If the document has >5 entries, verify the "View full audit log →" link appears and navigates to /?view=audit&entityType=Document&entityId=<docId>.
+    6. Log in as OFFICER → open a document in your union → verify the Audit Trail card is HIDDEN (Officers can't see audit data per IA-2).
+  * Search assigned officer filter:
+    1. As REGISTRAR, go to Search view (`/?view=search`).
+    2. Verify the "All officers" dropdown appears BETWEEN the "All statuses" dropdown and the date-range inputs.
+    3. Type a search query (≥2 chars) → select an officer from the dropdown → verify results are filtered to that officer's union's documents.
+    4. Verify the URL updates to include ?assignee=<userId>.
+    5. Click "Clear filters" → verify the assignee filter resets to "All officers".
+    6. Use browser Back/Forward → verify the assignee filter state is restored from the URL.
+    7. Log in as OFFICER → go to Search view → verify the "All officers" dropdown is HIDDEN (Officers' search is already self-scoped — the filter is meaningless for them).
+    8. Try an invalid assignee (e.g. manually set ?assignee=nonexistent-id in the URL) → verify 0 results returned (no error, no leak).
+- Wave 2 status: ALL THREE items COMPLETE (Item 1 — compliance card; Item 2 — inline audit trail; Item 3 — assigned officer filter). Ready to move to Wave 3 (two-person approval workflow, document view audit log) or any other priority the user picks.

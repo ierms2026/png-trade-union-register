@@ -84,6 +84,19 @@ interface ComplianceResponse {
   documentTypes: string[];
 }
 
+// Wave 2 / Item 3: Officer list for the "Assigned officer" filter dropdown.
+// Fetched from /api/officers (REGISTRAR + INSPECTOR only — Officers get 403,
+// which useFetch treats as an error; we hide the dropdown in that case).
+interface Officer {
+  id: string;
+  email: string;
+  assignedUnionId: string | null;
+  unionName: string | null;
+}
+interface OfficersResponse {
+  officers: Officer[];
+}
+
 const PAGE_SIZE = 20;
 
 // =============================================================================
@@ -93,7 +106,7 @@ const PAGE_SIZE = 20;
 
 function readInitialState() {
   if (typeof window === "undefined") {
-    return { q: "", union: "all", documentType: "all", reviewStatus: "all", startDate: "", endDate: "", sort: "uploadedAt_desc", page: 1 };
+    return { q: "", union: "all", documentType: "all", reviewStatus: "all", startDate: "", endDate: "", assignee: "all", sort: "uploadedAt_desc", page: 1 };
   }
   const params = new URLSearchParams(window.location.search);
   return {
@@ -103,6 +116,7 @@ function readInitialState() {
     reviewStatus: params.get("reviewStatus") ?? "all",
     startDate: params.get("startDate") ?? "",
     endDate: params.get("endDate") ?? "",
+    assignee: params.get("assignee") ?? "all",
     sort: params.get("sort") ?? "uploadedAt_desc",
     page: Math.max(1, parseInt(params.get("page") || "1", 10) || 1),
   };
@@ -118,6 +132,10 @@ export function SearchView() {
   const [statusFilter, setStatusFilter] = useState(initial.reviewStatus);
   const [startDateFilter, setStartDateFilter] = useState(initial.startDate);
   const [endDateFilter, setEndDateFilter] = useState(initial.endDate);
+  // Wave 2 / Item 3: assigned officer filter. Resolved server-side to a
+  // unionId (the officer's assignedUnionId). Ignored for OFFICER callers
+  // (their search is already self-scoped).
+  const [assigneeFilter, setAssigneeFilter] = useState(initial.assignee);
   const [sortBy, setSortBy] = useState(initial.sort);
   const [page, setPage] = useState(initial.page);
 
@@ -126,8 +144,14 @@ export function SearchView() {
   // compliance matrix (for document types). These are lightweight payloads.
   const { data: unionsData } = useFetch<UnionsResponse>("/api/unions");
   const { data: complianceData } = useFetch<ComplianceResponse>("/api/compliance");
+  // Wave 2 / Item 3: fetch the officer list for the assignee dropdown.
+  // /api/officers returns 403 for OFFICER role — useFetch stores the error,
+  // we detect it and hide the dropdown. REGISTRAR + INSPECTOR get the list.
+  const { data: officersData, error: officersError } = useFetch<OfficersResponse>("/api/officers");
   const unions = unionsData?.unions ?? [];
   const documentTypes = complianceData?.documentTypes ?? [];
+  const officers = officersData?.officers ?? [];
+  const showAssigneeFilter = !officersError && officers.length > 0;
 
   // --- Build the API query string -----------------------------------------
   // The API is fetched whenever submittedQuery or any filter/page changes.
@@ -141,11 +165,12 @@ export function SearchView() {
     if (statusFilter !== "all") params.set("reviewStatus", statusFilter);
     if (startDateFilter) params.set("startDate", startDateFilter);
     if (endDateFilter) params.set("endDate", endDateFilter);
+    if (assigneeFilter !== "all") params.set("assignee", assigneeFilter);
     if (sortBy !== "uploadedAt_desc") params.set("sort", sortBy);
     params.set("page", String(page));
     params.set("limit", String(PAGE_SIZE));
     return `/api/search?${params.toString()}`;
-  }, [shouldFetch, submittedQuery, unionFilter, typeFilter, statusFilter, startDateFilter, endDateFilter, sortBy, page]);
+  }, [shouldFetch, submittedQuery, unionFilter, typeFilter, statusFilter, startDateFilter, endDateFilter, assigneeFilter, sortBy, page]);
 
   const { data, loading, error, refetch } = useFetch<SearchResponse>(apiQuery);
 
@@ -164,6 +189,7 @@ export function SearchView() {
       setStatusFilter(state.reviewStatus);
       setStartDateFilter(state.startDate);
       setEndDateFilter(state.endDate);
+      setAssigneeFilter(state.assignee);
       setSortBy(state.sort);
       setPage(state.page);
     }
@@ -178,13 +204,14 @@ export function SearchView() {
   // --- Push the current state to the URL ----------------------------------
   // Called by "Search" submit, filter changes, and page changes. Builds a
   // fresh URL with all params, then pushes it.
-  function pushToUrl(overrides: { q?: string; union?: string; documentType?: string; reviewStatus?: string; startDate?: string; endDate?: string; sort?: string; page?: number }) {
+  function pushToUrl(overrides: { q?: string; union?: string; documentType?: string; reviewStatus?: string; startDate?: string; endDate?: string; assignee?: string; sort?: string; page?: number }) {
     const q = overrides.q ?? submittedQuery;
     const union = overrides.union ?? unionFilter;
     const documentType = overrides.documentType ?? typeFilter;
     const reviewStatus = overrides.reviewStatus ?? statusFilter;
     const startDate = overrides.startDate ?? startDateFilter;
     const endDate = overrides.endDate ?? endDateFilter;
+    const assignee = overrides.assignee ?? assigneeFilter;
     const sort = overrides.sort ?? sortBy;
     const newPage = overrides.page ?? page;
     const url = new URL(window.location.origin + "/");
@@ -195,6 +222,7 @@ export function SearchView() {
     if (reviewStatus !== "all") url.searchParams.set("reviewStatus", reviewStatus);
     if (startDate) url.searchParams.set("startDate", startDate);
     if (endDate) url.searchParams.set("endDate", endDate);
+    if (assignee !== "all") url.searchParams.set("assignee", assignee);
     if (sort !== "uploadedAt_desc") url.searchParams.set("sort", sort);
     if (newPage > 1) url.searchParams.set("page", String(newPage));
     window.history.pushState({}, "", url.toString());
@@ -221,6 +249,7 @@ export function SearchView() {
     if (unionFilter !== "all") url.searchParams.set("union", unionFilter);
     if (typeFilter !== "all") url.searchParams.set("documentType", typeFilter);
     if (statusFilter !== "all") url.searchParams.set("reviewStatus", statusFilter);
+    if (assigneeFilter !== "all") url.searchParams.set("assignee", assigneeFilter);
     window.history.pushState({}, "", url.toString());
   }
 
@@ -254,6 +283,14 @@ export function SearchView() {
     pushToUrl({ endDate: value, page: 1 });
   }
 
+  // Wave 2 / Item 3: assigned officer filter handler. Resets page to 1
+  // (the result set changes when the filter changes).
+  function handleAssigneeChange(value: string) {
+    setAssigneeFilter(value);
+    setPage(1);
+    pushToUrl({ assignee: value, page: 1 });
+  }
+
   function handleSortChange(value: string) {
     setSortBy(value);
     pushToUrl({ sort: value });
@@ -265,8 +302,9 @@ export function SearchView() {
     setStatusFilter("all");
     setStartDateFilter("");
     setEndDateFilter("");
+    setAssigneeFilter("all");
     setPage(1);
-    pushToUrl({ union: "all", documentType: "all", reviewStatus: "all", startDate: "", endDate: "", page: 1 });
+    pushToUrl({ union: "all", documentType: "all", reviewStatus: "all", startDate: "", endDate: "", assignee: "all", page: 1 });
   }
 
   function handlePageChange(newPage: number) {
@@ -276,7 +314,7 @@ export function SearchView() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  const hasFilters = unionFilter !== "all" || typeFilter !== "all" || statusFilter !== "all" || startDateFilter !== "" || endDateFilter !== "";
+  const hasFilters = unionFilter !== "all" || typeFilter !== "all" || statusFilter !== "all" || startDateFilter !== "" || endDateFilter !== "" || assigneeFilter !== "all";
   const results = data?.results ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 0;
@@ -401,6 +439,28 @@ export function SearchView() {
               </SelectContent>
             </Select>
           </div>
+          {/* Wave 2 / Item 3: Assigned officer filter.
+              Only shown for REGISTRAR + INSPECTOR (Officers get 403 from
+              /api/officers — useFetch stores the error, showAssigneeFilter
+              stays false). Officers' search is already self-scoped, so the
+              filter is meaningless for them. */}
+          {showAssigneeFilter && (
+            <div className="w-56">
+              <Select value={assigneeFilter} onValueChange={handleAssigneeChange}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="All officers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All officers</SelectItem>
+                  {officers.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.email}{o.unionName ? ` — ${o.unionName}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {/* Date-range filter */}
           <div className="flex items-center gap-1.5">
             <Input
