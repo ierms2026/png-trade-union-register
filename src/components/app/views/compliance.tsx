@@ -433,14 +433,22 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
                   {row.scores.map((cell) => {
                     const cfg = STATUS_VISUAL[cell.status];
                     const dimmed = filter !== "ALL" && cell.status !== filter;
+                    // WCAG 1.4.1 (Use of Color): the cell color is no longer the
+                    // sole status indicator — the STATUS_VISUAL icon (check, X,
+                    // alert, clock, etc.) gives a non-color cue. The aria-label
+                    // gives screen readers a textual name for the cell so the
+                    // matrix is navigable without sight.
+                    const Icon = cfg.icon;
                     return (
                       <td key={cell.documentType} className="px-3 py-3 text-center">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span
+                              role="img"
+                              aria-label={`${row.unionName} — ${cell.documentType}: ${getComplianceStatusLabel(cell.status)}`}
                               className={`inline-flex h-7 w-7 cursor-help items-center justify-center rounded-full border ${cfg.cell} ${dimmed ? "opacity-25" : ""}`}
                             >
-                              <span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
+                              <Icon className="h-3.5 w-3.5" />
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-[220px]">

@@ -1544,3 +1544,44 @@ Work Log:
 - Tests: 884/59 pass. tsc 0 errors. Build compiles.
 
 Files changed: nav-structure.ts, vocabulary.ts, content-definitions.ts, unions.tsx, compliance.tsx, search.tsx, dashboard.tsx, dashboard-nav.test.ts, label-source-guard.test.ts, ia3-findability.test.ts, CONTENT.md
+
+---
+Task ID: 5
+Agent: main (Wave 1 / Item 1)
+Task: Audit Wave 1 — Immediate Fixes (High risk, Small effort), Item 1 only: Compliance matrix cells — add icon + aria-label (compliance.tsx)
+
+Work Log:
+- Read /home/z/my-project/src/components/app/views/compliance.tsx (the live compliance matrix component).
+- Found STATUS_VISUAL config (lines 69-76) already declares `icon: CheckCircle2 | AlertTriangle | XCircle | Clock | FileQuestion | Ban` for each status, but the cell renderer (row.scores.map block) only rendered a colored dot — the icon field was unused.
+- Replaced the inner `<span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />` with `<Icon className="h-3.5 w-3.5" />` (Icon = cfg.icon). Each cell now conveys status by SHAPE, not just color — fixes WCAG 1.4.1 (Use of Color).
+- Added `role="img"` and `aria-label={`${row.unionName} — ${cell.documentType}: ${getComplianceStatusLabel(cell.status)}`}` to the outer span so screen readers announce the cell identity without needing the hover tooltip.
+- Kept `cfg.dot` field in STATUS_VISUAL — still used by the legend at lines 282-303 (legend already has visible text labels, so it was not in scope for this fix).
+- Kept `cfg.cell` (color classes) and the `dimmed ? "opacity-25" : ""` filter-dim behavior intact — no visual regression to the existing color-coded matrix.
+- Added new contract test file: src/lib/__tests__/wave1-compliance-cell-a11y.test.ts (7 tests). Tests assert:
+  1. STATUS_VISUAL defines `icon` field.
+  2. Cells render `<Icon ... />` (not just the dot).
+  3. aria-label follows the `${unionName} — ${documentType}: ${statusLabel}` format with em-dash (U+2014).
+  4. role="img" present.
+  5. Dot span removed from cell block (regression guard).
+  6. Cell color classes + dimmed opacity preserved (no styling regression).
+  7. aria-label uses getComplianceStatusLabel (T20 single-source-of-truth contract preserved — no hardcoded "Compliant" / "Expiring" / etc. literals).
+- Used a whitespace-tolerant `extractMatrixCellBlock()` helper (Prettier reformats `(cell) => {` with spaces).
+
+Verification:
+- Lint: PASS for changed files (npx eslint compliance.tsx wave1-compliance-cell-a11y.test.ts → 0 errors). Full `npm run lint` shows 33 pre-existing errors in unrelated files (op01-hardening.test.ts, dispatcher.ts, sms.ts, etc.) — NOT introduced by this change, NOT in scope to fix.
+- Type check: PASS (tsc --noEmit → 0 errors).
+- Unit tests: PASS — 70 files / 1024 tests (was 1009/70; added 1 file with 7 tests, no regressions).
+- Build: PASS (NEXT_BUILD with SESSION_SECRET + DEMO_PASSWORD env vars → exit 0, "✓ Compiled successfully in 25.0s", 61/61 static pages generated). The pre-existing "Ecmascript file had an error" warnings about node:util in Edge Runtime are unrelated to this change.
+
+Stage Summary:
+- Files modified: 1 (src/components/app/views/compliance.tsx — cell renderer only, 11 lines changed in the row.scores.map block).
+- Files added: 1 (src/lib/__tests__/wave1-compliance-cell-a11y.test.ts — 7 contract tests, 124 lines).
+- Migration steps: NONE. No schema change, no env change, no DB migration. The fix is pure UI + a11y.
+- Manual test steps:
+  1. `npm run dev`, log in as REGISTRAR, navigate to "Compliance" view.
+  2. Verify each matrix cell shows an ICON (✓ for Compliant, ⚠ for Expiring, ✗ for Overdue, ⏱ for Awaiting Review, ? for Missing, ⊘ for N/A) — not just a colored dot.
+  3. Tab through the matrix with VoiceOver/NVDA running — each cell should announce e.g. "PNG Trade Union Congress — Constitution: Compliant" (no need to hover for the tooltip).
+  4. Use the status filter dropdown — filtered-out cells should still dim to opacity-25 (visual regression check).
+  5. Hover any cell — the existing tooltip with union name, doc type, status, expiry, document ID still appears (no tooltip regression).
+  6. Toggle dark mode — icon color follows the existing cell text color tokens (green-800/green-300, red-800/red-300, etc.) so contrast is preserved.
+- Constraints honored: no unrelated page touched, no functionality removed, no new UI library introduced (icon is from existing lucide-react import).
