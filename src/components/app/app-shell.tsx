@@ -4,12 +4,19 @@ import { Fragment, useState, useEffect, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, CheckCircle2, Settings2, GitCompare,
   ListTodo, Calendar, ScrollText, Users, Shield, Key, Bell, LogOut, CheckCheck, Home, FileCheck,
-  Search, MessageSquare,
+  Search, MessageSquare, Menu,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList,
   BreadcrumbPage, BreadcrumbSeparator,
@@ -197,6 +204,11 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
 
   // Chunk 6: Cmd+K / Ctrl+K opens the global search palette.
   const [searchOpen, setSearchOpen] = useState(false);
+  // Mobile sidebar Sheet state. The desktop sidebar (lg:block aside) is
+  // hidden below lg — this Sheet replaces it with a focus-trapped drawer
+  // that slides in from the left. Opens via the hamburger button in the
+  // header; closes on navigation, Escape, or overlay click.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       // Cmd+K (Mac) or Ctrl+K (Windows/Linux)
@@ -302,6 +314,21 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
       <header className="sticky top-0 z-30 border-b bg-card">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-3">
+            {/* Mobile sidebar hamburger (visible below lg only). Opens the
+                Sheet-wrapped SidebarNav below. Wave 5 mobile-nav feature:
+                previously mobile users had to use Cmd+K for nav — this
+                restores the standard hamburger + drawer pattern. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open navigation menu"
+              aria-haspopup="dialog"
+              aria-expanded={mobileNavOpen}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
             <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={28} height={23} className="h-7 w-auto" />
             <div className="hidden sm:block">
               <p className="text-sm font-semibold leading-tight">Register of Trade Unions</p>
@@ -395,12 +422,46 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
         <div className="h-1.5 bg-accent" />
       </header>
 
-      {/* IA-1: sidebar layout. The sidebar is hidden on mobile (below lg).
-          On mobile, nav is via Cmd+K palette + the user menu. */}
+      {/* IA-1: sidebar layout. The desktop sidebar is hidden on mobile
+          (below lg). On mobile, nav is via the hamburger Sheet below +
+          the Cmd+K palette + the user menu. */}
       <div className="flex flex-1 overflow-hidden">
         <aside className="hidden w-60 shrink-0 border-r bg-card lg:block">
           <SidebarNav nav={nav} standalone={standalone} activeView={activeView} onNavigate={onNavigate} />
         </aside>
+
+        {/* Mobile sidebar Sheet (visible below lg only). Slides in from the
+            left. The Sheet primitive (src/components/ui/sheet.tsx) is built
+            on Radix Dialog — gives us focus trap, Escape to close, overlay
+            click to close, and focus return to the hamburger trigger
+            automatically. The SidebarNav is reused (same component as the
+            desktop aside) so nav behavior is identical.
+
+            The onNavigate wrapper closes the Sheet before calling the real
+            onNavigate — so clicking a nav item dismisses the drawer and
+            navigates. This matches the user's expectation (the drawer
+            disappears when they pick a destination). */}
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+          <SheetContent side="left" className="w-72 p-0 sm:max-w-xs">
+            <SheetHeader className="border-b px-4 py-3">
+              <SheetTitle>Navigation</SheetTitle>
+              <SheetDescription>
+                Pick a destination to navigate. The menu closes automatically.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto">
+              <SidebarNav
+                nav={nav}
+                standalone={standalone}
+                activeView={activeView}
+                onNavigate={(view) => {
+                  setMobileNavOpen(false);
+                  onNavigate(view);
+                }}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="border-b bg-background">

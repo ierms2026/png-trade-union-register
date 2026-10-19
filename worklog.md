@@ -2071,3 +2071,71 @@ Stage Summary:
     8. Repeat for union-detail tab bar + calendar tab bar.
 - Wave 5 status: COMPLETE. Both deferred items implemented + tested.
 - All waves (1-5) now complete. Total running test count: 1220 (was 1009 at the start of Wave 1). Total new tests added across waves 1-5: 211.
+
+---
+Task ID: 11
+Agent: main (mobile sidebar hamburger — Wave 5 follow-up)
+Task: Mobile sidebar hamburger — currently mobile users navigate via the Cmd+K search palette; a true hamburger + focus-trapped Sheet would be a ~150-line feature
+
+Work Log:
+- Read src/components/ui/sheet.tsx — confirmed it's built on @radix-ui/react-dialog (provides focus trap, Escape to close, overlay click to close, focus return to trigger, aria-labelledby/describedby via SheetTitle/SheetDescription). No new dep needed.
+- Read src/components/app/app-shell.tsx — found the existing SidebarNav component (lines 112-184) + the desktop <aside className="hidden ... lg:block"> (line 428). The SidebarNav takes (nav, standalone, activeView, onNavigate) props.
+- Confirmed the layout: <aside> is hidden below lg; mobile users had to use Cmd+K palette. The audit (Wave 4) flagged this as out-of-a11y-scope but a real usability gap.
+
+Implementation (in src/components/app/app-shell.tsx, +64 lines):
+- Added imports: Menu icon (lucide-react) + Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription from @/components/ui/sheet.
+- Added state: const [mobileNavOpen, setMobileNavOpen] = useState(false) — controls the Sheet open/close.
+- Added hamburger button in the header, BEFORE the coat-of-arms image. Variant: ghost, size: icon, className: "lg:hidden" (visible only below lg). aria-label="Open navigation menu", aria-haspopup="dialog", aria-expanded={mobileNavOpen}. Uses <Menu className="h-5 w-5" />. onClick: setMobileNavOpen(true).
+- Added the Sheet drawer AFTER the desktop <aside> (inside the same <div className="flex flex-1 overflow-hidden"> parent):
+  * <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+  * <SheetContent side="left" className="w-72 p-0 sm:max-w-xs"> — slides in from the left (matches the desktop sidebar position). w-72 = 288px (slightly wider than the desktop w-60 = 240px — gives more tap area on mobile).
+  * <SheetHeader className="border-b px-4 py-3"> with <SheetTitle>Navigation</SheetTitle> + <SheetDescription>Pick a destination to navigate. The menu closes automatically.</SheetDescription>. These give the dialog a proper accessible name + description (Radix Dialog requires SheetTitle or logs a console warning).
+  * <div className="flex-1 overflow-y-auto"> wraps a <SidebarNav> — SAME component as the desktop aside (no duplication). The onNavigate prop is wrapped: (view) => { setMobileNavOpen(false); onNavigate(view); } — closes the drawer BEFORE navigating, matching the standard mobile-nav UX expectation.
+
+A11y guarantees (provided by Radix Dialog via the Sheet primitive — no custom code needed):
+- Focus trap: when the Sheet opens, focus moves inside; Tab cycles within the Sheet.
+- Escape closes the Sheet.
+- Overlay click (the bg-black/50 backdrop) closes the Sheet.
+- Focus returns to the hamburger trigger on close.
+- aria-labelledby (via SheetTitle) + aria-describedby (via SheetDescription) announce the dialog's purpose to SR users.
+- The hamburger button's aria-expanded={mobileNavOpen} + aria-haspopup="dialog" announce the trigger's state.
+
+Tests:
+- NEW src/lib/__tests__/mobile-sidebar-hamburger.test.ts (30 tests):
+  * Hamburger button (9 tests): imports Menu icon; imports Sheet primitives; visible only below lg (lg:hidden); aria-label="Open navigation menu"; aria-haspopup="dialog"; aria-expanded bound to mobileNavOpen; uses Menu icon; onClick opens the Sheet; size="icon" (Wave 1 touch-target rule preserved — used [\s\S] regex because the JSX spans multiple lines).
+  * Sheet drawer (8 tests): mobileNavOpen state exists; Sheet has open+onOpenChange bound; SheetContent side="left"; has SheetTitle (aria-labelledby); has SheetDescription (aria-describedby); reuses the SAME SidebarNav component (2 occurrences in the file); onNavigate wrapper closes the Sheet before navigating; receives the same nav+standalone+activeView props as the desktop aside.
+  * Desktop sidebar still works (2 tests): <aside> still lg:block; desktop aside still uses the original onNavigate (no wrapper, no setMobileNavOpen call).
+  * Sheet primitive a11y guarantees (7 tests): built on Radix Dialog; SheetClose (X button) exists; SheetClose has sr-only "Close" text; SheetTitle renders Radix Title (aria-labelledby); SheetDescription renders Radix Description (aria-describedby); supports side="left"; has overlay (bg-black/50) for click-outside-to-close.
+  * No regressions (4 tests): Wave 4 skip-to-content link still present; Wave 4 main id="main-content" still present; Wave 5 ScrollToTop still rendered; Wave 4 notifications Bell button still h-11 w-11.
+
+Verification:
+- Lint: PASS for changed files (npx eslint → 0 errors). Full `npm run lint` shows 33 pre-existing errors + 7 warnings in unrelated files (baseline before this task was also 33+7 — no new errors introduced).
+- Type check: PASS (tsc --noEmit → 0 errors).
+- Unit tests: PASS — 80 files / 1263 tests (was 1233/79 after ScrollToTop fix; +1 file, +30 tests, 0 regressions). Initial run had 1 failure (regex used [^>]* which doesn't match newlines in JS regex — fixed by switching to [\s\S]*? for multi-line JSX). All 30 mobile-sidebar tests passed on the SECOND run.
+- Build: PASS (NEXT_BUILD with SESSION_SECRET + DEMO_PASSWORD env vars → exit 0, "✓ Compiled successfully in 27.5s", 62/62 static pages — unchanged from prior; no new routes added, the Sheet is a client-side component).
+
+Stage Summary:
+- Files modified: 1
+  * src/components/app/app-shell.tsx (+64 lines — hamburger button in header + Sheet drawer alongside the desktop aside + imports + state)
+- Files added: 1
+  * src/lib/__tests__/mobile-sidebar-hamburger.test.ts (30 tests, 215 lines)
+- Migration steps: NONE. No schema change, no env change, no DB migration. Pure UI + a11y.
+- Constraints honored:
+  * No new dependencies (used existing lucide-react Menu icon + existing shadcn/ui Sheet primitive — both already in the project).
+  * No schema change, no env change.
+  * No unrelated page touched (only app-shell.tsx + the new test file).
+  * No functionality removed (desktop sidebar still works; Cmd+K palette still works; the Sheet is ADDITIVE — it gives mobile users a familiar nav pattern they didn't have before).
+  * SidebarNav component is REUSED (not duplicated) — same component renders in both the desktop aside + the mobile Sheet, so nav behavior is identical.
+- Manual test steps:
+  1. `npm run dev` → log in → resize browser window below lg (1024px).
+  2. Verify the hamburger button (≡) appears in the top-left of the header, BEFORE the coat-of-arms. The desktop sidebar should be hidden.
+  3. Click the hamburger → the Sheet drawer slides in from the left with the same SidebarNav content as the desktop.
+  4. Verify the drawer has a "Navigation" title + description at the top.
+  5. Tab through the drawer → focus stays INSIDE the drawer (focus trap). Shift+Tab cycles backward within the drawer.
+  6. Press Escape → the drawer closes. Focus returns to the hamburger button.
+  7. Click outside the drawer (on the dark overlay) → drawer closes.
+  8. Click the X button (top-right of the drawer) → drawer closes.
+  9. Open the drawer → click a nav item (e.g. "Compliance") → drawer closes AND the view navigates to Compliance.
+  10. Resize back to desktop (≥lg) → verify the hamburger disappears + the desktop sidebar reappears. The Sheet should NOT be openable (the trigger is hidden).
+  11. With a screen reader running → focus the hamburger → SR announces "Open navigation menu, button, collapsed". Click it → SR announces "Open navigation menu, button, expanded" then "Navigation, dialog, Pick a destination to navigate...".
+- Status: COMPLETE. The mobile sidebar hamburger feature is implemented + tested. The audit's "out-of-a11y-scope" deferred item is now addressed.
