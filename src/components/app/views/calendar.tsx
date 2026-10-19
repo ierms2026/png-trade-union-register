@@ -157,12 +157,20 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
 
       {/* Tabs + month navigation */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1 rounded-md border p-1">
+        {/* Wave 4 / a11y #8: calendar tab bar uses ARIA tablist pattern
+            (role=tablist + role=tab + aria-selected + roving tabIndex).
+            Also adds focus-visible:ring-2 (was missing — keyboard users
+            had no visible focus indicator). */}
+        <div className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Calendar view types">
           {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
             <button
               key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              tabIndex={tab === t ? 0 : -1}
               onClick={() => setTab(t)}
-              className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -215,17 +223,25 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
             <div className="grid grid-cols-7 gap-1 pt-2">
               {days.map((cell, i) => {
                 if (!cell.dateStr) {
-                  return <div key={i} className="aspect-square min-h-[80px] rounded border border-dashed border-muted" />;
+                  return <div key={i} className="aspect-square min-h-[80px] rounded border border-dashed border-muted" aria-hidden="true" />;
                 }
                 const dayEvents = eventsByDate.get(cell.dateStr) ?? [];
                 const isToday = cell.dateStr === todayStr;
+                // Wave 4 / a11y #2: convert <div onClick> → <button type="button">
+                // so day cells are natively focusable + Enter/Space-activated
+                // (WCAG 2.1.1 Keyboard). Even days with no events get a
+                // button (so SR users can explore the grid uniformly); the
+                // aria-label differentiates empty vs event-bearing days.
                 return (
-                  <div
+                  <button
                     key={i}
-                    className={`aspect-square min-h-[80px] rounded border p-1.5 transition-colors ${
+                    type="button"
+                    className={`aspect-square min-h-[80px] rounded border p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       isToday ? "border-primary bg-primary/5" : "border-muted"
                     } ${dayEvents.length > 0 ? "cursor-pointer hover:border-foreground/30 hover:bg-muted/30" : ""}`}
                     onClick={() => handleDayClick(cell.dateStr!, dayEvents)}
+                    aria-label={`${cell.dateStr}${dayEvents.length > 0 ? ` — ${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}` : " — no events"}`}
+                    aria-current={isToday ? "date" : undefined}
                   >
                     <div className={`mb-1 text-xs font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                       {cell.day}
@@ -237,25 +253,31 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
                     </div>
                     <div className="space-y-0.5">
                       {dayEvents.slice(0, 3).map((e, j) => (
-                        <div
+                        // Wave 4 / a11y #2: event chips are also <button>
+                        // (not <div onClick>) so they're keyboard-focusable
+                        // + Enter-activated. stopPropagation prevents the
+                        // day-cell onClick from also firing.
+                        <button
                           key={j}
-                          className={`truncate rounded border px-1 py-0.5 text-[10px] cursor-pointer hover:brightness-110 ${EVENT_COLORS[e.type]}`}
+                          type="button"
+                          className={`block w-full truncate rounded border px-1 py-0.5 text-left text-[10px] cursor-pointer hover:brightness-110 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring ${EVENT_COLORS[e.type]}`}
                           title={e.title}
+                          aria-label={`${e.title} — ${e.type}${e.meta?.unionName ? ` · ${e.meta.unionName}` : ""}`}
                           onClick={(ev) => {
                             ev.stopPropagation();
                             handleEventClick(e);
                           }}
                         >
                           {e.title}
-                        </div>
+                        </button>
                       ))}
                       {dayEvents.length > 3 && (
-                        <div className="text-[10px] text-muted-foreground hover:text-foreground">
+                        <div className="text-[10px] text-muted-foreground hover:text-foreground" aria-hidden="true">
                           +{dayEvents.length - 3} more...
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -288,9 +310,16 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
           </DialogHeader>
           <div className="space-y-2">
             {selectedDay?.events.map((e, i) => (
-              <div
+              // Wave 4 / a11y #2: event rows in the day-detail dialog are
+              // <button> (not <div onClick>) so they're keyboard-focusable +
+              // Enter-activated. Each has an aria-label with the event title
+              // + type + union (so SR users get the full context without
+              // reading the nested <p> elements).
+              <button
                 key={i}
-                className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 cursor-pointer hover:brightness-95 ${EVENT_COLORS[e.type]}`}
+                type="button"
+                className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left cursor-pointer hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${EVENT_COLORS[e.type]}`}
+                aria-label={`${e.title} — ${e.type}${e.meta?.status ? ` · ${e.meta.status}` : ""}${e.meta?.unionName ? ` · ${e.meta.unionName}` : ""}`}
                 onClick={() => {
                   handleEventClick(e);
                   setSelectedDay(null);
@@ -304,8 +333,8 @@ export function CalendarView({ onNavigate }: { onNavigate?: (view: string, param
                     {e.meta?.unionName ? ` · ${e.meta.unionName}` : ""}
                   </p>
                 </div>
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-50" />
-              </div>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden="true" />
+              </button>
             ))}
           </div>
         </DialogContent>

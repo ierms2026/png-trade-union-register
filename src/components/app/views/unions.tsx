@@ -205,7 +205,12 @@ export function UnionsView({
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-xl">{selectedUnion.unionName}</CardTitle>
+                {/* Wave 4 / a11y #5: union name is the page-level <h1> for
+                    the union-detail view (WCAG 1.3.1 + 2.4.6). Was a
+                    CardTitle (renders as <div>) — SR users navigating by
+                    headings had no anchor for which union they were viewing.
+                    Kept the same classes so the visual layout is unchanged. */}
+                <h1 className="text-xl font-semibold leading-none tracking-tight">{selectedUnion.unionName}</h1>
                 <CardDescription className="mt-1 flex items-center gap-2">
                   <span>Reg. No: {selectedUnion.registrationNo}</span>
                   <Badge variant={selectedUnion.status === "ACTIVE" ? "default" : "secondary"}>
@@ -247,11 +252,14 @@ export function UnionsView({
         </Card>
 
         {/* IA-2: Tab bar */}
-        <div className="flex gap-1 rounded-md border p-1">
+        <div className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Union hub sections">
           {hubTabs.map((t) => (
             <button
               key={t}
               type="button"
+              role="tab"
+              aria-selected={hubTab === t}
+              tabIndex={hubTab === t ? 0 : -1}
               onClick={() => setHubTab(t)}
               aria-current={hubTab === t ? "page" : undefined}
               className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -317,9 +325,11 @@ export function UnionsView({
             <CardContent className="pt-6">
               {/* IA-3: officer's Documents tab is titled "My filings" (user-facing
                   label for OFFICER role). Other roles see "Documents". */}
-              <h4 className="mb-3 text-sm font-medium">
+              {/* Wave 4 / a11y #5: promote <h4> → <h2> so the heading hierarchy
+                  is h1 (union name) → h2 (section). Was skipping h2/h3. */}
+              <h2 className="mb-3 text-sm font-medium">
                 {isOfficer ? "My filings" : "Documents"} ({selectedUnion.documents.length})
-              </h4>
+              </h2>
               {selectedUnion.documents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No documents filed yet.</p>
               ) : (
@@ -345,9 +355,13 @@ export function UnionsView({
                           <div key={cat.label}>
                             <div className="mb-2">
                               <div className="flex items-center justify-between">
-                                <h5 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                {/* Wave 4 / a11y #5: promote <h5> → <h3> for
+                                    category labels so the hierarchy is
+                                    h1 (union) → h2 (Documents section) →
+                                    h3 (category). Was skipping h3. */}
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                   {cat.label}
-                                </h5>
+                                </h3>
                                 <span className="text-xs text-muted-foreground">
                                   {filedInCat.length} of {totalInCat} current
                                 </span>

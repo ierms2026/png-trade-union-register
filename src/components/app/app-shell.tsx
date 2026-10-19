@@ -288,6 +288,17 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* Wave 4 / a11y #1: Skip-to-content link (WCAG 2.4.1 Bypass Blocks).
+          First focusable element on every authenticated page. Visually
+          hidden until focused — then appears top-left so keyboard users can
+          bypass the header + breadcrumb + sidebar and jump straight to the
+          main content. The href="#main-content" matches the id on <main> below. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring"
+      >
+        Skip to main content
+      </a>
       <header className="sticky top-0 z-30 border-b bg-card">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-3">
@@ -408,7 +419,7 @@ export function AppShell({ user, activeView, onNavigate, children }: AppShellPro
             </div>
           </div>
 
-          <main className="flex-1 overflow-y-auto">
+          <main id="main-content" className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-7xl p-4 lg:p-6">{children}</div>
           </main>
         </div>

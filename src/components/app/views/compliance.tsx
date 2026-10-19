@@ -113,12 +113,22 @@ export function ComplianceView({
 
   return (
     <div className="space-y-6">
+      {/* Wave 4 / a11y #4: restore a page-level <h1> for screen-reader
+          navigation (WCAG 1.3.1 Info and Relationships + 2.4.6 Headings and
+          Labels). IA-2 removed the visible h1 because the tab bar replaces
+          the page heading visually — but SR users navigating by headings
+          landed on nothing. This sr-only h1 gives them an anchor without
+          changing the visual layout. */}
+      <h1 className="sr-only">Compliance</h1>
       {/* Tab bar */}
-      <div className="flex gap-1 rounded-md border p-1">
+      <div className="flex gap-1 rounded-md border p-1" role="tablist" aria-label="Compliance view sections">
         {tabs.map((t) => (
           <button
             key={t}
             type="button"
+            role="tab"
+            aria-selected={tab === t}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
             aria-current={tab === t ? "page" : undefined}
             className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${

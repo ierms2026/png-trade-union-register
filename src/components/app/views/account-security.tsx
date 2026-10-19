@@ -565,6 +565,7 @@ function NotificationPreferencesSection() {
             </div>
           </div>
           <Switch
+            aria-label="Email notifications"
             checked={prefs?.emailNotificationsEnabled ?? true}
             disabled={saving}
             onCheckedChange={(checked) => {
@@ -608,6 +609,7 @@ function NotificationPreferencesSection() {
             </div>
           </div>
           <Switch
+            aria-label="SMS notifications"
             checked={prefs?.smsNotificationsEnabled ?? false}
             disabled={saving || !prefs?.phone}
             onCheckedChange={(checked) => {
@@ -627,6 +629,7 @@ function NotificationPreferencesSection() {
             </div>
           </div>
           <Switch
+            aria-label="WhatsApp notifications"
             checked={prefs?.whatsappNotificationsEnabled ?? false}
             disabled={saving || !prefs?.phone}
             onCheckedChange={(checked) => {
