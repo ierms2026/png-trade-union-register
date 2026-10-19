@@ -281,7 +281,7 @@ function DocumentRow({
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
               <Link
                 href={`/?view=document-detail&id=${doc.id}`}
-                className="text-sm font-semibold hover:underline"
+                className="text-base font-semibold hover:underline"
               >
                 {doc.documentType}
               </Link>

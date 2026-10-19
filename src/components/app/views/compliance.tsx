@@ -325,86 +325,11 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
         })}
       </div>
 
-      {/* Charts row */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Union status distribution — donut */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-lg">Union Status</CardTitle>
-            <CardDescription>Distribution of union registration statuses.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={{ value: { label: "Unions" } }} className="h-[200px] w-full">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                <Pie
-                  data={unionStatusData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={45}
-                  outerRadius={70}
-                  paddingAngle={2}
-                >
-                  {unionStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ChartContainer>
-            <div className="mt-2 space-y-1 text-xs">
-              {unionStatusData.map((d) => (
-                <div key={d.name} className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
-                  <span className="text-muted-foreground">{d.name}:</span>
-                  <span className="font-medium">{d.value}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Compliance Summary — 4 horizontal bars showing aggregate counts.
-            Fixed size (always 4 bars) regardless of how many unions exist.
-            Replaces the per-union stacked bar that didn't scale. */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Compliance Summary</CardTitle>
-            <CardDescription>Aggregate document status across all unions.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={summaryBarConfig} className="h-[240px] w-full">
-              <BarChart data={summaryBarData} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
-                <XAxis
-                  type="number"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 12 }}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 13, fontWeight: 500 }}
-                  width={90}
-                  interval={0}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {summaryBarData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Matrix */}
+      {/* Matrix (PRIMARY — moved above charts per design review) ===
+          The matrix IS the compliance view. Charts are supplementary.
+          Was: charts first (ate above-the-fold), matrix below. Now:
+          matrix first, charts below. */}
+      {/* Matrix — the live compliance grid */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Unions × Document Types</CardTitle>
@@ -519,6 +444,88 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
           </table>
         </CardContent>
       </Card>
+
+
+      {/* Charts row (supplementary — moved below the matrix per design review) */}
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Union status distribution — donut */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Union Status</CardTitle>
+            <CardDescription>Distribution of union registration statuses.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={{ value: { label: "Unions" } }} className="h-[200px] w-full">
+              <PieChart>
+                <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+                <Pie
+                  data={unionStatusData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={45}
+                  outerRadius={70}
+                  paddingAngle={2}
+                >
+                  {unionStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ChartContainer>
+            <div className="mt-2 space-y-1 text-xs">
+              {unionStatusData.map((d) => (
+                <div key={d.name} className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                  <span className="text-muted-foreground">{d.name}:</span>
+                  <span className="font-medium">{d.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Compliance Summary — 4 horizontal bars showing aggregate counts.
+            Fixed size (always 4 bars) regardless of how many unions exist.
+            Replaces the per-union stacked bar that didn't scale. */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg">Compliance Summary</CardTitle>
+            <CardDescription>Aggregate document status across all unions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={summaryBarConfig} className="h-[240px] w-full">
+              <BarChart data={summaryBarData} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
+                <XAxis
+                  type="number"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 12 }}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 13, fontWeight: 500 }}
+                  width={90}
+                  interval={0}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {summaryBarData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
     </div>
   );
 }

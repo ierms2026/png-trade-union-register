@@ -247,7 +247,10 @@ export function UnionsView({
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
                 </Button>
+                {/* Design review: demote Upload button — union name should be
+                    the focal point, not the CTA. Was variant="default" (filled). */}
                 <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => {
                     setUploadDialogOpen(true);
@@ -275,7 +278,7 @@ export function UnionsView({
               aria-current={hubTab === t ? "page" : undefined}
               className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 hubTab === t
-                  ? "bg-accent/10 text-primary"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
