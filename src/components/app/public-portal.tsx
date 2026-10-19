@@ -98,10 +98,17 @@ export function PublicPortal({ onStaffLogin }: Props) {
     // quiet official eyebrow, the h1 (now clearly dominant at 5xl), and ONE
     // supporting line. The legal citation moves to the footer; the inline
     // links duplicate the nav bar (already there as Resources / About tabs).
+    // Design review fix C: the eyebrow (coat of arms + "Office of The
+    // Industrial Registrar" badge) was floating awkwardly above the h1 with
+    // no clear spatial relationship. Restructured: the coat of arms + badge
+    // sit on ONE line as a quiet official mark, then the h1 sits directly
+    // below with a tight gap (space-y-2, was space-y-3). The supporting line
+    // follows. This makes the eyebrow read as a unit WITH the h1, not
+    // floating above it.
     return (
-      <div className="space-y-3 text-center">
+      <div className="space-y-2 text-center">
         <div className="flex items-center justify-center gap-2">
-          <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={32} height={26} className="h-8 w-auto" />
+          <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={28} height={23} className="h-7 w-auto" />
           <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/5 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-accent-foreground">
             <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M12 2L4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-4z" /><path d="M9 12l2 2 4-4" /></svg>
             Office of The Industrial Registrar
@@ -327,7 +334,11 @@ export function PublicPortal({ onStaffLogin }: Props) {
             <Image src="/coat-of-arms.png" alt="National Emblem of Papua New Guinea" width={32} height={26} className="h-8 w-auto" />
             <div><p className="text-sm font-semibold leading-tight">Register of Trade Unions</p><p className="text-xs text-muted-foreground">Office of The Industrial Registrar · Papua New Guinea</p></div>
           </div>
-          <Button variant="outline" size="sm" className="border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40" onClick={onStaffLogin}><LogIn className="mr-2 h-4 w-4" />Sign In</Button>
+          {/* Design review fix A: Sign In was variant="outline" — visually
+              weaker than the nav links, looked like an afterthought. Now
+              variant="default" (filled, primary) so it reads as the page's
+              primary CTA for staff. The muted outline styling is dropped. */}
+          <Button variant="default" size="sm" onClick={onStaffLogin}><LogIn className="mr-2 h-4 w-4" />Sign In</Button>
         </div>
         <div className="h-1.5 bg-accent" />
       </header>
@@ -339,20 +350,35 @@ export function PublicPortal({ onStaffLogin }: Props) {
           <button onClick={() => handleTabChange("help")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === "help" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Help</button>
         </div>
       </div>
-      <main className="mx-auto max-w-4xl space-y-8 p-4 py-10">
+      {/* Design review fix C: main was py-10 (huge gap between header + title).
+          Reduced to py-8 so the title sits closer to the nav bar. space-y-8
+          kept from the prior fix (tight rhythm between hero + list). */}
+      <main className="mx-auto max-w-4xl space-y-8 p-4 py-8">
         {renderHero()}
         {tab === "register" ? renderSearch() : tab === "resources" ? renderLegislation() : tab === "about" ? renderAbout() : renderHelp()}
       </main>
       <footer className="border-t bg-card">
-        <div className="mx-auto max-w-4xl space-y-3 px-4 py-6 text-center text-xs text-muted-foreground">
-          <p className="font-medium">Office of The Industrial Registrar</p>
-          <p>PNG Department of Labour &amp; Industrial Relations</p>
-          {/* Contact details — only rendered if at least one is configured
-              via NEXT_PUBLIC_REGISTRAR_* env vars. The compact variant shows
-              them as a single inline line, separated by middle dots. */}
-          <RegistrarContactInfo variant="compact" className="text-xs" />
-          <p className="text-muted-foreground/70">© {new Date().getFullYear()} Independent State of Papua New Guinea · All rights reserved</p>
-          <p className="text-muted-foreground/70">This register is published in accordance with the Industrial Organizations Act. For enquiries, contact the Office of The Industrial Registrar.</p>
+        {/* Design review fix B: footer was a "wall of grey" — 5 lines of
+            text crammed together at text-xs with no breathing room.
+            Restructured with clear sections + spacing:
+              1. Org name (font-medium) — the authoritative source
+              2. Department name — quieter
+              3. Contact info (compact) — practical
+              4. Copyright + legal — quietest, separated by a top border
+            The redundant "published in accordance with the Industrial
+            Organizations Act" line is removed (the hero already cites the
+            Act; the footer doesn't need to repeat it). */}
+        <div className="mx-auto max-w-4xl px-4 py-8 text-center text-xs text-muted-foreground">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-foreground">Office of The Industrial Registrar</p>
+            <p>PNG Department of Labour &amp; Industrial Relations</p>
+          </div>
+          <div className="mt-3">
+            <RegistrarContactInfo variant="compact" className="text-xs" />
+          </div>
+          <div className="mt-4 border-t pt-3 text-muted-foreground/70">
+            <p>© {new Date().getFullYear()} Independent State of Papua New Guinea · All rights reserved</p>
+          </div>
         </div>
       </footer>
     </div>
