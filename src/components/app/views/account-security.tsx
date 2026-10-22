@@ -83,7 +83,7 @@ function TwoFactorSection({ user }: { user: AuthUser }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle as="h3" className="flex items-center gap-2 text-lg">
           <KeyRound className="h-5 w-5" />
           Two-Factor Authentication
         </CardTitle>
@@ -403,7 +403,7 @@ function SessionsSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle as="h3" className="flex items-center gap-2 text-lg">
           <Monitor className="h-5 w-5" />
           {/* IA-1: "Active Sessions" → "My sessions" */}
           My sessions

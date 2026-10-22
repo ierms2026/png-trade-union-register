@@ -213,7 +213,7 @@ export function HelpGuideView({ userRole, onNavigate }: HelpGuideViewProps) {
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
             <div>
-              <CardTitle className="text-lg">Your Role: {guide.roleName}</CardTitle>
+              <CardTitle as="h2" className="text-lg">Your Role: {guide.roleName}</CardTitle>
               <CardDescription>{guide.summary}</CardDescription>
             </div>
           </div>
@@ -298,7 +298,7 @@ export function HelpGuideView({ userRole, onNavigate }: HelpGuideViewProps) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-accent-foreground" />
-            <CardTitle className="text-lg">Still Need Help?</CardTitle>
+            <CardTitle as="h2" className="text-lg">Still Need Help?</CardTitle>
           </div>
           <CardDescription>
             If something on this screen doesn&apos;t make sense, contact the Office of The Industrial Registrar.

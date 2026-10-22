@@ -194,7 +194,7 @@ export function SecurityView() {
         {/* Login trend — line chart */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle as="h3" className="flex items-center gap-2 text-lg">
               <Activity className="h-5 w-5" />
               Login Activity (7 Days)
             </CardTitle>
@@ -258,7 +258,7 @@ export function SecurityView() {
         {data && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle as="h3" className="flex items-center gap-2 text-lg">
                 <KeyRound className="h-5 w-5" />
                 2FA Adoption
               </CardTitle>
@@ -316,7 +316,7 @@ export function SecurityView() {
       {/* Locked-out users — single-card list */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle as="h3" className="flex items-center gap-2 text-lg">
             <Lock className="h-5 w-5" />
             Locked-Out Users
           </CardTitle>
@@ -354,7 +354,7 @@ export function SecurityView() {
       {data.disabledUsers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle as="h3" className="flex items-center gap-2 text-lg">
               <Users className="h-5 w-5" />
               Disabled Users
             </CardTitle>

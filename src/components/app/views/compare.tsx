@@ -125,7 +125,7 @@ export function CompareView() {
       {/* Union picker */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Select Unions ({selectedIds.length}/6)</CardTitle>
+          <CardTitle as="h2" className="text-lg">Select Unions ({selectedIds.length}/6)</CardTitle>
           <CardDescription>Add unions to compare their compliance gaps.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -168,7 +168,7 @@ export function CompareView() {
       {selectedUnions.length >= 2 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Compliance Gap Matrix</CardTitle>
+            <CardTitle as="h2" className="text-lg">Compliance Gap Matrix</CardTitle>
             <CardDescription>
               Rows = document types, columns = selected unions. Cells show compliance status.
             </CardDescription>

@@ -332,7 +332,7 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
       {/* Matrix — the live compliance grid */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Unions × Document Types</CardTitle>
+          <CardTitle as="h2" className="text-lg">Unions × Document Types</CardTitle>
           <CardDescription>
             Generated at {new Date(data.generatedAt).toLocaleString()}
           </CardDescription>
@@ -452,7 +452,7 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
         {/* Union status distribution — donut */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-lg">Union Status</CardTitle>
+            <CardTitle as="h2" className="text-lg">Union Status</CardTitle>
             <CardDescription>Distribution of union registration statuses.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -492,7 +492,7 @@ function ComplianceOverviewTab({ initialFilter }: { initialFilter?: string | nul
             Replaces the per-union stacked bar that didn't scale. */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg">Compliance Summary</CardTitle>
+            <CardTitle as="h2" className="text-lg">Compliance Summary</CardTitle>
             <CardDescription>Aggregate document status across all unions.</CardDescription>
           </CardHeader>
           <CardContent>

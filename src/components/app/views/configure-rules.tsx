@@ -91,7 +91,7 @@ export function ConfigureRulesView() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Compliance Rules ({data.rules.length})</CardTitle>
+          <CardTitle as="h2" className="text-lg">Compliance Rules ({data.rules.length})</CardTitle>
           <CardDescription>Each rule applies to every union's filing of that document type.</CardDescription>
         </CardHeader>
         <CardContent>

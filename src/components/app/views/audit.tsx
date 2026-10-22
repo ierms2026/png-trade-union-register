@@ -207,7 +207,7 @@ export function AuditView() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle as="h3" className="flex items-center gap-2 text-lg">
             <Filter className="h-4 w-4" />
             Filters
           </CardTitle>

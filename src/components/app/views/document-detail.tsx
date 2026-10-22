@@ -234,7 +234,7 @@ export function DocumentDetailView({
       {/* Union contact info */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Union Contact Information</CardTitle>
+          <CardTitle as="h3" className="text-base">Union Contact Information</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
@@ -262,7 +262,7 @@ export function DocumentDetailView({
       {/* Version history */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle as="h3" className="flex items-center gap-2 text-base">
             <History className="h-4 w-4" />
             Version History
           </CardTitle>
@@ -431,7 +431,7 @@ function DocumentComplianceCard({
   return (
     <Card className={`${visual.border}`}>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle as="h3" className="flex items-center gap-2 text-base">
           <ShieldCheck className="h-4 w-4" />
           Compliance Status
         </CardTitle>
@@ -530,7 +530,7 @@ function InlineAuditTrail({ documentId }: { documentId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle as="h3" className="flex items-center gap-2 text-base">
           <ScrollText className="h-4 w-4" />
           Audit Trail
         </CardTitle>

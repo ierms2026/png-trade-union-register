@@ -92,7 +92,7 @@ export function LegislationView() {
                   <div className="flex items-start gap-3">
                     <Scale className="h-5 w-5 flex-shrink-0 text-primary mt-0.5" />
                     <div>
-                      <CardTitle className="text-base leading-tight">{entry.title}</CardTitle>
+                      <CardTitle as="h3" className="text-base leading-tight">{entry.title}</CardTitle>
                       <CardDescription className="mt-1">{entry.shortTitle} · {entry.year}</CardDescription>
                     </div>
                   </div>

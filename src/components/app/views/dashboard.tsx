@@ -456,7 +456,7 @@ function TrendChart({ points, loading, error, onRetry }: TrendChartProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Compliance Trend</CardTitle>
+            <CardTitle as="h2" className="text-lg">Compliance Trend</CardTitle>
             <CardDescription>
               Daily compliance rate over the last {windowDays} days of collected history.
             </CardDescription>
@@ -716,7 +716,7 @@ function ComplianceCompositionBar({ counts, denominator, totalUnions, onFilter }
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Document Compliance Composition</CardTitle>
+          <CardTitle as="h2" className="text-lg">Document Compliance Composition</CardTitle>
           <CardDescription>Compliance status breakdown across all unions.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -737,7 +737,7 @@ function ComplianceCompositionBar({ counts, denominator, totalUnions, onFilter }
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Document Compliance Composition</CardTitle>
+          <CardTitle as="h2" className="text-lg">Document Compliance Composition</CardTitle>
           <CardDescription>Compliance status breakdown across all unions.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -761,7 +761,7 @@ function ComplianceCompositionBar({ counts, denominator, totalUnions, onFilter }
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Document Compliance Composition</CardTitle>
+        <CardTitle as="h2" className="text-lg">Document Compliance Composition</CardTitle>
         <CardDescription>
           {denominator} required documents across {totalUnions} unions.
         </CardDescription>
@@ -894,7 +894,7 @@ function RequiredVsOnFileMeters({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Required vs On-File by Type</CardTitle>
+        <CardTitle as="h2" className="text-lg">Required vs On-File by Type</CardTitle>
         <CardDescription>
           On file vs required across {requiredTypes.length} document types.
         </CardDescription>
@@ -971,7 +971,7 @@ function NeedsAttentionPanel({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Needs Attention</CardTitle>
+            <CardTitle as="h2" className="text-lg">Needs Attention</CardTitle>
             <CardDescription>Overdue and expiring documents across all unions.</CardDescription>
           </div>
           {total > 0 && (
@@ -1092,7 +1092,7 @@ function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Compliance Matrix</CardTitle>
+          <CardTitle as="h2" className="text-lg">Compliance Matrix</CardTitle>
           <CardDescription>Union × document type compliance status.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -1107,7 +1107,7 @@ function ComplianceHeatmap({ matrix }: ComplianceHeatmapProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Compliance Matrix</CardTitle>
+            <CardTitle as="h2" className="text-lg">Compliance Matrix</CardTitle>
             <CardDescription>
               {matrix.rows.length} unions × {matrix.columnTypes.length} document types.
             </CardDescription>
@@ -1272,7 +1272,7 @@ function ExpiryForecastCard({ forecast, onFilter }: ExpiryForecastCardProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Expiry Forecast</CardTitle>
+            <CardTitle as="h2" className="text-lg">Expiry Forecast</CardTitle>
             <CardDescription>Documents coming due, by window.</CardDescription>
           </div>
           {!allZero && (
@@ -1823,7 +1823,7 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           {docTypesLoading ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Required vs On-File by Type</CardTitle>
+                <CardTitle as="h2" className="text-lg">Required vs On-File by Type</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[240px] animate-pulse rounded-md bg-muted" />
@@ -1875,7 +1875,7 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
           <div data-testid="documents-by-category">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Documents by Category</CardTitle>
+                <CardTitle as="h2" className="text-lg">Documents by Category</CardTitle>
                 <CardDescription>
                   On-file counts grouped by document-type category. Click a category to expand.
                 </CardDescription>
@@ -2049,7 +2049,7 @@ function RecentActivityPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle as="h3" className="flex items-center gap-2 text-lg">
           <Activity className="h-5 w-5" />
           Recent Activity
         </CardTitle>
