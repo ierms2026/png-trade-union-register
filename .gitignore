@@ -60,3 +60,5 @@ server.log
 *.db-journal
 .env
 prisma/schema-test.prisma
+skills/
+download/qnap-dashboard/
