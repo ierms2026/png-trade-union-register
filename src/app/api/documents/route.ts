@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
   // Note: this searches fileName, NOT textContent. Use /api/search for full-text search.
   if (q) {
     where.versions = {
-      some: { fileName: { contains: q } },
+      some: { fileName: { contains: q , mode: "insensitive" } },
     };
   }
 

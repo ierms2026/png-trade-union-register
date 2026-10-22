@@ -1,3 +1,29 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/compliance-sweep",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/compliance-snapshot",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/compliance-digest",
+      "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/cron/audit-retention-sweep",
+      "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron/snapshot-retention-sweep",
+      "schedule": "0 4 * * 0"
+    },
+    {
+      "path": "/api/cron/webhook-retry",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

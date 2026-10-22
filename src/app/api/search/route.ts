@@ -232,9 +232,9 @@ export async function GET(req: NextRequest) {
   // the three; the document-level where (scoping + filters) is ANDed on top.
   const whereClause: Record<string, unknown> = {
     OR: [
-      { textContent: { contains: whitespaceFlexibleQuery } },
-      { fileName: { contains: whitespaceFlexibleQuery } },
-      { document: { ...documentWhere, documentType: { contains: whitespaceFlexibleQuery } } },
+      { textContent: { contains: whitespaceFlexibleQuery , mode: "insensitive" } },
+      { fileName: { contains: whitespaceFlexibleQuery , mode: "insensitive" } },
+      { document: { ...documentWhere, documentType: { contains: whitespaceFlexibleQuery , mode: "insensitive" } } },
     ],
     document: documentWhere,
     ...versionWhere,

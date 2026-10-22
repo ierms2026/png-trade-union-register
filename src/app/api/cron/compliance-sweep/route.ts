@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
     if ((issue.tier === "T_0_OVERDUE" || issue.tier === "T_30_OVERDUE") && registrars.length > 0) {
       const taskTitle = `Non-Compliance: ${issue.documentType} — ${issue.unionName}`;
       const existingTask = await db.task.findFirst({
-        where: { title: { contains: taskTitle }, status: { in: ["PENDING", "IN_PROGRESS"] } },
+        where: { title: { contains: taskTitle , mode: "insensitive" }, status: { in: ["PENDING", "IN_PROGRESS"] } },
       });
       if (!existingTask) {
         try {

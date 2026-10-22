@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = {};
   if (entityType) where.entityType = entityType;
-  if (action) where.action = { contains: action };
-  if (actor) where.actorName = { contains: actor };
+  if (action) where.action = { contains: action , mode: "insensitive" };
+  if (actor) where.actorName = { contains: actor , mode: "insensitive" };
   if (startDate || endDate) {
     const created: Record<string, Date> = {};
     if (startDate) created.gte = new Date(startDate);

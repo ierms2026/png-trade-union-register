@@ -53,8 +53,8 @@ export async function GET(req: NextRequest) {
   // Wave 2: entityId filter — used by the document-detail inline audit trail
   // to show only entries for THIS document (e.g. reviews, retention approvals).
   if (entityId) where.entityId = entityId;
-  if (action) where.action = { contains: action };
-  if (actor) where.actorName = { contains: actor };
+  if (action) where.action = { contains: action , mode: "insensitive" };
+  if (actor) where.actorName = { contains: actor , mode: "insensitive" };
   if (unionId) where.unionId = unionId;
   if (startDate || endDate) {
     const created: Record<string, Date> = {};

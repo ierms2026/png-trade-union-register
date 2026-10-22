@@ -59,3 +59,4 @@ server.log
 *.db-shm
 *.db-journal
 .env
+prisma/schema-test.prisma

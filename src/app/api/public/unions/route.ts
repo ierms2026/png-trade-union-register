@@ -58,8 +58,8 @@ export async function GET(req: NextRequest) {
   const where: { OR?: Array<Record<string, unknown>> } = {};
   if (q) {
     where.OR = [
-      { unionName: { contains: q } },
-      { registrationNo: { contains: q } },
+      { unionName: { contains: q , mode: "insensitive" } },
+      { registrationNo: { contains: q , mode: "insensitive" } },
     ];
   }
 
