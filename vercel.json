@@ -20,10 +20,6 @@
     {
       "path": "/api/cron/snapshot-retention-sweep",
       "schedule": "0 4 * * 0"
-    },
-    {
-      "path": "/api/cron/webhook-retry",
-      "schedule": "*/5 * * * *"
     }
   ]
 }
