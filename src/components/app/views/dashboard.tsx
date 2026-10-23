@@ -111,11 +111,17 @@ interface StatCardProps {
    * The RateKpiCard has its own 1.2 tooltip — it does NOT use this prop.
    */
   definition?: string;
+  /**
+   * Design review fix: when true, the card gets a red alert border + the
+   * value text turns red. Used for MISSING count > 0 and OVERDUE count > 0
+   * so critical numbers stand out instead of blending into the gray.
+   */
+  alert?: boolean;
 }
 
-function StatCard({ label, value, icon: Icon, color, href, ariaLabel, sparkline, definition }: StatCardProps) {
+function StatCard({ label, value, icon: Icon, color, href, ariaLabel, sparkline, definition, alert }: StatCardProps) {
   const cardContent = (
-    <Card className={href ? "cursor-pointer transition-all hover:shadow-md hover:border-accent focus-within:ring-2 focus-within:ring-ring" : ""}>
+    <Card className={`${href ? "cursor-pointer transition-all hover:shadow-md hover:border-accent focus-within:ring-2 focus-within:ring-ring" : ""} ${alert ? "border-destructive/40 bg-destructive/5" : ""}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           {/* 6.2: label becomes a focusable Tooltip trigger when `definition`
@@ -168,7 +174,7 @@ function StatCard({ label, value, icon: Icon, color, href, ariaLabel, sparkline,
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className={`text-2xl font-bold ${alert ? "text-destructive" : ""}`}>{value}</div>
         {sparkline ? (
           <div className="mt-2" aria-hidden="true">{sparkline}</div>
         ) : null}
@@ -1605,6 +1611,30 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
       <div>
         <PageHeader title="Dashboard" description="Overview of the union registry and compliance status." />      </div>
 
+      {/* Design review fix #2: onboarding banner when compliance is 0%. */}
+      {stats && counts && counts.MISSING > 0 && counts.COMPLIANT === 0 && counts.EXPIRING === 0 && counts.OVERDUE === 0 && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+              <AlertCircle className="h-5 w-5 text-destructive" aria-hidden="true" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground">
+                {counts.MISSING} documents need to be filed
+              </p>
+              <p className="text-xs text-muted-foreground">
+                None of the {stats.totalUnions} registered unions have filed any documents yet. Upload documents and approve them to start building compliance.
+              </p>
+            </div>
+            {onNavigate && (
+              <Button size="sm" variant="default" onClick={() => onNavigate("documents")}>
+                Upload Documents
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* === Row 1: KPI band (7 cards) — the reason you visit a dashboard ===
           Design review fix #1: moved to the TOP (was Row 2, below Welcome +
@@ -1694,6 +1724,7 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
                 ariaLabel={`${STATUS_CONFIG[status].label}: ${counts![status]} documents — view filtered list`}
                 sparkline={sparkline}
                 definition={STATUS_CONFIG[status].definition}
+                alert={(status === "MISSING" && counts![status] > 0) || (status === "OVERDUE" && counts![status] > 0)}
               />
             );
           })}
@@ -1902,21 +1933,21 @@ export function DashboardView({ user, onNavigate, onFilterCompliance }: {
       })()}
 
       {/* === Row 6: Trend Chart | Recent Activity ===
-          6.1 final layout. Both are tall cards; pairing them keeps the row
-          height balanced. Trend chart is full-featured (chart + accessible
-          table); Recent Activity is the 5.1/5.2 panel (state-changing rows +
-          session summaries + View-all footer). */}
+          Design review fix #3: hide the trend chart when there's no data
+          (0% compliance = no snapshots = empty chart that looks broken).
+          Show it only when there are actual trend points. */}
       <div className="grid gap-6 lg:grid-cols-2 items-start">
-        {/* Trend chart — 4.2b. Was temporarily near Compliance Summary; 6.1
-            moves it to its permanent home. */}
-        <div data-testid="trend-chart">
-          <TrendChart
-            points={trendData?.points ?? []}
-            loading={trendLoading}
-            error={trendError}
-            onRetry={refetchTrend}
-          />
-        </div>
+        {/* Trend chart — only when there's data */}
+        {(trendData?.points && trendData.points.length > 0) || trendLoading ? (
+          <div data-testid="trend-chart">
+            <TrendChart
+              points={trendData?.points ?? []}
+              loading={trendLoading}
+              error={trendError}
+              onRetry={refetchTrend}
+            />
+          </div>
+        ) : null}
 
         {/* Recent activity — 5.1 + 5.2. Was bottom-right of the Compliance
             Summary row; 6.1 moves it to its permanent home, paired with the
