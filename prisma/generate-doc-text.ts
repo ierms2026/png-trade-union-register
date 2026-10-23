@@ -85,7 +85,7 @@ This constitution may be amended by a resolution passed by a two-thirds majority
 DISSOLUTION
 Upon dissolution, the assets of the Union shall be distributed in accordance with a resolution passed at a general meeting convened for that purpose.`,
 
-    "Financial Return": () => `ANNUAL FINANCIAL RETURN — ${unionName}
+    "Financial Returns": () => `ANNUAL FINANCIAL RETURN — ${unionName}
 
 Registration Number: ${registrationNo}
 File Reference: ${fileName}
@@ -155,7 +155,7 @@ All elected office bearers have confirmed their acceptance of office in writing.
 Signed: Returning Officer
 Signed: Secretary`,
 
-    "Financial Membership List": () => `FINANCIAL MEMBERSHIP LIST — ${unionName}
+    "Financial Membership": () => `FINANCIAL MEMBERSHIP LIST — ${unionName}
 
 Registration Number: ${registrationNo}
 File Reference: ${fileName}

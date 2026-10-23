@@ -126,13 +126,13 @@ describe("officer scoping (where-clause pattern from /api/unions)", () => {
     const beta = await seedUnion("Beta", "REG-B");
     // 2 documents in Alpha, 3 in Beta.
     await testDb.document.create({
-      data: { unionId: alpha.id, documentType: "Constitution" },
+      data: { unionId: alpha.id, documentType: "Rules & Constitution" },
     });
     await testDb.document.create({
       data: { unionId: alpha.id, documentType: "Bylaws" },
     });
     await testDb.document.create({
-      data: { unionId: beta.id, documentType: "Constitution" },
+      data: { unionId: beta.id, documentType: "Rules & Constitution" },
     });
     await testDb.document.create({
       data: { unionId: beta.id, documentType: "Bylaws" },

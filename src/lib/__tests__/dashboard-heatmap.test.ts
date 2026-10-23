@@ -20,11 +20,10 @@ const FROZEN_NOW = new Date("2026-06-15T12:00:00Z");
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const ALL_REQUIRED_TYPES = [
-  "Affiliations", "Application for Registration", "Awards",
-  "Constitution", "Election of Office Bearers", "Financial Membership List",
-  "Financial Return", "General Matters", "General Secretary Appointments",
-  "Inspection Reports", "Registration Certificate", "Secret Ballots",
-  "Welfare Fund",
+  "Application for Registration", "Registration Certificate", "Rules & Constitution",
+  "Financial Returns", "Financial Membership", "Affiliations", "Welfare Funds",
+  "Election of Office Bearers", "Secret Ballots", "General Secretary's Appointments",
+  "Inspection Reports", "General Matters",
 ];
 
 const UNIONS: UnionSummary[] = Array.from({ length: 6 }, (_, i) => ({
@@ -40,10 +39,9 @@ function makeFixtureCells(): ComplianceCell[] {
   const compliant: Array<[number, string]> = [
     [0, "Registration Certificate"], [1, "Registration Certificate"], [2, "Registration Certificate"],
     [3, "Registration Certificate"], [4, "Registration Certificate"],
-    [0, "Constitution"], [1, "Constitution"], [2, "Constitution"], [3, "Constitution"],
-    [0, "Financial Return"], [1, "Financial Return"], [2, "Financial Return"], [3, "Financial Return"],
+    [0, "Rules & Constitution"], [1, "Rules & Constitution"], [2, "Rules & Constitution"], [3, "Rules & Constitution"],
+    [0, "Financial Returns"], [1, "Financial Returns"], [2, "Financial Returns"], [3, "Financial Returns"],
     [0, "Election of Office Bearers"], [1, "Election of Office Bearers"],
-    [0, "Awards"], [1, "Awards"],
   ];
   for (const [unionIdx, docType] of compliant) {
     cells.push({
@@ -52,9 +50,9 @@ function makeFixtureCells(): ComplianceCell[] {
       documentId: `doc-c-${unionIdx}-${docType}`,
     });
   }
-  cells.push({ unionId: "union-0", documentType: "Financial Membership List", status: "EXPIRING", filedAt: new Date("2025-08-01"), expiryDate: new Date(FROZEN_NOW.getTime() + 30 * MS_PER_DAY), documentId: "doc-e-0" });
+  cells.push({ unionId: "union-0", documentType: "Financial Membership", status: "EXPIRING", filedAt: new Date("2025-08-01"), expiryDate: new Date(FROZEN_NOW.getTime() + 30 * MS_PER_DAY), documentId: "doc-e-0" });
   cells.push({ unionId: "union-1", documentType: "Affiliations", status: "EXPIRING", filedAt: new Date("2025-08-01"), expiryDate: new Date(FROZEN_NOW.getTime() + 60 * MS_PER_DAY), documentId: "doc-e-1" });
-  cells.push({ unionId: "union-4", documentType: "Financial Return", status: "OVERDUE", filedAt: new Date("2023-01-01"), expiryDate: new Date(FROZEN_NOW.getTime() - 30 * MS_PER_DAY), documentId: "doc-o-0" });
+  cells.push({ unionId: "union-4", documentType: "Financial Returns", status: "OVERDUE", filedAt: new Date("2023-01-01"), expiryDate: new Date(FROZEN_NOW.getTime() - 30 * MS_PER_DAY), documentId: "doc-o-0" });
   cells.push({ unionId: "union-5", documentType: "Election of Office Bearers", status: "OVERDUE", filedAt: new Date("2023-06-01"), expiryDate: new Date(FROZEN_NOW.getTime() - 10 * MS_PER_DAY), documentId: "doc-o-1" });
   return cells;
 }
@@ -65,9 +63,9 @@ describe("compliance heatmap — rendering", () => {
     const matrix = getUnionDocMatrix(cells, UNIONS, ALL_REQUIRED_TYPES);
 
     expect(matrix.rows).toHaveLength(6);
-    expect(matrix.columnTypes).toHaveLength(13);
+    expect(matrix.columnTypes).toHaveLength(12);
     for (const row of matrix.rows) {
-      expect(row.cells).toHaveLength(13);
+      expect(row.cells).toHaveLength(12);
     }
   });
 
@@ -76,7 +74,7 @@ describe("compliance heatmap — rendering", () => {
     const matrix = getUnionDocMatrix(cells, UNIONS, ALL_REQUIRED_TYPES);
 
     // Welfare Fund has 0 on-file → all 6 unions should show MISSING for it
-    const welfareColIdx = matrix.columnTypes.indexOf("Welfare Fund");
+    const welfareColIdx = matrix.columnTypes.indexOf("Welfare Funds");
     for (const row of matrix.rows) {
       const cell = row.cells[welfareColIdx];
       expect(cell.status).toBe("MISSING");
@@ -118,7 +116,7 @@ describe("compliance heatmap — rendering", () => {
 
     // Find a cell with a due date (EXPIRING or OVERDUE)
     const expiringRow = matrix.rows.find((r) => r.unionName === "Union A")!;
-    const fmlColIdx = matrix.columnTypes.indexOf("Financial Membership List");
+    const fmlColIdx = matrix.columnTypes.indexOf("Financial Membership");
     const cell = expiringRow.cells[fmlColIdx];
     expect(cell.status).toBe("EXPIRING");
     expect(cell.dueDate).not.toBeNull();
@@ -127,7 +125,7 @@ describe("compliance heatmap — rendering", () => {
     const config = STATUS_CONFIG[cell.status];
     const accessibleName = `Union A — Financial Membership List: ${config.label}, due ${cell.dueDate!.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}`;
     expect(accessibleName).toContain("Union A");
-    expect(accessibleName).toContain("Financial Membership List");
+    expect(accessibleName).toContain("Financial Membership");
     expect(accessibleName).toContain("Expiring");
     expect(accessibleName).toContain("due");
   });
@@ -136,7 +134,7 @@ describe("compliance heatmap — rendering", () => {
     const cells = makeFixtureCells();
     const matrix = getUnionDocMatrix(cells, UNIONS, ALL_REQUIRED_TYPES);
 
-    const welfareColIdx = matrix.columnTypes.indexOf("Welfare Fund");
+    const welfareColIdx = matrix.columnTypes.indexOf("Welfare Funds");
     const cell = matrix.rows[0].cells[welfareColIdx];
     expect(cell.status).toBe("MISSING");
 
@@ -186,7 +184,7 @@ describe("compliance heatmap — rendering", () => {
 
     // The component renders: `${matrix.rows.length} unions × ${matrix.columnTypes.length} document types.`
     const subtitle = `${matrix.rows.length} unions × ${matrix.columnTypes.length} document types.`;
-    expect(subtitle).toBe("6 unions × 13 document types.");
+    expect(subtitle).toBe("6 unions × 12 document types.");
   });
 
   it("all cell links point to existing route /unions/{unionId}", () => {

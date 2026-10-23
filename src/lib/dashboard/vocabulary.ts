@@ -463,7 +463,7 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
     documentTypes: [
       "Application for Registration",
       "Registration Certificate",
-      "Constitution",
+      "Rules & Constitution",
     ],
   },
   {
@@ -471,10 +471,10 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
     description:
       "Documents filed on a yearly cycle. Must be renewed each year to stay compliant.",
     documentTypes: [
-      "Financial Return",
-      "Financial Membership List",
+      "Financial Returns",
+      "Financial Membership",
       "Affiliations",
-      "Welfare Fund",
+      "Welfare Funds",
     ],
   },
   {
@@ -484,7 +484,7 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
     documentTypes: [
       "Election of Office Bearers",
       "Secret Ballots",
-      "General Secretary Appointments",
+      "General Secretary's Appointments",
     ],
   },
   {
@@ -493,7 +493,6 @@ export const DOCUMENT_TYPE_CATEGORIES: DocumentTypeCategory[] = [
       "Documents produced by the Industrial Registrar's office during oversight of the union. Renewed annually.",
     documentTypes: [
       "Inspection Reports",
-      "Awards",
       "General Matters",
     ],
     // IA-4: internal — these types are produced by the Industrial

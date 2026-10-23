@@ -200,11 +200,11 @@ describe("IA-3: document type categories", () => {
     expect(labels).toEqual(["Registration", "Annual Filings", "Governance", "Oversight"]);
   });
 
-  it("the 4 categories cover all 13 canonical document types", () => {
+  it("the 4 categories cover all 12 canonical document types", () => {
     const allTypes = DOCUMENT_TYPE_CATEGORIES.flatMap((c) => c.documentTypes);
-    expect(allTypes).toHaveLength(13);
+    expect(allTypes).toHaveLength(12);
     // No duplicates
-    expect(new Set(allTypes).size).toBe(13);
+    expect(new Set(allTypes).size).toBe(12);
   });
 
   it("Registration category has the 3 founding documents", () => {
@@ -212,15 +212,15 @@ describe("IA-3: document type categories", () => {
     expect(reg.documentTypes).toEqual([
       "Application for Registration",
       "Registration Certificate",
-      "Constitution",
+      "Rules & Constitution",
     ]);
   });
 
   it("Annual Filings category has 4 yearly-cycle documents", () => {
     const annual = DOCUMENT_TYPE_CATEGORIES.find((c) => c.label === "Annual Filings")!;
     expect(annual.documentTypes).toHaveLength(4);
-    expect(annual.documentTypes).toContain("Financial Return");
-    expect(annual.documentTypes).toContain("Financial Membership List");
+    expect(annual.documentTypes).toContain("Financial Returns");
+    expect(annual.documentTypes).toContain("Financial Membership");
   });
 
   it("Governance category has 3 leadership/election documents", () => {
@@ -230,22 +230,21 @@ describe("IA-3: document type categories", () => {
     expect(gov.documentTypes).toContain("Secret Ballots");
   });
 
-  it("Oversight category has 3 registrar-produced documents", () => {
+  it("Oversight category has 2 registrar-produced documents", () => {
     const oversight = DOCUMENT_TYPE_CATEGORIES.find((c) => c.label === "Oversight")!;
-    expect(oversight.documentTypes).toHaveLength(3);
+    expect(oversight.documentTypes).toHaveLength(2);
     expect(oversight.documentTypes).toContain("Inspection Reports");
-    expect(oversight.documentTypes).toContain("Awards");
   });
 
   it("groupDocumentTypesByCategory groups a flat list + omits empty categories", () => {
-    const input = ["Constitution", "Financial Return", "Awards", "Unknown Type"];
+    const input = ["Rules & Constitution", "Financial Returns", "General Matters", "Unknown Type"];
     const grouped = groupDocumentTypesByCategory(input);
-    // Constitution → Registration
-    expect(grouped.find((c) => c.label === "Registration")?.documentTypes).toEqual(["Constitution"]);
-    // Financial Return → Annual Filings
-    expect(grouped.find((c) => c.label === "Annual Filings")?.documentTypes).toEqual(["Financial Return"]);
-    // Awards → Oversight
-    expect(grouped.find((c) => c.label === "Oversight")?.documentTypes).toEqual(["Awards"]);
+    // Rules & Constitution → Registration
+    expect(grouped.find((c) => c.label === "Registration")?.documentTypes).toEqual(["Rules & Constitution"]);
+    // Financial Returns → Annual Filings
+    expect(grouped.find((c) => c.label === "Annual Filings")?.documentTypes).toEqual(["Financial Returns"]);
+    // General Matters → Oversight
+    expect(grouped.find((c) => c.label === "Oversight")?.documentTypes).toEqual(["General Matters"]);
     // Unknown Type → Other
     expect(grouped.find((c) => c.label === "Other")?.documentTypes).toEqual(["Unknown Type"]);
     // Governance has zero matching types → omitted
@@ -261,16 +260,15 @@ describe("IA-3: document type categories", () => {
     const input = [
       "Application for Registration",
       "Registration Certificate",
-      "Constitution",
-      "Financial Return",
-      "Financial Membership List",
+      "Rules & Constitution",
+      "Financial Returns",
+      "Financial Membership",
       "Affiliations",
-      "Welfare Fund",
+      "Welfare Funds",
       "Election of Office Bearers",
       "Secret Ballots",
-      "General Secretary Appointments",
+      "General Secretary's Appointments",
       "Inspection Reports",
-      "Awards",
       "General Matters",
     ];
     const grouped = groupDocumentTypesByCategory(input);

@@ -132,7 +132,7 @@ const ROLE_GUIDES: Record<UserRole, RoleGuide> = {
       {
         icon: FileText,
         title: "Upload a document",
-        description: "Upload a new version of a document (e.g. Financial Return, Constitution) for your assigned union.",
+        description: "Upload a new version of a document (e.g. Financial Returns, Rules & Constitution) for your assigned union.",
         view: "my-union",
       },
       {

@@ -146,7 +146,7 @@ Permanent — rarely re-filed after initial registration.
 - **Overdue:** Not applicable (permanent).
 - **Missing:** No certificate is on file — the union's registration may be incomplete.
 
-#### Constitution
+#### Rules & Constitution
 - **What it is:** The union's governing rules. Sets out how the union is run, how office bearers are elected, and how decisions are made.
 - **Who files it:** The union. Reviewed by the Industrial Registrar.
 - **How often:** Once (renewal period = 99 years, treated as permanent). A new version is filed if the constitution is amended.
@@ -160,7 +160,7 @@ Permanent — rarely re-filed after initial registration.
 Documents filed on a yearly cycle. Must be renewed each year to stay
 compliant.
 
-#### Financial Return
+#### Financial Returns
 - **What it is:** The union's annual financial return. Shows income, expenses, assets, and liabilities.
 - **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
 - **How often:** Annually (renewal period = 1 year).
@@ -169,7 +169,7 @@ compliant.
 - **Overdue:** Filed + approved, but the renewal date has passed (the return is now late).
 - **Missing:** No financial return is on file for this period.
 
-#### Financial Membership List
+#### Financial Membership
 - **What it is:** The current list of financial members of the union.
 - **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
 - **How often:** Annually (renewal period = 1 year).
@@ -187,7 +187,7 @@ compliant.
 - **Overdue:** Filed + approved, renewal date has passed.
 - **Missing:** No affiliations record is on file for this period.
 
-#### Welfare Fund
+#### Welfare Funds
 - **What it is:** Records of the union's welfare fund (a fund that provides benefits to members in need).
 - **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
 - **How often:** Annually (renewal period = 1 year).
@@ -219,7 +219,7 @@ governance. Renewed every 3 years.
 - **Overdue:** Filed + approved, renewal date has passed.
 - **Missing:** No secret ballot records are on file for this period.
 
-#### General Secretary Appointments
+#### General Secretary's Appointments
 - **What it is:** Records of the appointment of the union's General Secretary.
 - **Who files it:** The union (Union Official). Reviewed by the Industrial Registrar.
 - **How often:** Every 3 years (renewal period = 3 years).
@@ -242,7 +242,6 @@ oversight of the union. Renewed annually.
 - **Overdue:** Filed + approved, renewal date has passed (an inspection is overdue).
 - **Missing:** No inspection report is on file for this period.
 
-#### Awards
 - **What it is:** Any industrial awards or agreements the union is a party to.
 - **Who files it:** May be filed by either the union or the Industrial Registrar. Reviewed by the Industrial Registrar.
 - **How often:** Every 3 years (renewal period = 3 years).
@@ -266,7 +265,7 @@ oversight of the union. Renewed annually.
 
 Retention is the rule that says how long a document must be kept
 **after it has been superseded or expired**. For example, a
-Financial Return filed in 2020 that was renewed in 2021 becomes
+Financial Returns filed in 2020 that was renewed in 2021 becomes
 "historical" — but the 2020 record cannot just be deleted. Retention
 rules say how long it must be kept before disposal.
 

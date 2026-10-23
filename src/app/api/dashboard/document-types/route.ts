@@ -12,9 +12,9 @@ import { buildDocumentTypesWhere, getDocumentTypesScope } from "@/lib/dashboard/
 //
 // Returns:
 //   {
-//     documentTypes: [{ documentType: "Constitution", count: 4 }, ...],
+//     documentTypes: [{ documentType: "Rules & Constitution", count: 4 }, ...],
 //     total: 21,
-//     requiredTypes: ["Constitution", "Financial Return", ...],  // from ComplianceRule
+//     requiredTypes: ["Rules & Constitution", "Financial Returns", ...],  // from ComplianceRule
 //     totalUnions: 6,
 //   }
 //

@@ -311,7 +311,7 @@ export const CONTENT_DEFINITIONS = {
     title: "Annual Filings",
     body:
       "Documents filed on a yearly cycle. Must be renewed each year to stay compliant. " +
-      "Includes: Financial Return, Financial Membership List, Affiliations, Welfare Fund.",
+      "Includes: Financial Returns, Financial Membership, Affiliations, Welfare Fund.",
   },
   "document-category.governance": {
     title: "Governance",
@@ -323,7 +323,7 @@ export const CONTENT_DEFINITIONS = {
     title: "Oversight",
     body:
       "Documents produced by the Industrial Registrar's office during oversight of the union. Renewed annually. " +
-      "Includes: Inspection Reports, Awards, General Matters.",
+      "Includes: Inspection Reports, General Matters.",
   },
 
   // --- Document types (the kinds of records a union must file) ---
@@ -343,21 +343,21 @@ export const CONTENT_DEFINITIONS = {
       "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.constitution": {
-    title: "Constitution",
+    title: "Rules & Constitution",
     body:
       "The union's governing rules. Sets out how the union is run, how office bearers are elected, and how decisions are made. " +
       "Permanent (renewal period = 99 years). A new version is filed if the constitution is amended. " +
       "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.financial-return": {
-    title: "Financial Return",
+    title: "Financial Returns",
     body:
       "The union's annual financial return. Shows income, expenses, assets, and liabilities. " +
       "Renewed annually (1 year). " +
       "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.financial-membership-list": {
-    title: "Financial Membership List",
+    title: "Financial Membership",
     body:
       "The current list of financial members of the union. " +
       "Renewed annually (1 year). " +
@@ -371,7 +371,7 @@ export const CONTENT_DEFINITIONS = {
       "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.welfare-fund": {
-    title: "Welfare Fund",
+    title: "Welfare Funds",
     body:
       "Records of the union's welfare fund (a fund that provides benefits to members in need). " +
       "Renewed annually (1 year). " +
@@ -392,7 +392,7 @@ export const CONTENT_DEFINITIONS = {
       "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.general-secretary-appointments": {
-    title: "General Secretary Appointments",
+    title: "General Secretary's Appointments",
     body:
       "Records of the appointment of the union's General Secretary. " +
       "Renewed every 3 years. " +
@@ -403,13 +403,6 @@ export const CONTENT_DEFINITIONS = {
     body:
       "Reports produced by the Industrial Registrar after inspecting the union's records, finances, or operations. " +
       "The union does not produce this document. Renewed annually (1 year). " +
-      "DRAFT: needs Industrial Registrar review.",
-  },
-  "document-type.awards": {
-    title: "Awards",
-    body:
-      "Any industrial awards or agreements the union is a party to. " +
-      "Renewed every 3 years. " +
       "DRAFT: needs Industrial Registrar review.",
   },
   "document-type.general-matters": {

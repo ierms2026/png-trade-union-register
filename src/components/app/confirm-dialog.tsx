@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils";
 //     description="This action is irreversible. The document will be permanently marked as disposed."
 //     confirmLabel="Confirm Disposal"
 //     destructive
-//     requireText="Constitution"
+//     requireText="Rules & Constitution"
 //     onConfirm={async () => { await dispose(docId); }}
 //   />
 // =============================================================================

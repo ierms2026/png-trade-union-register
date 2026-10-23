@@ -19,7 +19,7 @@ import { getUnionScope } from "@/lib/auth/union-scope";
 // FILTERS:
 //   ?union=ID           — restrict to a specific union (by union ID)
 //   ?documentType=X     — restrict to a specific document type (e.g.
-//                         "Constitution", "Financial Return")
+//                         "Rules & Constitution", "Financial Returns")
 //   ?reviewStatus=Y     — restrict to a review status (PENDING / APPROVED /
 //                         REJECTED). Case-insensitive.
 //   ?startDate=YYYY-MM-DD — restrict to versions uploaded on/after this date

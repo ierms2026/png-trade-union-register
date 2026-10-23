@@ -50,16 +50,15 @@ const RULES: RuleSeed[] = [
   { documentType: "General Matters", required: true, renewalYears: 1, retentionYrs: 5, rationale: "Routine correspondence, annual check." },
   { documentType: "Application for Registration", required: true, renewalYears: 99, retentionYrs: 99, rationale: "One-time, permanent." },
   { documentType: "Registration Certificate", required: true, renewalYears: 99, retentionYrs: 99, rationale: "One-time issuance, permanent." },
-  { documentType: "Constitution", required: true, renewalYears: 99, retentionYrs: 50, rationale: "One-time filing, 50-year retention." },
-  { documentType: "Financial Membership List", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual, 7-year retention." },
+  { documentType: "Rules & Constitution", required: true, renewalYears: 99, retentionYrs: 50, rationale: "One-time filing, 50-year retention." },
+  { documentType: "Financial Membership", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual, 7-year retention." },
   { documentType: "Election of Office Bearers", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Term-based (3yr), 7yr retention." },
   { documentType: "Secret Ballots", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Term-based, 7-year retention." },
-  { documentType: "Financial Return", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual audited, 7-year retention." },
+  { documentType: "Financial Returns", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual audited, 7-year retention." },
   { documentType: "Affiliations", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual declaration, 7-year retention." },
   { documentType: "Inspection Reports", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual, 7-year retention." },
-  { documentType: "General Secretary Appointments", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Term-based, 7yr retention." },
-  { documentType: "Welfare Fund", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual statement, 7-year retention." },
-  { documentType: "Awards", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Industrial awards, 3yr renewal, 7yr retention." },
+  { documentType: "General Secretary's Appointments", required: true, renewalYears: 3, retentionYrs: 7, rationale: "Term-based, 7yr retention." },
+  { documentType: "Welfare Funds", required: true, renewalYears: 1, retentionYrs: 7, rationale: "Annual statement, 7-year retention." },
 ];
 
 async function main() {
