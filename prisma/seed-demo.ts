@@ -56,6 +56,52 @@ interface DemoUser {
   assignedUnionId?: string; // set after unions are created
 }
 
+// =============================================================================
+// All 12 canonical compliance rules — one per document type.
+// These match prisma/seed.ts RULES array exactly. Included in seed-demo so
+// running `npx tsx prisma/seed-demo.ts` creates a fully working demo with
+// all document types active in the compliance matrix.
+// =============================================================================
+const COMPLIANCE_RULES = [
+  { documentType: "General Matters", required: true, renewalYears: 1, retentionYrs: 5, sensitive: false },
+  { documentType: "Application for Registration", required: true, renewalYears: 99, retentionYrs: 99, sensitive: false },
+  { documentType: "Registration Certificate", required: true, renewalYears: 99, retentionYrs: 99, sensitive: false },
+  { documentType: "Rules & Constitution", required: true, renewalYears: 99, retentionYrs: 50, sensitive: false },
+  { documentType: "Financial Membership", required: true, renewalYears: 1, retentionYrs: 7, sensitive: true },
+  { documentType: "Election of Office Bearers", required: true, renewalYears: 3, retentionYrs: 7, sensitive: false },
+  { documentType: "Secret Ballots", required: true, renewalYears: 3, retentionYrs: 7, sensitive: false },
+  { documentType: "Financial Returns", required: true, renewalYears: 1, retentionYrs: 7, sensitive: true },
+  { documentType: "Affiliations", required: true, renewalYears: 1, retentionYrs: 7, sensitive: false },
+  { documentType: "Inspection Reports", required: true, renewalYears: 1, retentionYrs: 7, sensitive: false },
+  { documentType: "General Secretary's Appointments", required: true, renewalYears: 3, retentionYrs: 7, sensitive: false },
+  { documentType: "Welfare Funds", required: true, renewalYears: 1, retentionYrs: 7, sensitive: true },
+];
+
+async function seedComplianceRules() {
+  console.log("\nSeeding compliance rules (12 document types)...");
+  for (const rule of COMPLIANCE_RULES) {
+    await db.complianceRule.upsert({
+      where: { documentType: rule.documentType },
+      create: {
+        documentType: rule.documentType,
+        required: rule.required,
+        renewalYears: rule.renewalYears,
+        retentionYrs: rule.retentionYrs,
+        sensitive: rule.sensitive,
+      },
+      update: {
+        required: rule.required,
+        renewalYears: rule.renewalYears,
+        retentionYrs: rule.retentionYrs,
+        sensitive: rule.sensitive,
+      },
+    });
+    console.log(`  ✓ ${rule.documentType} (renewal=${rule.renewalYears}y, retention=${rule.retentionYrs}y${rule.sensitive ? ", sensitive" : ""})`);
+  }
+  const count = await db.complianceRule.count();
+  console.log(`  ${count} compliance rules in DB.`);
+}
+
 async function seedUsers() {
   console.log("\nSeeding demo users...");
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
@@ -543,6 +589,7 @@ async function seedTasks(userIdByEmail: Record<string, string>, unionIdByName: R
 async function main() {
   console.log("=== Seeding demo data ===");
 
+  await seedComplianceRules();
   const userIdByEmail = await seedUsers();
   const unionIdByName = await seedUnions();
   await assignOfficer(userIdByEmail, unionIdByName);
